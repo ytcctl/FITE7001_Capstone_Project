@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en-HK">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>TokenHub — Tokenizing HKSTP Startups | HKU FTDA FYP</title>
+  <meta name="description" content="HKU FTDA Final-Year Project: TokenHub — a permissioned blockchain platform integrated with HKSTP to issue compliant security tokens for fractional startup equity and enable atomic DvP settlement." />
+
+  <style>
+    :root{
+      /* Light mode (forced) */
+      --bg: #f7f9ff;
+      --panel: rgba(255,255,255,.78);
+      --panel2: rgba(255,255,255,.92);
+      --text: rgba(14, 24, 45, .92);
+      --muted: rgba(14, 24, 45, .72);
+      --faint: rgba(14, 24, 45, .56);
+      --border: rgba(14, 24, 45, .14);
+      --shadow: 0 12px 30px rgba(14, 24, 45, .10);
+
+      --accent: #1f62ff;
+      --accent2: #6a3bff;
+      --good: #0f9d6a;
+      --warn: #b56a00;
+      --bad: #d6284a;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      --maxw: 1100px;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(900px 500px at 20% -10%, rgba(31, 98, 255, .12), transparent 60%),
+        radial-gradient(700px 420px at 85% 0%, rgba(106, 59, 255, .10), transparent 55%),
+        radial-gradient(800px 520px at 40% 110%, rgba(15, 157, 106, .08), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    a{ color: inherit; text-decoration: none; }
+    a.uline{ text-decoration: underline; text-underline-offset: 2px; }
+    a.uline:hover{ opacity: .9; }
+
+    .wrap{ max-width: var(--maxw); margin: 0 auto; padding: 18px 18px 70px; }
+
+    /* Top notice */
+    .notice{
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: linear-gradient(135deg, rgba(31,98,255,.14), rgba(106,59,255,.08));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+    .badge{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.75);
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .badge strong{ color: var(--text); font-weight: 650; }
+    .notice p{ margin: 0; color: var(--muted); font-size: 13px; }
+
+    /* Navbar */
+    .nav{
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      background: rgba(247, 249, 255, .82);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner{
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 180px;
+    }
+   .logo{
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(to right, var(--accent), var(--accent2));
+      box-shadow: 0 4px 15px rgba(147, 51, 234, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo::after {
+      content: "✨";
+      font-size: 20px;
+    }
+
+    .brand-title{ display: grid; line-height: 1.1; }
+    .brand-title span:nth-child(1){
+      font-weight: 720;
+      letter-spacing: .2px;
+      font-size: 14px;
+    }
+    .brand-title span:nth-child(2){
+      font-size: 12px; color: var(--muted);
+    }
+
+    .nav-links{
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    .nav-links a{
+      font-size: 13px;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+    }
+    .nav-links a:hover{
+      color: var(--text);
+      border-color: var(--border);
+      background: rgba(255,255,255,.65);
+    }
+    .nav-links a[aria-current="true"]{
+      color: var(--text);
+      border-color: rgba(31,98,255,.28);
+      background: rgba(31,98,255,.10);
+    }
+
+    .nav-toggle{
+      display: none;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.75);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+    .nav-toggle:focus{ outline: 3px solid rgba(31,98,255,.25); outline-offset: 2px; }
+
+    @media (max-width: 820px){
+      .nav-links{ display: none; width: 100%; }
+      .nav-links.open{
+        display: flex;
+        justify-content: flex-start;
+        padding-top: 10px;
+      }
+      .nav-inner{ flex-wrap: wrap; }
+      .nav-toggle{ display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+    }
+
+    /* Hero */
+    .hero{
+      padding: 22px 0 10px;
+      display: grid;
+      gap: 16px;
+    }
+    .hero-grid{
+      display: grid;
+      grid-template-columns: 1.3fr .7fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+    @media (max-width: 980px){
+      .hero-grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card.pad{ padding: 18px; }
+    .hero h1{
+      margin: 0;
+      font-size: clamp(26px, 3.2vw, 40px);
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .subtitle{
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      max-width: 72ch;
+    }
+    .chips{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .chip{
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,255,255,.70);
+    }
+    .cta{
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.78);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .btn.primary{
+      border-color: rgba(31,98,255,.35);
+      background: linear-gradient(135deg, rgba(31,98,255,.14), rgba(106,59,255,.10));
+    }
+    .btn:hover{ transform: translateY(-1px); }
+    .btn:active{ transform: translateY(0px); }
+    .btn:focus{ outline: 3px solid rgba(31,98,255,.25); outline-offset: 2px; }
+
+    .side-metrics{
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+    }
+    .metric{
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.78);
+    }
+    .metric .k{
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .metric .v{
+      font-size: 16px;
+      font-weight: 760;
+      letter-spacing: .2px;
+    }
+    .metric .s{
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .mono{ font-family: var(--mono); }
+
+    /* Sections */
+    section{ margin-top: 18px; scroll-margin-top: 78px; }
+    .section-title{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .section-title h2{
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -.01em;
+    }
+    .section-title p{
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid-2{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    @media (max-width: 900px){
+      .grid-2, .grid-3{ grid-template-columns: 1fr; }
+    }
+
+    .bullets{ margin: 10px 0 0; padding-left: 18px; color: var(--muted); }
+    .bullets li{ margin: 6px 0; }
+    .callout{
+      border-left: 3px solid rgba(31,98,255,.55);
+      padding: 10px 12px;
+      background: rgba(31,98,255,.08);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .callout strong{ color: var(--text); }
+
+    /* Legend */
+    .legend{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .legend-item{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,255,255,.78);
+      white-space: nowrap;
+    }
+    .swatch{
+      width: 12px; height: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: rgba(14,24,45,.06);
+    }
+    .swatch.green{ background: rgba(15,157,106,.28); border-color: rgba(15,157,106,.35); }
+    .swatch.blue{ background: rgba(31,98,255,.20); border-color: rgba(31,98,255,.30); }
+    .swatch.yellow{ background: rgba(181,106,0,.22); border-color: rgba(181,106,0,.28); }
+    .swatch.milestone{
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      transform: rotate(45deg);
+      background: rgba(14,24,45,.18);
+      border-color: rgba(14,24,45,.22);
+    }
+
+    /* Tables */
+    table{
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.82);
+    }
+    th, td{
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 13px;
+    }
+    th{
+      text-align: left;
+      color: var(--text);
+      background: rgba(14,24,45,.04);
+      font-weight: 720;
+    }
+    td{ color: var(--muted); }
+    tr:last-child td{ border-bottom: none; }
+    .small{ font-size: 12px; color: var(--muted); }
+
+    /* Steps */
+    .steps{ display: grid; gap: 10px; margin-top: 10px; }
+    .step{
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.78);
+    }
+    .dot{
+      width: 26px; height: 26px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 12px;
+      color: var(--text);
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(31,98,255,.16), rgba(106,59,255,.10));
+    }
+    .step h4{ margin: 0; font-size: 13px; letter-spacing: .1px; }
+    .step p{ margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+    /* Details/accordion */
+    details{
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.78);
+      overflow: hidden;
+    }
+    details > summary{
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      font-weight: 720;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: rgba(14,24,45,.03);
+    }
+    details > summary::-webkit-details-marker{ display: none; }
+    details > summary .hint{ font-weight: 600; color: var(--muted); font-size: 12px; }
+    details .content{ padding: 14px 16px; }
+
+    /* WBS controls */
+    .controls{
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0 12px;
+    }
+    @media (max-width: 700px){
+      .controls{ grid-template-columns: 1fr; }
+    }
+    .input{
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.86);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .input::placeholder{ color: rgba(14,24,45,.45); }
+    .pillrow{ display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    @media (max-width: 700px){
+      .pillrow{ justify-content: flex-start; }
+    }
+    .pill{
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.78);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .pill strong{ color: var(--text); }
+
+    /* Footer */
+    footer{
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .footer-grid{
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+    }
+    @media (max-width: 900px){
+      .footer-grid{ grid-template-columns: 1fr; }
+    }
+    .kbd{
+      font-family: var(--mono);
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.78);
+      color: var(--muted);
+    }
+
+    /* Print */
+    @media print{
+      .nav, .nav-toggle, .cta, .notice{ display: none !important; }
+      body{ background: white; color: black; }
+      .card{ box-shadow: none; }
+      a{ text-decoration: underline; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="nav" role="navigation" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="brand" href="#top">
+        <div class="logo" aria-hidden="true"></div>
+        <div class="brand-title">
+          <span>TokenHub</span>
+          <span>HKU FTDA 2025-2026 Final-Year Project</span>
+        </div>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks">
+        <span aria-hidden="true">☰</span>
+        <span>Menu</span>
+      </button>
+
+      <div class="nav-links" id="navLinks">
+        <a href="#overview">Overview</a>
+        <a href="#problem">Problem</a>
+        <a href="#solution">Solution</a>
+        <a href="#objectives">Objectives</a>
+        <a href="#workflows">Workflows</a>
+        <a href="#deliverables">Deliverables</a>
+        <a href="#timeline">Timeline</a>
+        <a href="#plan">Work Plan</a>
+        <a href="#team">Team</a>
+      </div>
+    </div>
+  </div>
+
+  <main id="top" class="wrap">
+
+
+    <header class="hero" aria-label="Project header">
+
+        <div class="card pad">
+          <h1>TokenHub: Tokenizing HKSTP Startups</h1>
+          <p >
+            A permissioned blockchain platform concept integrated with the <strong>Hong Kong Science &amp; Technology Parks (HKSTP)</strong> Investment Platform
+            to issue <strong>compliant security tokens</strong> representing <strong>fractional equity</strong> in HKSTP portfolio startups, and to enable
+            <strong>secondary trading</strong> with <strong>atomic Delivery-versus-Payment (DvP)</strong> settlement.
+          </p>
+      </div>
+    </header>
+
+    <section id="overview" aria-label="Overview">
+      <div class="section-title">
+        <h2>1) Overview</h2>
+        
+      </div>
+
+      <div class="grid-1">
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Executive summary</h3>
+          <ul class="bullets">
+            <li>Digitize fundraising workflows using smart contracts to reduce delay and operational friction.</li>
+            <li>Offer <strong>fractional ownership</strong> of HKSTP-backed startups using compliant security tokens.</li>
+            <li>Support a <strong>regulated secondary market</strong> to improve liquidity for investors.</li>
+            <li>Enable <strong>instant / near-instant settlement</strong> through atomic DvP (assets and payment settle together).</li>
+          </ul>
+        </div>
+        <p></p>
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">What makes it “HKSTP-ready”</h3>
+          <ul class="bullets">
+            <li><strong>Institutional maturity:</strong> use HKSTP’s rigorous vetting and ecosystem support.</li>
+            <li><strong>Compliance-first:</strong> permissioned transfer controls + KYC/AML.</li>
+            <li><strong>Investor experience:</strong> a portal for onboarding, wallet management, trading, settlement, and reporting.</li>
+            <li><strong>Auditability:</strong> immutable on-chain events enable cap-table accuracy and reporting automation.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="problem" aria-label="Problem statement">
+      <div class="section-title">
+        <h2>2) Problem &amp; Motivation</h2>
+        
+      </div>
+
+      <div class="grid-1">
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Startup pain points</h3>
+          <ul class="bullets">
+            <li>Extended fundraising timelines (often months).</li>
+            <li>Manual workflows (cap-table updates, subscriptions, reporting).</li>
+            <li>High transaction and operational costs.</li>
+            <li>Slow fund transfer and settlement processes.</li>
+          </ul>
+        </div>
+        <p></p>
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Investor pain points</h3>
+          <ul class="bullets">
+            <li>Limited liquidity in private markets (hard to exit early).</li>
+            <li>Lack of fractional ownership reduces access and flexibility.</li>
+            <li>Restricted access (often limited to accredited/institutional investors).</li>
+            <li>Information asymmetry and sporadic reporting.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="solution" aria-label="Proposed solution">
+      <div class="section-title">
+        <h2>3) Proposed Solution: TokenHub</h2>
+
+      </div>
+
+      <div class="grid-1">
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Token layer</h3>
+          <p class="small">
+            One token per startup, Ethereum-compatible, with compliance-aware transfer logic.
+          </p>
+          <ul class="bullets">
+            <li>Security tokens representing fractional startup equity.</li>
+            <li>ERC-3643 (T-REX) considered for built-in compliance and identity integration.</li>
+            <li>Internal “safe-list” for operational addresses (e.g., treasury/custody/escrow).</li>
+          </ul>
+        </div>
+        <p> </p>
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Compliance &amp; approvals</h3>
+          <p class="small">
+            “Policy off-chain, enforcement on-chain” using per-transaction approvals.
+          </p>
+          <ul class="bullets">
+            <li>KYC/AML.</li>
+            <li>Portal checks suitability, lock-ups, concentration caps, jurisdiction rules.</li>
+            <li>Compliance Service issues one-time signed approval (attestation) bound to each transfer.</li>
+          </ul>
+        </div>
+        <p> </p>
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Trading &amp; settlement</h3>
+          <p class="small">
+            Off-chain matching, on-chain atomic settlement (DvP).
+          </p>
+          <ul class="bullets">
+            <li>Order-book model for secondary trading.</li>
+            <li>Atomic DvP: security token + tokenized cash move in the same transaction.</li>
+            <li>Event-driven reporting: transfers and settlements feed analytics &amp; audit trails.</li>
+          </ul>
+        </div>
+      </div>
+
+      <details style="margin-top:14px;">
+        <summary>
+          <span>Compliance standard comparison</span>
+          <span class="hint">ERC-20 vs ERC-3643 (T-REX)</span>
+        </summary>
+        <div class="content">
+          <table aria-label="ERC-20 vs ERC-3643 comparison">
+            <thead>
+              <tr>
+                <th>Dimension</th>
+                <th>ERC-20</th>
+                <th>ERC-3643 (T-REX)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Transfer control</td>
+                <td>Unrestricted peer-to-peer</td>
+                <td>Permissioned; conditional transfers</td>
+              </tr>
+              <tr>
+                <td>Identity verification</td>
+                <td>None (pseudonymous)</td>
+                <td>Built-in (ONCHAINID)</td>
+              </tr>
+              <tr>
+                <td>Compliance logic</td>
+                <td>Requires off-chain enforcement</td>
+                <td>Embedded in smart contract</td>
+              </tr>
+              <tr>
+                <td>Regulatory compatibility</td>
+                <td>Not suitable for regulated securities</td>
+                <td>Designed for regulated assets</td>
+              </tr>
+              <tr>
+                <td>KYC/AML enforcement</td>
+                <td>Manual, off-chain</td>
+                <td>Automated, on-chain</td>
+              </tr>
+            </tbody>
+          </table>
+         
+        </div>
+      </details>
+    </section>
+
+    <section id="objectives" aria-label="Objectives">
+      <div class="section-title">
+        <h2>4) Objectives &amp; Measures</h2>
+       
+      </div>
+
+      <div class="card pad">
+        <table aria-label="Objectives and measures">
+          <thead>
+            <tr>
+              <th style="width:60px;">#</th>
+              <th>Objective</th>
+              <th>Measures (from plan)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Automated compliance and investor onboarding</td>
+              <td>
+                Tokenized offerings embed rules into smart contracts; real-time KYC/AML verification; investor record updates via blockchain.
+              </td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Lower investment barriers</td>
+              <td>
+                Fractional ownership enables participation with smaller commitments.
+              </td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Broader and faster capital mobilization</td>
+              <td>
+                Reduce reliance on institutional networks by enabling direct investor participation.
+              </td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Instant settlement and fund disbursement</td>
+              <td>
+                Permissioned blockchain + smart contracts enable near-instant transfer and settlement.
+              </td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Lower transaction costs</td>
+              <td>
+                Direct issuance and settlement reduce layers (banks/transfer agents/brokers).
+              </td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>Secondary market activation</td>
+              <td>
+                24/7 secondary trading on a regulated digital platform; improves liquidity before traditional exits.
+              </td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>Secure token management (custody + reporting)</td>
+              <td>
+                Real-time dashboards and automated compliance reports accessible to investors and regulators.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      
+    </section>
+
+    <section id="workflows" aria-label="Workflows">
+      <div class="section-title">
+        <h2>5) End-to-end Workflows (High-level)</h2>
+      </div>
+
+      <div class="grid-2">
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Startup workflow (issuer side)</h3>
+          <div class="steps" aria-label="Startup workflow steps">
+            <div class="step">
+              <div class="dot">1</div>
+              <div>
+                <h4>Onboard &amp; set up tokenization</h4>
+                <p>Startup joins the platform; cap-table and offering parameters are prepared for compliant issuance.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="dot">2</div>
+              <div>
+                <h4>Issue security tokens (fractional equity)</h4>
+                <p>Token contract is deployed/configured per startup; issuance controlled by offering rules.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="dot">3</div>
+              <div>
+                <h4>Fundraising &amp; investor communications</h4>
+                <p>Investors subscribe through the portal; disclosures and updates are published via the dashboard.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="dot">4</div>
+              <div>
+                <h4>Ongoing governance &amp; reporting</h4>
+                <p>On-chain events feed cap-table, audit logs, and regulator-ready reporting workflows.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Investor workflow (buy-side)</h3>
+          <div class="steps" aria-label="Investor workflow steps">
+            <div class="step">
+              <div class="dot">1</div>
+              <div>
+                <h4>SSO + MFA registration</h4>
+                <p>Account access through secure authentication, aligned with portal requirements.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="dot">2</div>
+              <div>
+                <h4>KYC/AML</h4>
+                <p>Identity verification, beneficial ownership checks, sanctions/PEP screening, and risk classification.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="dot">3</div>
+              <div>
+                <h4>Funding &amp; wallet management</h4>
+                <p>Deposit/withdrawal flow (e.g., FPS); wallet creation and portfolio views.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="dot">4</div>
+              <div>
+                <h4>Trading + atomic DvP settlement</h4>
+                <p>Orders matched via order-book; settlement occurs on-chain with atomic asset/payment transfer.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <details style="margin-top:14px;">
+        <summary>
+          <span>KYC/AML capability checklist</span>
+          <span class="hint">CDD + monitoring</span>
+        </summary>
+        <div class="content">
+          <div class="grid-2">
+            <div class="card pad" style="box-shadow:none;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Customer Due Diligence (CDD)</h3>
+              <ul class="bullets">
+                <li>Identity verification with government-issued documents</li>
+                <li>Beneficial ownership determination (for legal entities)</li>
+                <li>Source-of-funds assessment</li>
+                <li>Sanctions and PEP screening (OFAC / UN / EU)</li>
+                <li>Risk-based investor classification</li>
+              </ul>
+            </div>
+            <div class="card pad" style="box-shadow:none;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Ongoing monitoring</h3>
+              <ul class="bullets">
+                <li>Real-time anomaly detection on token transfers</li>
+                <li>Pattern monitoring (e.g., rapid accumulation; profile-inconsistent trading)</li>
+                <li>Threshold-based reporting (example in plan: aggregated daily transfers &gt; HK$500,000)</li>
+                <li>Periodic review of investor risk classification</li>
+              </ul>
+            </div>
+          </div>
+ 
+        </div>
+      </details>
+      <p> </p>
+      <div class="grid-1">
+        <div class="card pad">
+          <figure style="margin:0;">
+            <img
+              id="End_to_End_Workflow"
+              src="img/End_to_End.svg"
+              style="width:100%; height:auto; border-radius:14px; border:1px solid var(--border); background:#ffffff;"
+              loading="lazy"
+            />
+
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="deliverables" aria-label="Deliverables">
+      <div class="section-title">
+        <h2>6) Deliverables</h2>
+      </div>
+
+      <div class="grid-2">
+        
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">A) Token trading marketplace &amp; settlement</h3>
+          <ul class="bullets">
+            <li>Investor portal: onboarding, funding/withdrawals (e.g., FPS), wallet management.</li>
+            <li>Real-time order book trading (off-chain matching).</li>
+            <li>Atomic DvP settlement with tokenized cash (stablecoin / tokenized deposit).</li>
+            <li>Portfolio views, statements, and real-time balance updates.</li>
+          </ul>
+        </div>
+
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">B) Secure token management module</h3>
+          <ul class="bullets">
+            <li>Per-transaction approvals (e.g., signed attestation bound to from/to/amount/expiry/nonce).</li>
+            <li>Internal safe-list for operational movements (treasury/custody/escrow).</li>
+            <li>Multi-sig admin, emergency pause, monitoring, and audit readiness.</li>
+            <li>Runbook &amp; security memo: key ceremonies, rotation, pause procedures.</li>
+             <li>Smart-contract compliance approach (ERC-3643 / permissioned transfers).</li>
+          </ul>
+        </div>
+      </div>
+
+      <details style="margin-top:14px;">
+        <summary>
+          <span>Licensing awareness snapshot</span>
+          <span class="hint">Type 1 / Type 7</span>
+        </summary>
+        <div class="content">
+          <table aria-label="SFC licensing snapshot">
+            <thead>
+              <tr>
+                <th>Licensing type</th>
+                <th>Activity</th>
+                <th>Selected requirements (summary)</th>
+                <th>Capital requirements (as stated)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Type 1 (Dealing in Securities)</td>
+                <td>Marketing, distribution, subscription arrangement</td>
+                <td>License application; fit and proper; responsible officers; external system review</td>
+                <td>HK$5,000,000 paid-up; HK$3,000,000 liquid</td>
+              </tr>
+              <tr>
+                <td>Type 7 (Providing Automated Trading Services)</td>
+                <td>Secondary market trading, order matching, execution</td>
+                <td>License application; surveillance; trading rules; cybersecurity controls</td>
+                <td>HK$5,000,000 paid-up; HK$3,000,000 liquid (or 5% adjusted liabilities)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section id="timeline" aria-label="Schedule and timeline">
+      <div class="section-title">
+        <h2>7) Schedule &amp; Timeline</h2>
+        
+      </div>
+
+      <div class="grid-1">
+        <div class="card pad">
+          <figure style="margin:0;">
+            <img
+              id="timelineImg"
+              src="img/timeline.svg"
+              style="width:100%; height:auto; border-radius:14px; border:1px solid var(--border); background:#ffffff;"
+              loading="lazy"
+            />
+
+          </figure>
+        </div>
+        <p> </p>
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Key milestones (from timeline)</h3>
+          <ul class="bullets">
+            <li><strong>2025-11-17:</strong> Detailed Project Plan Submission</li>
+            <li><strong>2026-03-01:</strong> Project Webpage (milestone)</li>
+            <li><strong>2026-03-01:</strong> Interim Report (milestone)</li>
+            <li><strong>2026-03-01 → 2026-03-31:</strong> Interim Presentation</li>
+            <li><strong>2026-04-01 → 2026-04-15:</strong> System Test</li>
+            <li><strong>2026-04-16 → 2026-04-30:</strong> User Acceptance Test (UAT)</li>
+            <li><strong>2026-05-01:</strong> Project Report (milestone)</li>
+            <li><strong>2026-05-01 → 2026-05-15:</strong> Oral Examination</li>
+          </ul>
+
+        </div>
+      </div>
+
+      <details style="margin-top:14px;">
+        <summary>
+          <span>Timeline tasks (text version)</span>
+          <span class="hint">IDs, names, start &amp; finish</span>
+        </summary>
+        <div class="content">
+          <table aria-label="Timeline tasks table">
+            <thead>
+              <tr>
+                <th style="width:70px;">ID</th>
+                <th>Task Name</th>
+                <th style="min-width:130px;">Start</th>
+                <th style="min-width:130px;">Finish</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">1</td><td>Detailed Project Plan Submission</td><td class="mono">2025-11-17</td><td class="mono">2025-11-17</td></tr>
+              <tr><td class="mono">2</td><td>Start-up company end-to-end workflow / investor end-to-end workflow</td><td class="mono">2025-11-17</td><td class="mono">2025-12-05</td></tr>
+              <tr><td class="mono">3</td><td>Regulatory framework / KYC/ AML</td><td class="mono">2025-11-17</td><td class="mono">2026-02-27</td></tr>
+              <tr><td class="mono">4</td><td>Market research</td><td class="mono">2025-11-17</td><td class="mono">2026-02-27</td></tr>
+              <tr><td class="mono">5</td><td>Safeguard measures for startup companies to protect investors' interest</td><td class="mono">2025-11-17</td><td class="mono">2026-02-27</td></tr>
+              <tr><td class="mono">6</td><td>UI / UX Design</td><td class="mono">2025-11-17</td><td class="mono">2026-02-27</td></tr>
+              <tr><td class="mono">7</td><td>Project Webpage</td><td class="mono">2026-03-01</td><td class="mono">2026-03-01</td></tr>
+              <tr><td class="mono">8</td><td>Interim Report</td><td class="mono">2026-03-01</td><td class="mono">2026-03-01</td></tr>
+              <tr><td class="mono">9</td><td>Interim Presentation</td><td class="mono">2026-03-01</td><td class="mono">2026-03-31</td></tr>
+              <tr><td class="mono">10</td><td>Token Trading Marketplace and Settlement</td><td class="mono">2025-11-17</td><td class="mono">2026-03-31</td></tr>
+              <tr><td class="mono">11</td><td>Secure Token Management Module</td><td class="mono">2025-11-17</td><td class="mono">2026-03-31</td></tr>
+              <tr><td class="mono">12</td><td>System Test</td><td class="mono">2026-04-01</td><td class="mono">2026-04-15</td></tr>
+              <tr><td class="mono">13</td><td>User Acceptance Test (UAT)</td><td class="mono">2026-04-16</td><td class="mono">2026-04-30</td></tr>
+              <tr><td class="mono">14</td><td>Project Report</td><td class="mono">2026-05-01</td><td class="mono">2026-05-01</td></tr>
+              <tr><td class="mono">15</td><td>Oral Examination</td><td class="mono">2026-05-01</td><td class="mono">2026-05-15</td></tr>
+            </tbody>
+          </table>
+          <p class="small" style="margin-top:10px;">
+            Dates above are transcribed from the attached timeline image and displayed in an unambiguous format.
+          </p>
+        </div>
+      </details>
+    </section>
+
+    <section id="plan" aria-label="Work plan and WBS">
+      <div class="section-title">
+        <h2>8) Work Plan &amp; Work Breakdown Structure (WBS)</h2>
+
+      </div>
+
+      <div class="grid-3">
+        <div class="card pad">
+          <div class="metric" style="border:none; background:transparent; padding:0;">
+            <div class="k">Total estimated hours</div>
+            <div class="v"><span id="totalHours2">—</span></div>
+            <div class="s">Across planning, compliance, architecture, portals, trading, settlement, and testing.</div>
+          </div>
+        </div>
+        <div class="card pad">
+          <div class="metric" style="border:none; background:transparent; padding:0;">
+            <div class="k">Number of tasks</div>
+            <div class="v"><span id="taskCount">—</span></div>
+            <div class="s">From the WBS table in the plan.</div>
+          </div>
+        </div>
+        <div class="card pad">
+          <div class="metric" style="border:none; background:transparent; padding:0;">
+            <div class="k">Focus areas</div>
+            <div class="v">Compliance + DvP</div>
+            <div class="s">Compliance automation and atomic settlement are central engineering themes.</div>
+          </div>
+        </div>
+      </div>
+
+      <details style="margin-top:14px;" open>
+        <summary>
+          <span>WBS task list</span>
+        </summary>
+        <div class="content">
+
+
+          <div class="card pad" style="box-shadow:none; margin-bottom:12px;">
+            <h3 style="margin:0 0 6px; font-size:15px;">Category totals</h3>
+            <div id="categoryTotals" class="grid-3" aria-label="Category totals"></div>
+          </div>
+
+          <div style="overflow:auto; border-radius:14px; border:1px solid var(--border);">
+            <table aria-label="Work breakdown table">
+              <thead>
+                <tr>
+                  <th style="min-width:80px;">Task ID</th>
+                  <th style="min-width:220px;">Type</th>
+                  <th style="min-width:280px;">Task Name</th>
+                  <th style="min-width:120px;">Est. Hours</th>
+                </tr>
+              </thead>
+              <tbody id="wbsBody"></tbody>
+            </table>
+          </div>
+
+          
+        </div>
+      </details>
+    </section>
+
+    <section id="team" aria-label="Team and supervision">
+      <div class="section-title">
+        <h2>9) Team &amp; Supervision</h2>
+
+      </div>
+
+      <div class="grid-1">
+        <div class="card pad">
+          <h3 style="margin:0 0 10px; font-size:15px;">Student team</h3>
+          <table aria-label="Team members">
+            <thead>
+              <tr>
+                <th>Student Name</th>
+                <th>Student ID</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Alan Wong Hiu Leung</td>
+                <td>3036384074</td>
+                <td><a class="uline" href="mailto:alanwhkk@connect.hku.hk">alanwhkk@connect.hku.hk</a></td>
+              </tr>
+              <tr>
+                <td>Jacky Kiang Ho Tin <span class="small">(Product Owner)</span></td>
+                <td>3036383460</td>
+                <td><a class="uline" href="mailto:u3638346@connect.hku.hk">u3638346@connect.hku.hk</a></td>
+              </tr>
+              <tr>
+                <td>Kelvin Tam King Yin</td>
+                <td>3036382624</td>
+                <td><a class="uline" href="mailto:u3638262@connect.hku.hk">u3638262@connect.hku.hk</a></td>
+              </tr>
+              <tr>
+                <td>Peter Choi Chi For</td>
+                <td>3036384024</td>
+                <td><a class="uline" href="mailto:u3638402@connect.hku.hk">u3638402@connect.hku.hk</a></td>
+              </tr>
+              <tr>
+                <td>Tiffany Chan Kwun Yu</td>
+                <td>3036383733</td>
+                <td><a class="uline" href="mailto:u3638373@connect.hku.hk">u3638373@connect.hku.hk</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p></p>
+        <div class="card pad">
+          <h3 style="margin:0 0 6px; font-size:15px;">Supervisor</h3>
+          <p style="margin:0; color:var(--muted);">
+            <strong style="color:var(--text);">Dr. Siu Ming Yiu</strong>
+          </p>
+
+          <div style="height:12px;"></div>
+
+      
+        </div>
+      </div>
+    </section>
+
+    <footer aria-label="Footer">
+
+      <p style="margin:14px 0 0;">
+        © HKU FTDA 2025 -2026 Final-Year Project.
+      </p>
+    </footer>
+  </main>
+
+  <script>
+    // ----- Mobile menu toggle -----
+    (function(){
+      const btn = document.getElementById('navToggle');
+      const links = document.getElementById('navLinks');
+      if (!btn || !links) return;
+
+      btn.addEventListener('click', () => {
+        const open = links.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(open));
+      });
+    })();
+
+    // ----- Scrollspy for nav links -----
+    (function(){
+      const nav = document.getElementById('navLinks');
+      if (!nav) return;
+      const anchors = Array.from(nav.querySelectorAll('a[href^="#"]'));
+
+      const sectionIds = anchors
+        .map(a => a.getAttribute('href'))
+        .filter(Boolean)
+        .map(h => h.slice(1));
+
+      const sections = sectionIds
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+
+      function setCurrent(id){
+        anchors.forEach(a => {
+          const isCurrent = a.getAttribute('href') === '#' + id;
+          a.setAttribute('aria-current', isCurrent ? 'true' : 'false');
+        });
+      }
+
+      const io = new IntersectionObserver((entries) => {
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a,b) => (b.intersectionRatio - a.intersectionRatio));
+        if (visible.length) setCurrent(visible[0].target.id);
+      }, { root: null, threshold: [0.2, 0.35, 0.5, 0.65, 0.8] });
+
+      sections.forEach(s => io.observe(s));
+    })();
+
+    // ----- Timeline image missing handler -----
+    (function(){
+      const img = document.getElementById('timelineImg');
+      const warn = document.getElementById('timelineMissing');
+      if (!img || !warn) return;
+      img.addEventListener('error', () => {
+        warn.style.display = 'block';
+      });
+    })();
+
+    // ----- WBS data -----
+    const WBS = [
+      { id: "1.1",  type: "Project Planning & Charter",          name: "Create Detailed Project Plan",                         hours: 50 },
+
+      { id: "2.1",  type: "REGULATORY & COMPLIANCE FRAMEWORK",    name: "Regulatory Analysis & Classification",               hours: 60 },
+      { id: "2.2",  type: "REGULATORY & COMPLIANCE FRAMEWORK",    name: "SFC Type 1/7 Licensing Strategy",                    hours: 45 },
+      { id: "2.4",  type: "REGULATORY & COMPLIANCE FRAMEWORK",    name: "KYC/AML Procedures Manual Development",              hours: 40 },
+      { id: "2.5",  type: "REGULATORY & COMPLIANCE FRAMEWORK",    name: "AMLO Compliance Procedures Documented",              hours: 15 },
+
+      { id: "3",    type: "Research",                              name: "Business Analysis",                                  hours: 150 },
+
+      { id: "4.1",  type: "System Architecture",                   name: "System Design",                                      hours: 21 },
+      { id: "4.2",  type: "System Architecture",                   name: "Component Interaction design",                       hours: 15 },
+
+      { id: "5.1",  type: "SSO & MFA Authentication Module",       name: "SSO Architecture Design",                             hours: 15 },
+      { id: "5.2",  type: "SSO & MFA Authentication Module",       name: "MFA Implementation",                                  hours: 21 },
+
+      { id: "6.1",  type: "Wallet Management Module",              name: "Wallet Management Architecture Design",               hours: 15 },
+      { id: "6.2",  type: "Wallet Management Module",              name: "Wallet Implementation",                               hours: 21 },
+
+      { id: "7.1",  type: "Smart Contract Suite Development",      name: "Token Contract Development",                          hours: 30 },
+      { id: "7.2",  type: "Smart Contract Suite Development",      name: "Compliance Controller Contract Development",          hours: 21 },
+      { id: "7.3",  type: "Smart Contract Suite Development",      name: "ONCHAINID Identity Registry Contract Development",     hours: 21 },
+      { id: "7.4",  type: "Smart Contract Suite Development",      name: "Settlement Token Contract Development",               hours: 30 },
+      { id: "7.5",  type: "Smart Contract Suite Development",      name: "Governance Voting Contract Development",              hours: 21 },
+
+      { id: "8.1",  type: "FPS & Tokenized Deposit Integration",   name: "FPS API Integration Architecture",                    hours: 15 },
+      { id: "8.2",  type: "FPS & Tokenized Deposit Integration",   name: "FPS Payment Gateway Implementation",                  hours: 30 },
+      { id: "8.3",  type: "FPS & Tokenized Deposit Integration",   name: "Settlement Token Minting/Burning Logic",              hours: 21 },
+      { id: "8.4",  type: "FPS & Tokenized Deposit Integration",   name: "Deposit/Withdrawal Workflow Integration",             hours: 21 },
+      { id: "8.5",  type: "FPS & Tokenized Deposit Integration",   name: "FPS Status Tracking & Error Handling",                hours: 15 },
+
+      { id: "9.1",  type: "Investor Portal MVP",                   name: "Portal UX/UI Design",                                 hours: 30 },
+      { id: "9.2",  type: "Investor Portal MVP",                   name: "Dashboard Component Development",                     hours: 30 },
+      { id: "9.3",  type: "Investor Portal MVP",                   name: "Wallet Interface Component",                          hours: 21 },
+      { id: "9.4",  type: "Investor Portal MVP",                   name: "Portfolio View Component",                            hours: 21 },
+      { id: "9.5",  type: "Investor Portal MVP",                   name: "Real-Time Balance Updates",                           hours: 15 },
+      { id: "9.6",  type: "Investor Portal MVP",                   name: "KYC/AML Gateway Architecture Design",                 hours: 15 },
+      { id: "9.7",  type: "Investor Portal MVP",                   name: "Document Verification Service Integration",           hours: 21 },
+      { id: "9.8",  type: "Investor Portal MVP",                   name: "Identity Verification Workflow",                      hours: 21 },
+      { id: "9.9",  type: "Investor Portal MVP",                   name: "Sanctions/PEPs Screening Integration",                hours: 15 },
+
+      { id: "10.1", type: "Startup Portal MVP",                    name: "Startup Portal UX/UI Design",                         hours: 21 },
+      { id: "10.2", type: "Startup Portal MVP",                    name: "Cap Table Management Components",                     hours: 30 },
+      { id: "10.3", type: "Startup Portal MVP",                    name: "Financial Disclosure Components",                     hours: 21 },
+      { id: "10.4", type: "Startup Portal MVP",                    name: "Investor Communication Components",                   hours: 15 },
+      { id: "10.5", type: "Startup Portal MVP",                    name: "Backend Cap Table Management API",                    hours: 30 },
+      { id: "10.6", type: "Startup Portal MVP",                    name: "Backend Financial Reporting API",                     hours: 21 },
+
+      { id: "11.1", type: "Order Book & Trading Engine",           name: "Order Matching Algorithm Design",                     hours: 21 },
+      { id: "11.2", type: "Order Book & Trading Engine",           name: "Order Book Data Structure Implementation",            hours: 21 },
+      { id: "11.3", type: "Order Book & Trading Engine",           name: "Price-Time Priority Matching Engine",                 hours: 21 },
+      { id: "11.4", type: "Order Book & Trading Engine",           name: "Real-Time Order Book API",                            hours: 30 },
+      { id: "11.5", type: "Order Book & Trading Engine",           name: "Order Management & Lifecycle",                        hours: 15 },
+
+      { id: "12.1", type: "DvP Settlement Smart Contract & Integration", name: "DvP Settlement Contract Development",          hours: 30 },
+      { id: "12.2", type: "DvP Settlement Smart Contract & Integration", name: "Atomic Execution Logic Implementation",       hours: 21 },
+      { id: "12.3", type: "DvP Settlement Smart Contract & Integration", name: "Per-Transaction Approval Verification",      hours: 21 },
+      { id: "12.4", type: "DvP Settlement Smart Contract & Integration", name: "DvP Settlement Contract Testing",            hours: 30 },
+      { id: "12.5", type: "DvP Settlement Smart Contract & Integration", name: "DvP Integration with Trading Engine",        hours: 21 },
+
+      { id: "13.1", type: "Trading Platform",                      name: "Trading Platform UX/UI Design",                       hours: 30 },
+      { id: "13.2", type: "Trading Platform",                      name: "Order Entry Components",                              hours: 21 },
+      { id: "13.3", type: "Trading Platform",                      name: "Order Book Display Components",                       hours: 21 },
+
+      { id: "14.1", type: "Security & Access Control",             name: "Security Group & IAM Policy Setup",                   hours: 21 },
+      { id: "14.2", type: "Security & Access Control",             name: "TLS/SSL Certificate Management",                      hours: 15 },
+      { id: "14.3", type: "Security & Access Control",             name: "DDoS Protection",                                     hours: 21 },
+      { id: "14.4", type: "Security & Access Control",             name: "Web Application Firewall (WAF) Setup",                hours: 15 },
+      { id: "14.5", type: "Security & Access Control",             name: "Blockchain Node Monitoring",                          hours: 15 },
+
+      { id: "15.1", type: "Testing",                               name: "System Test",                                         hours: 80 },
+      { id: "15.2", type: "Testing",                               name: "UAT Test",                                            hours: 80 }
+    ];
+
+    function sumHours(list){ return list.reduce((acc, t) => acc + (Number(t.hours) || 0), 0); }
+    function fmtInt(n){ return (Number(n) || 0).toLocaleString("en-HK"); }
+
+    // ----- Render WBS -----
+    (function(){
+      const body = document.getElementById('wbsBody');
+      const filter = document.getElementById('wbsFilter');
+      const shownCount = document.getElementById('shownCount');
+      const shownHours = document.getElementById('shownHours');
+      const totalHours = sumHours(WBS);
+
+      // totals in hero
+      const totalHoursEl = document.getElementById('totalHours');
+      const totalHoursEl2 = document.getElementById('totalHours2');
+      const taskCountEl = document.getElementById('taskCount');
+      if (totalHoursEl) totalHoursEl.textContent = fmtInt(totalHours);
+      if (totalHoursEl2) totalHoursEl2.textContent = fmtInt(totalHours);
+      if (taskCountEl) taskCountEl.textContent = fmtInt(WBS.length);
+
+      function renderRows(list){
+        if (!body) return;
+        body.innerHTML = list.map(t => `
+          <tr>
+            <td class="mono">${escapeHtml(t.id)}</td>
+            <td>${escapeHtml(t.type)}</td>
+            <td>${escapeHtml(t.name)}</td>
+            <td class="mono">${fmtInt(t.hours)}</td>
+          </tr>
+        `).join("");
+
+        if (shownCount) shownCount.textContent = fmtInt(list.length);
+        if (shownHours) shownHours.textContent = fmtInt(sumHours(list));
+      }
+
+      function renderCategoryTotals(list){
+        const el = document.getElementById('categoryTotals');
+        if (!el) return;
+
+        const map = new Map();
+        for (const t of list){
+          map.set(t.type, (map.get(t.type) || 0) + t.hours);
+        }
+        const entries = Array.from(map.entries()).sort((a,b) => b[1] - a[1]);
+
+        el.innerHTML = entries.map(([type, hrs]) => `
+          <div class="metric">
+            <div class="k">${escapeHtml(type)}</div>
+            <div class="v">${fmtInt(hrs)} <span class="small">hrs</span></div>
+            <div class="s">${Math.round((hrs / totalHours) * 100)}% of total effort</div>
+          </div>
+        `).join("");
+      }
+
+      function applyFilter(){
+        const q = (filter?.value || "").trim().toLowerCase();
+        const list = !q ? WBS : WBS.filter(t => (
+          String(t.id).toLowerCase().includes(q) ||
+          String(t.type).toLowerCase().includes(q) ||
+          String(t.name).toLowerCase().includes(q)
+        ));
+        renderRows(list);
+        renderCategoryTotals(list);
+      }
+
+      // Basic HTML escape to keep rendering safe even if edited
+      function escapeHtml(str){
+        return String(str)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      renderRows(WBS);
+      renderCategoryTotals(WBS);
+
+      if (filter){
+        filter.addEventListener('input', applyFilter);
+      }
+
+      // Keyboard shortcut: "/" focuses search when visible
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && filter){
+          const active = document.activeElement;
+          const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+          if (!typing){
+            e.preventDefault();
+            filter.focus();
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
