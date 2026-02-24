@@ -297,6 +297,7 @@
       font-size: 13px;
     }
 
+    .grid-1{ display: grid; gap: 14px; }
     .grid-2{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid-3{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
     @media (max-width: 900px){
@@ -461,6 +462,15 @@
     }
     .pill strong{ color: var(--text); }
 
+    /* Global Controls */
+    .global-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+
     /* Footer */
     footer{
       margin-top: 22px;
@@ -490,7 +500,7 @@
 
     /* Print */
     @media print{
-      .nav, .nav-toggle, .cta, .notice{ display: none !important; }
+      .nav, .nav-toggle, .cta, .notice, .global-controls{ display: none !important; }
       body{ background: white; color: black; }
       .card{ box-shadow: none; }
       a{ text-decoration: underline; }
@@ -520,6 +530,7 @@
         <a href="#solution">Solution</a>
         <a href="#objectives">Objectives</a>
         <a href="#workflows">Workflows</a>
+        <a href="#regulatory">Regulatory</a>
         <a href="#deliverables">Deliverables</a>
         <a href="#timeline">Timeline</a>
         <a href="#plan">Work Plan</a>
@@ -532,7 +543,6 @@
 
 
     <header class="hero" aria-label="Project header">
-
         <div class="card pad">
           <h1>TokenHub: Tokenizing HKSTP Startups</h1>
           <p >
@@ -543,10 +553,14 @@
       </div>
     </header>
 
+    <div class="global-controls">
+      <button id="expandAllBtn" class="btn" style="padding: 6px 14px; font-size: 12px;">Expand All Sections</button>
+      <button id="collapseAllBtn" class="btn" style="padding: 6px 14px; font-size: 12px;">Collapse All</button>
+    </div>
+
     <section id="overview" aria-label="Overview">
       <div class="section-title">
         <h2>1) Overview</h2>
-        
       </div>
 
       <div class="grid-1">
@@ -575,7 +589,6 @@
     <section id="problem" aria-label="Problem statement">
       <div class="section-title">
         <h2>2) Problem &amp; Motivation</h2>
-        
       </div>
 
       <div class="grid-1">
@@ -604,7 +617,6 @@
     <section id="solution" aria-label="Proposed solution">
       <div class="section-title">
         <h2>3) Proposed Solution: TokenHub</h2>
-
       </div>
 
       <div class="grid-1">
@@ -695,7 +707,6 @@
     <section id="objectives" aria-label="Objectives">
       <div class="section-title">
         <h2>4) Objectives &amp; Measures</h2>
-       
       </div>
 
       <div class="card pad">
@@ -760,8 +771,6 @@
           </tbody>
         </table>
       </div>
-
-      
     </section>
 
     <section id="workflows" aria-label="Workflows">
@@ -879,15 +888,98 @@
               style="width:100%; height:auto; border-radius:14px; border:1px solid var(--border); background:#ffffff;"
               loading="lazy"
             />
-
           </figure>
         </div>
       </div>
     </section>
 
+    <section id="regulatory" aria-label="Regulatory Framework">
+      <details style="margin-top:14px; background: rgba(255,255,255,.92);">
+        <summary style="padding: 16px 18px; background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));">
+          <h2 style="margin: 0; font-size: 18px; letter-spacing: -.01em; color: var(--text);">
+            6) Regulatory Framework / KYC / AML
+          </h2>
+          <span class="hint" style="color: var(--accent);">Click to expand ▼</span>
+        </summary>
+        
+        <div class="content">
+          <div class="grid-1">
+            <div class="card pad" style="box-shadow: none;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Legal Characterization of Tokenized HKSTP Startups</h3>
+              <p class="small">
+                Hong Kong's existing legal and regulatory framework, primarily referring to the Securities and Futures Ordinance (Cap. 571) administered by the Securities and Futures Commission (SFC), serves as a foundation for classifying tokenized assets as "securities". The framework adequately accommodates the issuance of tokenized shares in HKSTP startups on our TokenHub platform, where shares are first issued using conventional process under Companies Ordinance then followed by tokenization of beneficial interests in the company shares. This means that tokenization is only treated as a technical representation rather than a new asset class, under the fundamental principle of “same activity, same risk, same rules”.
+              </p>
+              <p class="small">
+                As highlighted in the SFC tokenization circular in November 2023, the “see-through” approach views tokenized securities as traditional securities with a tokenization wrapper.  This has marked a significant shift from the previous statement in March 2019, where the SFC classified security tokens as "complex products" hence they can only be offered to professional investors and the SFC required intermediaries to adopt additional investor protection measures. After taking the new approach, the offerings of tokenized securities fall within the existing framework for regulating securities, preserving the legal rights and obligations despite the securities being represented digitally on distributed ledger. Similarly, all the securities-related activities such as distribution, advising on tokenized private equity remain subject to the intermediaries’ existing code of conduct.
+              </p>
+            </div>
+
+            <div class="card pad" style="box-shadow: none;">
+              <h3 style="margin:0 0 6px; font-size:15px;">SFC Type 1/7/VATP Licensing Strategy for TokenHub</h3>
+              <p class="small">
+                Given the clear legal characterization of tokenized HKSTP startups as “securities” under the SFC’s “see-through” approach, our TokenHub platform requires SFC Type 1 regulated activity (dealing in securities) and Type 7 regulated activity (providing automated trading services) under the Securities and Futures Ordinance (Cap. 571) (SFO). Meanwhile, under the Anti-Money Laundering and Counter-Terrorist Financing Ordinance (Cap. 615) (AMLO), licensing applies to any centralised platforms providing trading services in non-security tokens. Although our platform primarily trades security tokens, the SFC strongly suggests that virtual asset trading platforms apply for licences under both the SFO and AMLO regimes, given the potential evolution of virtual asset’s classification. This dual licensing approach ensures comprehensive coverage for both security-token-focused activities (e.g., issuance and secondary market trading of tokenized HKSTP shares) and any trading with virtual asset features, thereby supporting business continuity and regulatory compliance.
+              </p>
+            </div>
+
+            <div class="card pad" style="box-shadow: none;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Regulatory Analysis on Settlement Finality</h3>
+              <p class="small">
+                Settlement finality as defined under the Clearing and Settlement System Ordinance (Cap. 584), in general term refers to “the discharge of an obligation through the transfer of funds or securities that has become irrevocable and unconditional”. This regime aims to provide statutory protection of the integrity of transfer orders that settled through eligible designated clearing and settlement system (CSS) against reversal, even in insolvency. A designated CSS should fulfil the necessary statutory requirements stated in the Payment Systems and Stored Value Facilities Ordinance (Cap. 584). From the PSSVFO section 4(1), the HKMA is empowered to designate any clearing and settlement systems or retail payment systems. When these systems are in operation in Hong Kong or accepting transfer orders denominated in Hong Kong dollars, they are subject to the HKMA oversight. Furthermore, under section 55 of the PSSVFO, a certificate of finality is deemed to be issued by the CSS designated by the HKMA, ensuring legal irrevocability.
+              </p>
+              <p class="small">
+                However, TokenHub is unlikely to qualify for designation as a CSS under the PSSVFO, given its private nature, limited scale, and focus on trading of tokenized private equity rather than high-volume payment or broad securities settlement systems. Without such designation, on-chain settlements cannot rely on statutory finality protections meaning that “technical finality” achieved on chain will not automatically grant “legal finality”. Instead, TokenHub can achieve contractual finality through agreements embedded in platform terms, token subscription agreements, and smart contract logic. These clauses will explicitly declare on-chain transfers of tokenized beneficial interests as final, irrevocable, and unconditional upon execution, supported by legal advice confirming enforceability under Hong Kong law.
+              </p>
+              <p class="small">
+                Despite contractual agreements, it is essential to address an issue when transactions incurred participant who are entering insolvency proceedings. Under Section 182 of the Companies (Winding Up and Miscellaneous Provisions) Ordinance (Cap. 32), any disposition of the property made after the commencement of the winding up shall void unless the court otherwise orders. This means that a “technical finalized” transaction could still be legally challenged or reversed by the liquidator during insolvency.
+              </p>
+              
+              <div class="callout" style="margin-top:10px;">
+                <strong>Impact on Smart Contract and Architecture Design:</strong>
+                <ul class="bullets">
+                  <li><strong>Defining the Point of Finality:</strong> The smart contract logic shall define settlement finality (or “technical finality”) as the point when a transaction achieves a predefined number of block confirmations (N blocks). To ensure legal alignment, the platform’s terms and conditions will state that only upon reaching N-block confirmations, the transfer of legal and beneficial interests is deemed irrevocable and legally binding between the parties.</li>
+                  <li><strong>“Rectifiable Ledger” Architecture:</strong> To ensure that on-chain transactions compliant with court-ordered reversals (e.g. during insolvency proceedings), the smart contracts shall include a “forcedTransfer()” function that allows a licensed custodian to reallocate tokens in response to a valid order or liquidator’s instruction. With this mechanism the on-chain records to be rectified, such that the records can synchronize with the legal finality determined by the court and remains an accurate “source of truth” to reflects the ownership of the underlying asset (i.e. tokens).</li>
+                  <li><strong>Atomic Settlement - Delivery vs. Payment (DvP):</strong> To reduce settlement risks where one party failing to perform after the counterparty has settled, the platform utilizes an Atomic DvP mechanism.  This mechanism ensures the tokens transfer and payment settlement occur as a single, indivisible transaction. Within the smart contracts, the assets are only transferred when the corresponding payment is verified on-chain simultaneously. If either leg is not performed, the entire transaction is reverted.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="card pad" style="box-shadow: none;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Regulatory Analysis on Custody Arrangements</h3>
+              <p class="small">
+                Unlike purely virtual assets (like Bitcoin), tokenized HKSTP startups are legally characterized as “securities”. Hence, their custody arrangements and transfer must comply with SFC’s regulations. This means that TokenHub cannot simply allow participants to self-custody or transfer their tokens via unmanaged “wallet-to-wallet” approach. Instead, mirroring the traditional public equity markets (such as CCASS framework), client assets need to be held by a licensed custodian with the asset transfers being executed and recorded in centralized ledger.
+              </p>
+              <p class="small">
+                This requirement brings to the consideration that smart contract design need to shift from a “wallet-to-wallet” to a “permissioned custody” model, where transfers are only executed between verified, custodian-managed wallets. Furthermore, the client tokens must be strictly segregated from the intermediary’s own assets to protect investors in the event of intermediary’s insolvency. It is also expected that the intermediaries maintain proper key management and tokens recovery mechanism.
+              </p>
+
+              <div class="callout" style="margin-top:10px;">
+                <strong>Impact on Smart Contract and Architecture Design:</strong>
+                <ul class="bullets">
+                  <li><strong>“Permissioned Custody and Transfer” model:</strong> Instead of a public “transfer()” function, this model requires every transaction being pre-checked against an on-chain identity registry. The token transfer will only execute if both sender’s and receiver’s wallets are within whitelist and associated with verified custodians. If a participant attempts to send tokens to any self-custody wallet, the smart contract will reject such transaction.</li>
+                  <li><strong>Tokens recovery mechanism:</strong> The architecture shall include a “Administrator” role held by the licensed custodian. In case an investor loses key to access to their wallet, after approved by TokenHub platform the custodian can initiate burn of the lost tokens and mint new tokens into another wallet for investor. Such technical clawback mechanism ensures that legal ownership remains despite any technical accidents.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="card pad" style="box-shadow: none; border-top: 1px solid var(--border); border-radius: 0; padding-top: 14px;">
+              <h3 style="margin:0 0 6px; font-size:13px; color: var(--muted);">References &amp; Sources</h3>
+              <ul class="bullets small" style="margin:0;">
+                <li><strong>[1]</strong> Securities and Futures Commission, Circular on Tokenisation of SFC-Authorised Investment Products (2 November 2023)</li>
+                <li><strong>[2]</strong> Securities and Futures Commission, Statement on Security Token Offerings (28 March 2019)</li>
+                <li><strong>[3]</strong> Securities and Futures Commission, Virtual asset trading platform operators (Last update: 16 Jan 2025)</li>
+                <li><strong>[4]</strong> Hong Kong Monetary Authority, EXPLANATORY NOTE ON DESIGNATION AND ISSUANCE OF CERTIFICATE OF FINALITY OF CLEARING AND SETTLEMENT SYSTEMS UNDER THE CLEARING AND SETTLEMENT SYSTEMS ORDINANCE (CAP. 584)</li>
+                <li><strong>[5]</strong> Payment Systems and Stored Value Facilities Ordinance (Cap. 584)</li>
+                <li><strong>[6]</strong> Companies (Winding Up and Miscellaneous Provisions) Ordinance (Cap. 32)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
     <section id="deliverables" aria-label="Deliverables">
       <div class="section-title">
-        <h2>6) Deliverables</h2>
+        <h2>7) Deliverables</h2>
       </div>
 
       <div class="grid-2">
@@ -950,8 +1042,7 @@
 
     <section id="timeline" aria-label="Schedule and timeline">
       <div class="section-title">
-        <h2>7) Schedule &amp; Timeline</h2>
-        
+        <h2>8) Schedule &amp; Timeline</h2>
       </div>
 
       <div class="grid-1">
@@ -963,7 +1054,6 @@
               style="width:100%; height:auto; border-radius:14px; border:1px solid var(--border); background:#ffffff;"
               loading="lazy"
             />
-
           </figure>
         </div>
         <p> </p>
@@ -979,7 +1069,6 @@
             <li><strong>2026-05-01:</strong> Project Report (milestone)</li>
             <li><strong>2026-05-01 → 2026-05-15:</strong> Oral Examination</li>
           </ul>
-
         </div>
       </div>
 
@@ -1025,7 +1114,7 @@
 
     <section id="plan" aria-label="Work plan and WBS">
       <div class="section-title">
-        <h2>8) Work Plan &amp; Work Breakdown Structure (WBS)</h2>
+        <h2>9) Work Plan &amp; Work Breakdown Structure (WBS)</h2>
 
       </div>
 
@@ -1086,7 +1175,7 @@
 
     <section id="team" aria-label="Team and supervision">
       <div class="section-title">
-        <h2>9) Team &amp; Supervision</h2>
+        <h2>10) Team &amp; Supervision</h2>
 
       </div>
 
@@ -1197,6 +1286,25 @@
       sections.forEach(s => io.observe(s));
     })();
 
+    // ----- Expand/Collapse All Buttons -----
+    (function(){
+      const expandAllBtn = document.getElementById('expandAllBtn');
+      const collapseAllBtn = document.getElementById('collapseAllBtn');
+      const allDetails = document.querySelectorAll('details');
+
+      if (expandAllBtn) {
+        expandAllBtn.addEventListener('click', () => {
+          allDetails.forEach(detail => detail.setAttribute('open', 'true'));
+        });
+      }
+
+      if (collapseAllBtn) {
+        collapseAllBtn.addEventListener('click', () => {
+          allDetails.forEach(detail => detail.removeAttribute('open'));
+        });
+      }
+    })();
+
     // ----- Timeline image missing handler -----
     (function(){
       const img = document.getElementById('timelineImg');
@@ -1241,10 +1349,10 @@
       { id: "9.3",  type: "Investor Portal MVP",                   name: "Wallet Interface Component",                          hours: 21 },
       { id: "9.4",  type: "Investor Portal MVP",                   name: "Portfolio View Component",                            hours: 21 },
       { id: "9.5",  type: "Investor Portal MVP",                   name: "Real-Time Balance Updates",                           hours: 15 },
-      { id: "9.6",  type: "Investor Portal MVP",                   name: "KYC/AML Gateway Architecture Design",                 hours: 15 },
-      { id: "9.7",  type: "Investor Portal MVP",                   name: "Document Verification Service Integration",           hours: 21 },
-      { id: "9.8",  type: "Investor Portal MVP",                   name: "Identity Verification Workflow",                      hours: 21 },
-      { id: "9.9",  type: "Investor Portal MVP",                   name: "Sanctions/PEPs Screening Integration",                hours: 15 },
+      { id: "9.6",  type: "Investor MVP",                   name: "KYC/AML Gateway Architecture Design",                 hours: 15 },
+      { id: "9.7",  type: "Investor MVP",                   name: "Document Verification Service Integration",           hours: 21 },
+      { id: "9.8",  type: "Investor MVP",                   name: "Identity Verification Workflow",                      hours: 21 },
+      { id: "9.9",  type: "Investor MVP",                   name: "Sanctions/PEPs Screening Integration",                hours: 15 },
 
       { id: "10.1", type: "Startup Portal MVP",                    name: "Startup Portal UX/UI Design",                         hours: 21 },
       { id: "10.2", type: "Startup Portal MVP",                    name: "Cap Table Management Components",                     hours: 30 },
