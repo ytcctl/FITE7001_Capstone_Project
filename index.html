@@ -530,6 +530,7 @@
         <a href="#solution">Solution</a>
         <a href="#objectives">Objectives</a>
         <a href="#workflows">Workflows</a>
+        <a href="#architecture">Architecture</a>
         <a href="#regulatory">Regulatory</a>
         <a href="#deliverables">Deliverables</a>
         <a href="#timeline">Timeline</a>
@@ -893,11 +894,37 @@
       </div>
     </section>
 
+    <section id="architecture" aria-label="Blockchain Architecture">
+      <details style="margin-top:14px; background: rgba(255,255,255,.92);">
+        <summary style="padding: 16px 18px; background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));">
+          <h2 style="margin: 0; font-size: 18px; letter-spacing: -.01em; color: var(--text);">
+            6) Blockchain Architecture
+          </h2>
+          <span class="hint" style="color: var(--accent);">Click to expand ▼</span>
+        </summary>
+        
+        <div class="content" style="padding: 0; overflow: hidden; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
+          <div style="padding: 14px 18px; background: #fff; border-bottom: 1px solid var(--border);">
+            <p class="small" style="margin: 0;">
+              The detailed Blockchain Architecture diagram, hot vs. cold wallet storage protocols, and technical specifications are embedded below. 
+              <a href="Blockchain_Architecture.html" target="_blank" class="uline" style="color: var(--accent); font-weight: 600; margin-left: 10px;">Open in new tab ↗</a>
+            </p>
+          </div>
+          <iframe 
+            src="Blockchain_Architecture.html" 
+            style="width: 100%; height: 800px; border: none; display: block; background: #ffffff;" 
+            title="Blockchain Architecture Details"
+            loading="lazy">
+          </iframe>
+        </div>
+      </details>
+    </section>
+
     <section id="regulatory" aria-label="Regulatory Framework">
       <details style="margin-top:14px; background: rgba(255,255,255,.92);">
         <summary style="padding: 16px 18px; background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));">
           <h2 style="margin: 0; font-size: 18px; letter-spacing: -.01em; color: var(--text);">
-            6) Regulatory Framework / KYC / AML
+            7) Regulatory Framework / KYC / AML
           </h2>
           <span class="hint" style="color: var(--accent);">Click to expand ▼</span>
         </summary>
@@ -910,7 +937,7 @@
                 Hong Kong's existing legal and regulatory framework, primarily referring to the Securities and Futures Ordinance (Cap. 571) administered by the Securities and Futures Commission (SFC), serves as a foundation for classifying tokenized assets as "securities". The framework adequately accommodates the issuance of tokenized shares in HKSTP startups on our TokenHub platform, where shares are first issued using conventional process under Companies Ordinance then followed by tokenization of beneficial interests in the company shares. This means that tokenization is only treated as a technical representation rather than a new asset class, under the fundamental principle of “same activity, same risk, same rules”.
               </p>
               <p class="small">
-                As highlighted in the SFC tokenization circular in November 2023, the “see-through” approach views tokenized securities as traditional securities with a tokenization wrapper.  This has marked a significant shift from the previous statement in March 2019, where the SFC classified security tokens as "complex products" hence they can only be offered to professional investors and the SFC required intermediaries to adopt additional investor protection measures. After taking the new approach, the offerings of tokenized securities fall within the existing framework for regulating securities, preserving the legal rights and obligations despite the securities being represented digitally on distributed ledger. Similarly, all the securities-related activities such as distribution, advising on tokenized private equity remain subject to the intermediaries’ existing code of conduct.
+                As highlighted in the SFC tokenization circular in November 2023, the “see-through” approach views tokenized securities as traditional securities with a tokenization wrapper. This has marked a significant shift from the previous statement in March 2019, where the SFC classified security tokens as "complex products" hence they can only be offered to professional investors and the SFC required intermediaries to adopt additional investor protection measures. After taking the new approach, the offerings of tokenized securities fall within the existing framework for regulating securities, preserving the legal rights and obligations despite the securities being represented digitally on distributed ledger. Similarly, all the securities-related activities such as distribution, advising on tokenized private equity remain subject to the intermediaries’ existing code of conduct.
               </p>
             </div>
 
@@ -938,7 +965,7 @@
                 <ul class="bullets">
                   <li><strong>Defining the Point of Finality:</strong> The smart contract logic shall define settlement finality (or “technical finality”) as the point when a transaction achieves a predefined number of block confirmations (N blocks). To ensure legal alignment, the platform’s terms and conditions will state that only upon reaching N-block confirmations, the transfer of legal and beneficial interests is deemed irrevocable and legally binding between the parties.</li>
                   <li><strong>“Rectifiable Ledger” Architecture:</strong> To ensure that on-chain transactions compliant with court-ordered reversals (e.g. during insolvency proceedings), the smart contracts shall include a “forcedTransfer()” function that allows a licensed custodian to reallocate tokens in response to a valid order or liquidator’s instruction. With this mechanism the on-chain records to be rectified, such that the records can synchronize with the legal finality determined by the court and remains an accurate “source of truth” to reflects the ownership of the underlying asset (i.e. tokens).</li>
-                  <li><strong>Atomic Settlement - Delivery vs. Payment (DvP):</strong> To reduce settlement risks where one party failing to perform after the counterparty has settled, the platform utilizes an Atomic DvP mechanism.  This mechanism ensures the tokens transfer and payment settlement occur as a single, indivisible transaction. Within the smart contracts, the assets are only transferred when the corresponding payment is verified on-chain simultaneously. If either leg is not performed, the entire transaction is reverted.</li>
+                  <li><strong>Atomic Settlement - Delivery vs. Payment (DvP):</strong> To reduce settlement risks where one party failing to perform after the counterparty has settled, the platform utilizes an Atomic DvP mechanism. This mechanism ensures the tokens transfer and payment settlement occur as a single, indivisible transaction. Within the smart contracts, the assets are only transferred when the corresponding payment is verified on-chain simultaneously. If either leg is not performed, the entire transaction is reverted.</li>
                 </ul>
               </div>
             </div>
@@ -979,7 +1006,7 @@
 
     <section id="deliverables" aria-label="Deliverables">
       <div class="section-title">
-        <h2>7) Deliverables</h2>
+        <h2>8) Deliverables</h2>
       </div>
 
       <div class="grid-2">
@@ -1042,7 +1069,7 @@
 
     <section id="timeline" aria-label="Schedule and timeline">
       <div class="section-title">
-        <h2>8) Schedule &amp; Timeline</h2>
+        <h2>9) Schedule &amp; Timeline</h2>
       </div>
 
       <div class="grid-1">
@@ -1114,8 +1141,7 @@
 
     <section id="plan" aria-label="Work plan and WBS">
       <div class="section-title">
-        <h2>9) Work Plan &amp; Work Breakdown Structure (WBS)</h2>
-
+        <h2>10) Work Plan &amp; Work Breakdown Structure (WBS)</h2>
       </div>
 
       <div class="grid-3">
@@ -1175,8 +1201,7 @@
 
     <section id="team" aria-label="Team and supervision">
       <div class="section-title">
-        <h2>10) Team &amp; Supervision</h2>
-
+        <h2>11) Team &amp; Supervision</h2>
       </div>
 
       <div class="grid-1">
