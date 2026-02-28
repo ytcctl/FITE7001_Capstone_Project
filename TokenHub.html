@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en-HK">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>TokenHub — Tokenizing HKSTP Startups | HKU FTDA FYP</title>
+  <meta name="description" content="HKU FTDA Final-Year Project: TokenHub — a permissioned blockchain platform integrated with HKSTP to issue compliant security tokens." />
+</head>
+<body style="margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:radial-gradient(900px 500px at 20% -10%,rgba(31,98,255,.12),transparent 60%),radial-gradient(700px 420px at 85% 0%,rgba(106,59,255,.10),transparent 55%),radial-gradient(800px 520px at 40% 110%,rgba(15,157,106,.08),transparent 60%),#f7f9ff; color:rgba(14,24,45,.92); line-height:1.6;">
+
+  <!-- ====== NAV ====== -->
+  <div style="position:sticky; top:0; z-index:50; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); background:rgba(247,249,255,.82); border-bottom:1px solid rgba(14,24,45,.14);" role="navigation" aria-label="Primary">
+    <div style="max-width:1100px; margin:0 auto; padding:12px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <a href="#top" style="display:flex; align-items:center; gap:10px; min-width:180px; color:inherit; text-decoration:none;">
+        <div style="width:40px; height:40px; border-radius:12px; background:linear-gradient(to right,#1f62ff,#6a3bff); box-shadow:0 4px 15px rgba(147,51,234,0.4); display:flex; align-items:center; justify-content:center; font-size:20px;" aria-hidden="true">✨</div>
+        <div style="display:grid; line-height:1.1;">
+          <span style="font-weight:720; letter-spacing:.2px; font-size:14px;">TokenHub</span>
+          <span style="font-size:12px; color:rgba(14,24,45,.72);">HKU FTDA 2025-2026 Final-Year Project</span>
+        </div>
+      </a>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:center;">
+        <a href="#overview" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Overview</a>
+        <a href="#problem" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Problem</a>
+        <a href="#solution" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Solution</a>
+        <a href="#objectives" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Objectives</a>
+        <a href="#workflows" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Workflows</a>
+        <a href="#architecture" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Architecture</a>
+        <a href="#regulatory" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Regulatory</a>
+        <a href="#deliverables" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Deliverables</a>
+        <a href="#timeline" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Timeline</a>
+        <a href="#plan" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Work Plan</a>
+        <a href="#team" style="font-size:13px; color:rgba(14,24,45,.72); padding:8px 10px; border-radius:10px; text-decoration:none;">Team</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MAIN ====== -->
+  <main id="top" style="max-width:1100px; margin:0 auto; padding:18px 18px 70px;">
+
+    <!-- HERO -->
+    <header style="padding:22px 0 10px;">
+      <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+        <h1 style="margin:0; font-size:clamp(26px,3.2vw,40px); letter-spacing:-0.02em; line-height:1.15;">TokenHub: Tokenizing HKSTP Startups</h1>
+        <p>
+          A permissioned blockchain platform concept integrated with the <strong>Hong Kong Science &amp; Technology Parks (HKSTP)</strong> Investment Platform
+          to issue <strong>compliant security tokens</strong> representing <strong>fractional equity</strong> in HKSTP portfolio startups, and to enable
+          <strong>secondary trading</strong> with <strong>atomic Delivery-versus-Payment (DvP)</strong> settlement.
+        </p>
+      </div>
+    </header>
+
+    <!-- ====== 1) OVERVIEW ====== -->
+    <section id="overview" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Overview">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">1) Overview</h2>
+      </div>
+      <div style="display:grid; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Executive summary</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Digitize fundraising workflows using smart contracts to reduce delay and operational friction.</li>
+            <li style="margin:6px 0;">Offer <strong>fractional ownership</strong> of HKSTP-backed startups using compliant security tokens.</li>
+            <li style="margin:6px 0;">Support a <strong>regulated secondary market</strong> to improve liquidity for investors.</li>
+            <li style="margin:6px 0;">Enable <strong>instant / near-instant settlement</strong> through atomic DvP (assets and payment settle together).</li>
+          </ul>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">What makes it "HKSTP-ready"</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;"><strong>Institutional maturity:</strong> use HKSTP's rigorous vetting and ecosystem support.</li>
+            <li style="margin:6px 0;"><strong>Compliance-first:</strong> permissioned transfer controls + KYC/AML.</li>
+            <li style="margin:6px 0;"><strong>Investor experience:</strong> a portal for onboarding, wallet management, trading, settlement, and reporting.</li>
+            <li style="margin:6px 0;"><strong>Auditability:</strong> immutable on-chain events enable cap-table accuracy and reporting automation.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== 2) PROBLEM ====== -->
+    <section id="problem" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Problem statement">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">2) Problem &amp; Motivation</h2>
+      </div>
+      <div style="display:grid; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Startup pain points</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Extended fundraising timelines (often months).</li>
+            <li style="margin:6px 0;">Manual workflows (cap-table updates, subscriptions, reporting).</li>
+            <li style="margin:6px 0;">High transaction and operational costs.</li>
+            <li style="margin:6px 0;">Slow fund transfer and settlement processes.</li>
+          </ul>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Investor pain points</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Limited liquidity in private markets (hard to exit early).</li>
+            <li style="margin:6px 0;">Lack of fractional ownership reduces access and flexibility.</li>
+            <li style="margin:6px 0;">Restricted access (often limited to accredited/institutional investors).</li>
+            <li style="margin:6px 0;">Information asymmetry and sporadic reporting.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== 3) SOLUTION ====== -->
+    <section id="solution" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Proposed solution">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">3) Proposed Solution: TokenHub</h2>
+      </div>
+      <div style="display:grid; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Token layer</h3>
+          <p style="font-size:12px; color:rgba(14,24,45,.72);">One token per startup, Ethereum-compatible, with compliance-aware transfer logic.</p>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Security tokens representing fractional startup equity.</li>
+            <li style="margin:6px 0;">ERC-3643 (T-REX) considered for built-in compliance and identity integration.</li>
+            <li style="margin:6px 0;">Internal "safe-list" for operational addresses (e.g., treasury/custody/escrow).</li>
+          </ul>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Compliance &amp; approvals</h3>
+          <p style="font-size:12px; color:rgba(14,24,45,.72);">"Policy off-chain, enforcement on-chain" using per-transaction approvals.</p>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">KYC/AML.</li>
+            <li style="margin:6px 0;">Portal checks suitability, lock-ups, concentration caps, jurisdiction rules.</li>
+            <li style="margin:6px 0;">Compliance Service issues one-time signed approval (attestation) bound to each transfer.</li>
+          </ul>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Trading &amp; settlement</h3>
+          <p style="font-size:12px; color:rgba(14,24,45,.72);">Off-chain matching, on-chain atomic settlement (DvP).</p>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Order-book model for secondary trading.</li>
+            <li style="margin:6px 0;">Atomic DvP: security token + tokenized cash move in the same transaction.</li>
+            <li style="margin:6px 0;">Event-driven reporting: transfers and settlements feed analytics &amp; audit trails.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Compliance comparison -->
+      <details style="margin-top:14px; border:1px solid rgba(14,24,45,.14); border-radius:18px; background:rgba(255,255,255,.78); overflow:hidden;">
+        <summary style="list-style:none; cursor:pointer; padding:14px 16px; font-weight:720; display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(14,24,45,.03);">
+          <span>Compliance standard comparison</span>
+          <span style="font-weight:600; color:rgba(14,24,45,.72); font-size:12px;">ERC-20 vs ERC-3643 (T-REX)</span>
+        </summary>
+        <div style="padding:14px 16px;">
+          <table style="width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82);" aria-label="ERC-20 vs ERC-3643 comparison">
+            <thead>
+              <tr>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Dimension</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">ERC-20</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">ERC-3643 (T-REX)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Transfer control</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Unrestricted peer-to-peer</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Permissioned; conditional transfers</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Identity verification</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">None (pseudonymous)</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Built-in (ONCHAINID)</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Compliance logic</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Requires off-chain enforcement</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Embedded in smart contract</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Regulatory compatibility</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Not suitable for regulated securities</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Designed for regulated assets</td></tr>
+              <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">KYC/AML enforcement</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Manual, off-chain</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Automated, on-chain</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- ====== 4) OBJECTIVES ====== -->
+    <section id="objectives" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Objectives">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">4) Objectives &amp; Measures</h2>
+      </div>
+      <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+        <table style="width:100%; border-collapse:collapse; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82);" aria-label="Objectives and measures">
+          <thead>
+            <tr>
+              <th style="width:60px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">#</th>
+              <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Objective</th>
+              <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Measures (from plan)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Automated compliance and investor onboarding</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Tokenized offerings embed rules into smart contracts; real-time KYC/AML verification; investor record updates via blockchain.</td></tr>
+            <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Lower investment barriers</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Fractional ownership enables participation with smaller commitments.</td></tr>
+            <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Broader and faster capital mobilization</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Reduce reliance on institutional networks by enabling direct investor participation.</td></tr>
+            <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Instant settlement and fund disbursement</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Permissioned blockchain + smart contracts enable near-instant transfer and settlement.</td></tr>
+            <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Lower transaction costs</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Direct issuance and settlement reduce layers (banks/transfer agents/brokers).</td></tr>
+            <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">6</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Secondary market activation</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">24/7 secondary trading on a regulated digital platform; improves liquidity before traditional exits.</td></tr>
+            <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">7</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Secure token management (custody + reporting)</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Real-time dashboards and automated compliance reports accessible to investors and regulators.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ====== 5) WORKFLOWS ====== -->
+    <section id="workflows" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Workflows">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">5) End-to-end Workflows (High-level)</h2>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <!-- Startup workflow -->
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Startup workflow (issuer side)</h3>
+          <div style="display:grid; gap:10px; margin-top:10px;">
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">1</div>
+              <div><h4 style="margin:0; font-size:13px;">Onboard &amp; set up tokenization</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Startup joins the platform; cap-table and offering parameters are prepared for compliant issuance.</p></div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">2</div>
+              <div><h4 style="margin:0; font-size:13px;">Issue security tokens (fractional equity)</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Token contract is deployed/configured per startup; issuance controlled by offering rules.</p></div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">3</div>
+              <div><h4 style="margin:0; font-size:13px;">Fundraising &amp; investor communications</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Investors subscribe through the portal; disclosures and updates are published via the dashboard.</p></div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">4</div>
+              <div><h4 style="margin:0; font-size:13px;">Ongoing governance &amp; reporting</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">On-chain events feed cap-table, audit logs, and regulator-ready reporting workflows.</p></div>
+            </div>
+          </div>
+        </div>
+        <!-- Investor workflow -->
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Investor workflow (buy-side)</h3>
+          <div style="display:grid; gap:10px; margin-top:10px;">
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">1</div>
+              <div><h4 style="margin:0; font-size:13px;">SSO + MFA registration</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Account access through secure authentication, aligned with portal requirements.</p></div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">2</div>
+              <div><h4 style="margin:0; font-size:13px;">KYC/AML</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Identity verification, beneficial ownership checks, sanctions/PEP screening, and risk classification.</p></div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">3</div>
+              <div><h4 style="margin:0; font-size:13px;">Funding &amp; wallet management</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Deposit/withdrawal flow (e.g., FPS); wallet creation and portfolio views.</p></div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);">
+              <div style="width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; border:1px solid rgba(14,24,45,.14); background:linear-gradient(135deg,rgba(31,98,255,.16),rgba(106,59,255,.10));">4</div>
+              <div><h4 style="margin:0; font-size:13px;">Trading + atomic DvP settlement</h4><p style="margin:4px 0 0; color:rgba(14,24,45,.72); font-size:13px;">Orders matched via order-book; settlement occurs on-chain with atomic asset/payment transfer.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KYC checklist -->
+      <details style="margin-top:14px; border:1px solid rgba(14,24,45,.14); border-radius:18px; background:rgba(255,255,255,.78); overflow:hidden;">
+        <summary style="list-style:none; cursor:pointer; padding:14px 16px; font-weight:720; display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(14,24,45,.03);">
+          <span>KYC/AML capability checklist</span>
+          <span style="font-weight:600; color:rgba(14,24,45,.72); font-size:12px;">CDD + monitoring</span>
+        </summary>
+        <div style="padding:14px 16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div style="padding:18px;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Customer Due Diligence (CDD)</h3>
+              <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+                <li style="margin:6px 0;">Identity verification with government-issued documents</li>
+                <li style="margin:6px 0;">Beneficial ownership determination (for legal entities)</li>
+                <li style="margin:6px 0;">Source-of-funds assessment</li>
+                <li style="margin:6px 0;">Sanctions and PEP screening (OFAC / UN / EU)</li>
+                <li style="margin:6px 0;">Risk-based investor classification</li>
+              </ul>
+            </div>
+            <div style="padding:18px;">
+              <h3 style="margin:0 0 6px; font-size:15px;">Ongoing monitoring</h3>
+              <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+                <li style="margin:6px 0;">Real-time anomaly detection on token transfers</li>
+                <li style="margin:6px 0;">Pattern monitoring (e.g., rapid accumulation; profile-inconsistent trading)</li>
+                <li style="margin:6px 0;">Threshold-based reporting (example: aggregated daily transfers &gt; HK$500,000)</li>
+                <li style="margin:6px 0;">Periodic review of investor risk classification</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Workflow image -->
+      <div style="display:grid; gap:14px; margin-top:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <figure style="margin:0;">
+            <img src="https://wp2025.cs.hku.hk/mfp25016/wp-content/uploads/sites/148/End_to_End.png" style="width:100%; height:auto; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:#ffffff;" loading="lazy" alt="End to end workflow diagram" />
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== 6) ARCHITECTURE ====== -->
+    <section id="architecture" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Blockchain Architecture">
+      <details style="margin-top:14px; background:rgba(255,255,255,.92); border:1px solid rgba(14,24,45,.14); border-radius:18px; overflow:hidden;">
+        <summary style="list-style:none; cursor:pointer; padding:16px 18px; background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">6) Blockchain Architecture &amp; Technical Specifications</h2>
+          <span style="font-weight:600; color:#1f62ff; font-size:12px;">Click to expand ▼</span>
+        </summary>
+        <div style="padding:14px 16px;">
+          <div style="padding:18px;">
+
+            <h3 style="margin:18px 0 8px; font-size:16px;">6.1 Cold wallet vs. Hot wallet Management Architecture Design</h3>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.1.1 Custodial Wallet Management Architecture: Hot vs. Cold Storage Protocols</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">To comply with the SFC's updated conduct standards for Virtual Asset Trading Platforms (VATPs) issued on January 16, 2025, TokenHub implements a tiered storage architecture that prioritizes the security of client assets while maintaining operational liquidity.</p>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.1.2 The "98/2" Asset Allocation Requirement</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">TokenHub adheres to the mandatory <strong>98/2 Requirement</strong>, ensuring that at least 98% of client virtual assets are stored in cold storage (offline), with no more than 2% held in hot storage (online) for daily transaction processing.</p>
+
+            <table style="width:100%; border-collapse:collapse; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82); margin-bottom:14px;" aria-label="Wallet tier comparison">
+              <thead>
+                <tr>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Wallet Tier</th>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Connectivity</th>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Storage Ratio</th>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Primary Use Case</th>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Security Control</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><strong>Hot Wallet</strong></td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Always Online</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">&lt; 2%</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Instant withdrawals, FPS/tokenized deposit settlement.</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Real-time monitoring, IP whitelisting, HSM-protected hot keys.</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><strong>Warm Wallet</strong></td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Partially Online</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Transient</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Buffer for rebalancing; daily transactional sweeps.</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Multi-signature (2-of-3) requirement for manual approval of flows.</td></tr>
+                <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);"><strong>Cold Wallet</strong></td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Air-Gapped</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">&gt; 98%</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Deep storage of long-term investor holdings.</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Fully offline private keys, physically secure safe boxes in HK.</td></tr>
+              </tbody>
+            </table>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.1.3 Cold Storage Security Standards</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">TokenHub's cold storage infrastructure incorporates rigorous safeguards to meet the SFC's Expected Standards L and M, and the CryptoCurrency Security Standard (CCSS) Level 3 benchmarks.</p>
+
+            <div style="border-left:3px solid rgba(31,98,255,.55); padding:10px 12px; background:rgba(31,98,255,.08); border-radius:12px; font-size:13px; color:rgba(14,24,45,.72); margin-bottom:14px;">
+              <strong style="color:rgba(14,24,45,.92);">Hardware Security Module (HSM) Certification</strong>
+              <ul style="margin:10px 0 0; padding-left:18px;">
+                <li style="margin:6px 0;"><strong>FIPS 140-2 Level 3+:</strong> The HSM must possess a minimum certification of FIPS 140-2 Level 3, providing high resistance to physical tampering and identity-based authentication.</li>
+                <li style="margin:6px 0;"><strong>Tamper-Active Protection:</strong> For high-value startup tokens, TokenHub utilizes Level 4 HSMs, which detect mechanical, chemical, or environmental attacks and instantly zeroize all sensitive cryptographic parameters before compromise.</li>
+                <li style="margin:6px 0;"><strong>No Smart Contracts:</strong> The cold wallet system is explicitly prohibited from using smart contracts for internal custody logic.</li>
+              </ul>
+            </div>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.1.4 Air-Gapped Signing Workflow</h4>
+            <ul style="margin:10px 0 14px; padding-left:18px; color:rgba(14,24,45,.72);">
+              <li style="margin:6px 0;"><strong>Step 1: Construction:</strong> An unsigned transaction is built on a "watch-only" online terminal.</li>
+              <li style="margin:6px 0;"><strong>Step 2: Unidirectional Transfer:</strong> The unsigned transaction is transferred to the air-gapped device via animated QR codes or a quarantined USB drive.</li>
+              <li style="margin:6px 0;"><strong>Step 3: Offline Signing:</strong> The transaction is reviewed and signed on the air-gapped machine. The private key never leaves this isolated environment.</li>
+              <li style="margin:6px 0;"><strong>Step 4: Return &amp; Broadcast:</strong> The signed bundle is returned to the online terminal and broadcast to the blockchain.</li>
+            </ul>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.1.5 Operational Flow and Rebalancing</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">The platform maintains a real-time monitoring system to enforce the 98/2 ratio. Upon receipt of client assets in hot storage, the system automatically triggers a real-time sweep to move excess funds into cold storage. Small withdrawals are serviced instantly from hot storage.</p>
+
+            <hr style="border:0; border-top:1px solid rgba(14,24,45,.14); margin:20px 0;" />
+
+            <h3 style="margin:18px 0 8px; font-size:16px;">6.2 Permissioned Custody and Transfer</h3>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Under the SFC's guidelines, tokenized assets cannot be managed through a purely "wallet-to-wallet" or self-custody approach typical of public DeFi protocols. Instead, TokenHub utilizes a "Permissioned Custody" model.</p>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.2.1 The Permissioned Ledger State Machine</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">The ledger does not allow unrestricted transfers. Every transaction is intercepted by a compliance layer that validates the identity and eligibility of both the sender and the receiver. This is implemented through the integration of the ONCHAINID identity registry, an implementation of the ERC-3643 (T-REX) standard.</p>
+
+            <table style="width:100%; border-collapse:collapse; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82); margin-bottom:14px;" aria-label="Permissioned ledger components">
+              <thead>
+                <tr>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Component</th>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Implementation</th>
+                  <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Regulatory Goal</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><strong>Token Contract</strong></td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">ERC-3643 (T-REX)</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Standardizes transfer logic with compliance hooks.</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><strong>Identity Registry</strong></td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">ONCHAINID Mapping</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Ensures all participants are KYC/AML verified.</td></tr>
+                <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);"><strong>Compliance Contract</strong></td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Modular Rule Sets</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Enforces jurisdictional limits, investor caps, and lock-ups.</td></tr>
+              </tbody>
+            </table>
+
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">The interaction flow for a standard transfer is as follows:</p>
+            <ol style="margin:10px 0 14px; padding-left:18px; color:rgba(14,24,45,.72);">
+              <li style="margin:6px 0;"><strong>Initiation:</strong> A participant initiates a transfer(to, amount) call.</li>
+              <li style="margin:6px 0;"><strong>Eligibility Check:</strong> The token contract calls the IdentityRegistry to verify if the receiver is associated with a valid ONCHAINID that has passed KYC.</li>
+              <li style="margin:6px 0;"><strong>Compliance Check:</strong> The token contract calls the Compliance contract to verify offering rules.</li>
+              <li style="margin:6px 0;"><strong>Execution:</strong> If all checks pass, the ledger is updated. Otherwise it reverts with a compliance error.</li>
+            </ol>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.2.2 The forcedTransfer() Function</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">The <code style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">forcedTransfer()</code> function is the primary mechanism for ledger rectification. It allows a licensed custodian or platform administrator to reallocate tokens in response to a court order, liquidator instruction, or regulatory seizure. This bypasses standard checks but logs the action immutably with a legal reference ID (IPFS CID).</p>
+
+            <hr style="border:0; border-top:1px solid rgba(14,24,45,.14); margin:20px 0;" />
+
+            <h3 style="margin:18px 0 8px; font-size:16px;">6.3 Managing Identity with ONCHAINID</h3>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">TokenHub uses ONCHAINID (ERC-734/735) to manage identities without exposing personal data on-chain.</p>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.3.1 Minting and Recovery</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Tokens are minted/burned only by licensed custodians. If an investor loses their private key, the custodian can burn the tokens in the lost wallet and mint replacements to a verified new wallet, ensuring legal ownership remains intact.</p>
+
+            <h4 style="margin:14px 0 6px; font-size:14px; font-weight:650;">6.3.2 Deposit/Withdrawal Workflow via FPS</h4>
+            <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">TokenHub integrates Hong Kong's FPS and Project Ensemble to support instant deposit, withdrawal, and atomic DvP settlement. Investors receive a unique FPS ID; once the bank confirms payment, the system mints digital cash tokens on-chain. Withdrawals burn digital cash tokens and send funds back to verified bank accounts via FPS (closed-loop AML compliance).</p>
+
+            <!-- Nested references -->
+            <details style="margin-top:10px; border:1px solid rgba(14,24,45,.14); border-radius:18px; background:rgba(255,255,255,.78); overflow:hidden;">
+              <summary style="list-style:none; cursor:pointer; padding:14px 16px; font-weight:720; display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(14,24,45,.03);">Architecture References &amp; Citations</summary>
+              <div style="padding:14px 16px;">
+                <ol style="margin:0; padding-left:18px; font-size:12px; color:rgba(14,24,45,.72);">
+                  <li>Project Plan - Tokenizing HKSTP Startups v0.2.pdf</li>
+                  <li>SFC Circular on Tokenisation (2 Nov 2023)</li>
+                  <li>ERC-3643 (T-REX) Standard Documentation</li>
+                  <li>SFC Circular on Virtual Asset Trading Platforms (16 Jan 2025)</li>
+                  <li>Chainlink Atomic Settlement Papers</li>
+                  <li>HKMA Project Ensemble &amp; e-HKD Reports</li>
+                </ol>
+              </div>
+            </details>
+
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ====== 7) REGULATORY ====== -->
+    <section id="regulatory" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Regulatory Framework">
+      <details style="margin-top:14px; background:rgba(255,255,255,.92); border:1px solid rgba(14,24,45,.14); border-radius:18px; overflow:hidden;">
+        <summary style="list-style:none; cursor:pointer; padding:16px 18px; background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">7) Regulatory Framework / KYC / AML</h2>
+          <span style="font-weight:600; color:#1f62ff; font-size:12px;">Click to expand ▼</span>
+        </summary>
+        <div style="padding:14px 16px;">
+          <div style="display:grid; gap:14px;">
+
+            <div style="padding:18px;">
+              <h3 style="margin:18px 0 8px; font-size:16px;">7.1 Legal Characterization of Tokenized HKSTP Startups</h3>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Hong Kong's existing legal and regulatory framework, primarily referring to the Securities and Futures Ordinance (Cap. 571) administered by the Securities and Futures Commission (SFC), serves as a foundation for classifying tokenized assets as "securities". The framework adequately accommodates the issuance of tokenized shares in HKSTP startups on our TokenHub platform, where shares are first issued using conventional process under Companies Ordinance then followed by tokenization of beneficial interests in the company shares.</p>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">As highlighted in the SFC tokenization circular in November 2023, the "see-through" approach views tokenized securities as traditional securities with a tokenization wrapper. This has marked a significant shift from the previous statement in March 2019. Offerings of tokenized securities fall within the existing framework for regulating securities, preserving the legal rights and obligations despite the securities being represented digitally on a distributed ledger.</p>
+            </div>
+
+            <div style="padding:18px;">
+              <h3 style="margin:18px 0 8px; font-size:16px;">7.2 SFC Type 1/7/VATP Licensing Strategy</h3>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Given the clear legal characterization of tokenized HKSTP startups as "securities" under the SFC's "see-through" approach, our TokenHub platform requires <strong>SFC Type 1 regulated activity</strong> (dealing in securities) and <strong>Type 7 regulated activity</strong> (providing automated trading services).</p>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Although our platform primarily trades security tokens, the SFC strongly suggests that virtual asset trading platforms apply for licences under both the SFO and AMLO regimes (VATP), given the potential evolution of virtual asset's classification. This dual licensing approach ensures comprehensive coverage for both security-token-focused activities and any trading with virtual asset features.</p>
+            </div>
+
+            <div style="padding:18px;">
+              <h3 style="margin:18px 0 8px; font-size:16px;">7.3 Regulatory Analysis on Settlement Finality</h3>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Settlement finality refers to the discharge of an obligation that has become irrevocable. Under the Payment Systems and Stored Value Facilities Ordinance (Cap. 584), only designated systems enjoy statutory finality. TokenHub is unlikely to qualify as a designated CSS immediately.</p>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Therefore, TokenHub relies on <strong>contractual finality</strong> through agreements embedded in platform terms and smart contract logic. However, under the Companies (Winding Up and Miscellaneous Provisions) Ordinance (Cap. 32), court orders can reverse property dispositions during insolvency.</p>
+              <div style="border-left:3px solid rgba(31,98,255,.55); padding:10px 12px; background:rgba(31,98,255,.08); border-radius:12px; font-size:13px; color:rgba(14,24,45,.72); margin-top:10px;">
+                <strong style="color:rgba(14,24,45,.92);">Impact on Smart Contract and Architecture Design:</strong>
+                <ul style="margin:10px 0 0; padding-left:18px;">
+                  <li style="margin:6px 0;"><strong>Defining the Point of Finality:</strong> The smart contract logic defines settlement finality as the point when a transaction achieves a predefined number of block confirmations (N blocks).</li>
+                  <li style="margin:6px 0;"><strong>"Rectifiable Ledger" Architecture:</strong> As mentioned in the Architecture section, the <code style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">forcedTransfer()</code> function allows the ledger to synchronize with legal finality determined by a court.</li>
+                  <li style="margin:6px 0;"><strong>Atomic Settlement (DvP):</strong> To reduce settlement risk, assets transfer and payment settlement occur as a single, indivisible transaction.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style="padding:18px;">
+              <h3 style="margin:18px 0 8px; font-size:16px;">7.4 Regulatory Analysis on Custody Arrangements</h3>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Unlike purely virtual assets (like Bitcoin), tokenized HKSTP startups are legally characterized as "securities". Hence, custody arrangements must comply with SFC's regulations. TokenHub cannot simply allow participants to self-custody via unmanaged "wallet-to-wallet" transfers.</p>
+              <p style="margin-bottom:12px; font-size:13px; color:rgba(14,24,45,.72);">Mirroring traditional markets (like CCASS), client assets are held by a licensed custodian. The architecture employs a "Permissioned Custody" model where transfers are only executed between verified, custodian-managed wallets.</p>
+            </div>
+
+            <div style="padding:18px; border-top:1px solid rgba(14,24,45,.14);">
+              <h3 style="margin:0 0 6px; font-size:13px; color:rgba(14,24,45,.72);">References &amp; Sources</h3>
+              <ul style="margin:0; padding-left:18px; font-size:12px; color:rgba(14,24,45,.72);">
+                <li><strong>[1]</strong> SFC Circular on Tokenisation of SFC-Authorised Investment Products (2 Nov 2023)</li>
+                <li><strong>[2]</strong> SFC Statement on Security Token Offerings (28 Mar 2019)</li>
+                <li><strong>[3]</strong> SFC Virtual asset trading platform operators Guidelines (Jan 2025)</li>
+                <li><strong>[4]</strong> HKMA Explanatory Note on Designation and Issuance of Certificate of Finality</li>
+                <li><strong>[5]</strong> Payment Systems and Stored Value Facilities Ordinance (Cap. 584)</li>
+                <li><strong>[6]</strong> Companies (Winding Up and Miscellaneous Provisions) Ordinance (Cap. 32)</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ====== 8) DELIVERABLES ====== -->
+    <section id="deliverables" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Deliverables">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">8) Deliverables</h2>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">A) Token trading marketplace &amp; settlement</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Investor portal: onboarding, funding/withdrawals (e.g., FPS), wallet management.</li>
+            <li style="margin:6px 0;">Real-time order book trading (off-chain matching).</li>
+            <li style="margin:6px 0;">Atomic DvP settlement with tokenized cash (stablecoin / tokenized deposit).</li>
+            <li style="margin:6px 0;">Portfolio views, statements, and real-time balance updates.</li>
+          </ul>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">B) Secure token management module</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;">Per-transaction approvals (e.g., signed attestation bound to from/to/amount/expiry/nonce).</li>
+            <li style="margin:6px 0;">Internal safe-list for operational movements (treasury/custody/escrow).</li>
+            <li style="margin:6px 0;">Multi-sig admin, emergency pause, monitoring, and audit readiness.</li>
+            <li style="margin:6px 0;">Runbook &amp; security memo: key ceremonies, rotation, pause procedures.</li>
+            <li style="margin:6px 0;">Smart-contract compliance approach (ERC-3643 / permissioned transfers).</li>
+          </ul>
+        </div>
+      </div>
+
+      <details style="margin-top:14px; border:1px solid rgba(14,24,45,.14); border-radius:18px; background:rgba(255,255,255,.78); overflow:hidden;">
+        <summary style="list-style:none; cursor:pointer; padding:14px 16px; font-weight:720; display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(14,24,45,.03);">
+          <span>Licensing awareness snapshot</span>
+          <span style="font-weight:600; color:rgba(14,24,45,.72); font-size:12px;">Type 1 / Type 7</span>
+        </summary>
+        <div style="padding:14px 16px;">
+          <table style="width:100%; border-collapse:collapse; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82);" aria-label="SFC licensing snapshot">
+            <thead>
+              <tr>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Licensing type</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Activity</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Selected requirements (summary)</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Capital requirements (as stated)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Type 1 (Dealing in Securities)</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Marketing, distribution, subscription arrangement</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">License application; fit and proper; responsible officers; external system review</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">HK$5,000,000 paid-up; HK$3,000,000 liquid</td></tr>
+              <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Type 7 (Providing Automated Trading Services)</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Secondary market trading, order matching, execution</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">License application; surveillance; trading rules; cybersecurity controls</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">HK$5,000,000 paid-up; HK$3,000,000 liquid (or 5% adjusted liabilities)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- ====== 9) TIMELINE ====== -->
+    <section id="timeline" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Schedule and timeline">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">9) Schedule &amp; Timeline</h2>
+      </div>
+      <div style="display:grid; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <figure style="margin:0;">
+            <img src="https://wp2025.cs.hku.hk/mfp25016/wp-content/uploads/sites/148/timeline.png" style="width:100%; height:auto; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:#ffffff;" loading="lazy" alt="Project Timeline" />
+          </figure>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Key milestones (from timeline)</h3>
+          <ul style="margin:10px 0 0; padding-left:18px; color:rgba(14,24,45,.72);">
+            <li style="margin:6px 0;"><strong>2025-11-17:</strong> Detailed Project Plan Submission</li>
+            <li style="margin:6px 0;"><strong>2026-03-01:</strong> Project Webpage (milestone)</li>
+            <li style="margin:6px 0;"><strong>2026-03-01:</strong> Interim Report (milestone)</li>
+            <li style="margin:6px 0;"><strong>2026-03-01 → 2026-03-31:</strong> Interim Presentation</li>
+            <li style="margin:6px 0;"><strong>2026-04-01 → 2026-04-15:</strong> System Test</li>
+            <li style="margin:6px 0;"><strong>2026-04-16 → 2026-04-30:</strong> User Acceptance Test (UAT)</li>
+            <li style="margin:6px 0;"><strong>2026-05-01:</strong> Project Report (milestone)</li>
+            <li style="margin:6px 0;"><strong>2026-05-01 → 2026-05-15:</strong> Oral Examination</li>
+          </ul>
+        </div>
+      </div>
+
+      <details style="margin-top:14px; border:1px solid rgba(14,24,45,.14); border-radius:18px; background:rgba(255,255,255,.78); overflow:hidden;">
+        <summary style="list-style:none; cursor:pointer; padding:14px 16px; font-weight:720; display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(14,24,45,.03);">
+          <span>Timeline tasks (text version)</span>
+          <span style="font-weight:600; color:rgba(14,24,45,.72); font-size:12px;">IDs, names, start &amp; finish</span>
+        </summary>
+        <div style="padding:14px 16px;">
+          <table style="width:100%; border-collapse:collapse; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82);" aria-label="Timeline tasks table">
+            <thead>
+              <tr>
+                <th style="width:70px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">ID</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Task Name</th>
+                <th style="min-width:130px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Start</th>
+                <th style="min-width:130px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Finish</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Detailed Project Plan Submission</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Start-up company end-to-end workflow / investor end-to-end workflow</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-12-05</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Regulatory framework / KYC/ AML</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-02-27</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Market research</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-02-27</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Safeguard measures for startup companies to protect investors' interest</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-02-27</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">6</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">UI / UX Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-02-27</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">7</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Project Webpage</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-01</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-01</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">8</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Interim Report</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-01</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-01</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Interim Presentation</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-01</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-31</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Token Trading Marketplace and Settlement</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-31</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">11</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Secure Token Management Module</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2025-11-17</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-03-31</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">12</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">System Test</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-04-01</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-04-15</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">13</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">User Acceptance Test (UAT)</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-04-16</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-04-30</td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">14</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Project Report</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-05-01</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-05-01</td></tr>
+              <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Oral Examination</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-05-01</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2026-05-15</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- ====== 10) WORK PLAN ====== -->
+    <section id="plan" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Work plan and WBS">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">10) Work Plan &amp; Work Breakdown Structure (WBS)</h2>
+      </div>
+
+      <!-- Pre-rendered metrics (was JS-computed) -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <div style="font-size:12px; color:rgba(14,24,45,.72); margin-bottom:4px;">Total estimated hours</div>
+          <div style="font-size:16px; font-weight:760; letter-spacing:.2px;">1,497</div>
+          <div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">Across planning, compliance, architecture, portals, trading, settlement, and testing.</div>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <div style="font-size:12px; color:rgba(14,24,45,.72); margin-bottom:4px;">Number of tasks</div>
+          <div style="font-size:16px; font-weight:760; letter-spacing:.2px;">42</div>
+          <div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">From the WBS table in the plan.</div>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <div style="font-size:12px; color:rgba(14,24,45,.72); margin-bottom:4px;">Focus areas</div>
+          <div style="font-size:16px; font-weight:760; letter-spacing:.2px;">Compliance + DvP</div>
+          <div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">Compliance automation and atomic settlement are central engineering themes.</div>
+        </div>
+      </div>
+
+      <details style="margin-top:14px; border:1px solid rgba(14,24,45,.14); border-radius:18px; background:rgba(255,255,255,.78); overflow:hidden;" open>
+        <summary style="list-style:none; cursor:pointer; padding:14px 16px; font-weight:720; display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(14,24,45,.03);">
+          <span>WBS task list</span>
+        </summary>
+        <div style="padding:14px 16px;">
+
+          <!-- Pre-rendered category totals (was JS-computed) -->
+          <div style="padding:18px; margin-bottom:12px;">
+            <h3 style="margin:0 0 6px; font-size:15px;">Category totals</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Smart Contract Suite Development</div><div style="font-size:16px; font-weight:760;">200 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">13% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">REGULATORY &amp; COMPLIANCE FRAMEWORK</div><div style="font-size:16px; font-weight:760;">160 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">11% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Testing</div><div style="font-size:16px; font-weight:760;">160 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">11% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Research</div><div style="font-size:16px; font-weight:760;">150 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">10% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">DvP Settlement Smart Contract &amp; Integration</div><div style="font-size:16px; font-weight:760;">123 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">8% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Investor Portal MVP</div><div style="font-size:16px; font-weight:760;">117 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">8% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Startup Portal MVP</div><div style="font-size:16px; font-weight:760;">117 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">8% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Order Book &amp; Trading Engine</div><div style="font-size:16px; font-weight:760;">108 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">7% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Security &amp; Access Control</div><div style="font-size:16px; font-weight:760;">90 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">6% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Investor MVP</div><div style="font-size:16px; font-weight:760;">72 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">5% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Trading Platform</div><div style="font-size:16px; font-weight:760;">72 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">5% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">FPS &amp; Tokenized Deposit Integration</div><div style="font-size:16px; font-weight:760;">56 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">4% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">Project Planning &amp; Charter</div><div style="font-size:16px; font-weight:760;">50 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">3% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">SSO &amp; MFA Authentication Module</div><div style="font-size:16px; font-weight:760;">36 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">2% of total effort</div></div>
+              <div style="padding:12px; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.78);"><div style="font-size:12px; color:rgba(14,24,45,.72);">System Architecture</div><div style="font-size:16px; font-weight:760;">36 <span style="font-size:12px; color:rgba(14,24,45,.72);">hrs</span></div><div style="margin-top:6px; color:rgba(14,24,45,.72); font-size:12px;">2% of total effort</div></div>
+            </div>
+          </div>
+
+          <!-- Pre-rendered WBS table (was JS-computed) — all 42 rows -->
+          <div style="overflow:auto; border-radius:14px; border:1px solid rgba(14,24,45,.14);">
+            <table style="width:100%; border-collapse:collapse; background:rgba(255,255,255,.82);" aria-label="Work breakdown table">
+              <thead>
+                <tr>
+                  <th style="min-width:80px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Task ID</th>
+                  <th style="min-width:220px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Type</th>
+                  <th style="min-width:280px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Task Name</th>
+                  <th style="min-width:120px; padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Est. Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">1.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Project Planning &amp; Charter</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Create Detailed Project Plan</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">50</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">REGULATORY &amp; COMPLIANCE FRAMEWORK</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Regulatory Analysis &amp; Classification</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">60</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">REGULATORY &amp; COMPLIANCE FRAMEWORK</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">SFC Type 1/7 Licensing Strategy</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">45</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2.4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">REGULATORY &amp; COMPLIANCE FRAMEWORK</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">KYC/AML Procedures Manual Development</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">40</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">2.5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">REGULATORY &amp; COMPLIANCE FRAMEWORK</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">AMLO Compliance Procedures Documented</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Research</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Business Analysis</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">150</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">4.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">System Architecture</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">System Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">4.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">System Architecture</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Component Interaction design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">5.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">SSO &amp; MFA Authentication Module</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">SSO Architecture Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">5.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">SSO &amp; MFA Authentication Module</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">MFA Implementation</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">7.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Smart Contract Suite Development</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Token Contract Development</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">200</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">8.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">FPS &amp; Tokenized Deposit Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Deposit/Withdrawal Workflow Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">41</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">8.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">FPS &amp; Tokenized Deposit Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Settlement Token Minting/Burning Logic</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Portal UX/UI Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Dashboard Component Development</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Wallet Interface Component</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Portfolio View Component</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Real-Time Balance Updates</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.6</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">KYC/AML Gateway Architecture Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.7</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Document Verification Service Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.8</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Identity Verification Workflow</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">9.9</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Sanctions/PEPs Screening Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal UX/UI Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Cap Table Management Components</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10.3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Financial Disclosure Components</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10.4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Investor Communication Components</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10.5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Backend Cap Table Management API</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">10.6</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Startup Portal MVP</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Backend Financial Reporting API</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">11.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Book &amp; Trading Engine</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Matching Algorithm Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">28</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">11.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Book &amp; Trading Engine</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Book Data Structure Implementation</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">11.4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Book &amp; Trading Engine</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Real-Time Order Book API</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">37</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">11.5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Book &amp; Trading Engine</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Management &amp; Lifecycle</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">22</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">12.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Smart Contract &amp; Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Contract Development</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">12.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Smart Contract &amp; Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Atomic Execution Logic Implementation</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">12.3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Smart Contract &amp; Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Per-Transaction Approval Verification</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">12.4</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Smart Contract &amp; Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Contract Testing</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">12.5</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Settlement Smart Contract &amp; Integration</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">DvP Integration with Trading Engine</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">13.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Trading Platform</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Trading Platform UX/UI Design</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">30</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">13.2</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Trading Platform</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Entry Components</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">13.3</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Trading Platform</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Order Book Display Components</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">21</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">14.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Security &amp; Access Control</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Security Group &amp; IAM Policy Setup</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">90</td></tr>
+                <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15.1</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Testing</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">System Test</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">80</td></tr>
+                <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">15.2</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Testing</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">UAT Test</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">80</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p style="margin-top:10px; font-size:12px; color:rgba(14,24,45,.56);">Showing <strong>42</strong> tasks · Effort: <strong>1,497</strong> hrs</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ====== 11) TEAM ====== -->
+    <section id="team" style="margin-top:18px; scroll-margin-top:78px;" aria-label="Team and supervision">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px;">
+        <h2 style="margin:0; font-size:18px; letter-spacing:-.01em;">11) Team &amp; Supervision</h2>
+      </div>
+      <div style="display:grid; gap:14px;">
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 10px; font-size:15px;">Student team</h3>
+          <table style="width:100%; border-collapse:collapse; border-radius:14px; border:1px solid rgba(14,24,45,.14); background:rgba(255,255,255,.82);" aria-label="Team members">
+            <thead>
+              <tr>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Student Name</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Student ID</th>
+                <th style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); text-align:left; background:rgba(14,24,45,.04); font-weight:720; font-size:13px;">Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Alan Wong Hiu Leung</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">3036384074</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><a href="mailto:alanwhkk@connect.hku.hk" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">alanwhkk@connect.hku.hk</a></td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Jacky Kiang Ho Tin <span style="font-size:12px; color:rgba(14,24,45,.72);">(Product Owner)</span></td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">3036383460</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><a href="mailto:u3638346@connect.hku.hk" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">u3638346@connect.hku.hk</a></td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Kelvin Tam King Yin</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">3036382624</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><a href="mailto:u3638262@connect.hku.hk" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">u3638262@connect.hku.hk</a></td></tr>
+              <tr><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">Peter Choi Chi For</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);">3036384024</td><td style="padding:10px; border-bottom:1px solid rgba(14,24,45,.14); font-size:13px; color:rgba(14,24,45,.72);"><a href="mailto:u3638402@connect.hku.hk" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">u3638402@connect.hku.hk</a></td></tr>
+              <tr><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">Tiffany Chan Kwun Yu</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);">3036383733</td><td style="padding:10px; font-size:13px; color:rgba(14,24,45,.72);"><a href="mailto:u3638373@connect.hku.hk" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">u3638373@connect.hku.hk</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78)); border:1px solid rgba(14,24,45,.14); border-radius:18px; box-shadow:0 12px 30px rgba(14,24,45,.10); padding:18px;">
+          <h3 style="margin:0 0 6px; font-size:15px;">Supervisor</h3>
+          <p style="margin:0; color:rgba(14,24,45,.72);">
+            <strong style="color:rgba(14,24,45,.92);">Dr. Siu Ming Yiu</strong>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer style="margin-top:22px; padding-top:18px; border-top:1px solid rgba(14,24,45,.14); color:rgba(14,24,45,.72); font-size:12px;" aria-label="Footer">
+      <p style="margin:14px 0 0;">© HKU FTDA 2025 -2026 Final-Year Project.</p>
+    </footer>
+
+  </main>
+</body>
+</html>
