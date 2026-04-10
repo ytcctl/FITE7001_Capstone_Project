@@ -6,6 +6,7 @@ artifacts/
 cache/
 typechain-types/
 typechain/
+types/
 
 # Coverage
 coverage/
@@ -13,6 +14,7 @@ coverage.json
 
 # Environment variables (never commit secrets)
 .env
+.env.*
 .env.local
 .env.*.local
 
