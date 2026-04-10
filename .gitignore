@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Hardhat build artifacts and cache
+artifacts/
+cache/
+typechain-types/
+typechain/
+
+# Coverage
+coverage/
+coverage.json
+
+# Environment variables (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Optional: hardhat network files
+deployments/
