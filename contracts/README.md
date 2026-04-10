@@ -8,29 +8,29 @@ TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    INVESTOR PORTAL  (React/Next.js)                  │
-│   SSO+MFA │ KYC Upload │ Wallet │ Order Book │ Portfolio View        │
+│                    INVESTOR PORTAL  (React/Next.js)                 │
+│   SSO+MFA │ KYC Upload │ Wallet │ Order Book │ Portfolio View       │
 └───────────────────────────────────┬─────────────────────────────────┘
                                     │
           ┌─────────────────────────▼───────────────────────┐
-          │          COMPLIANCE SERVICE (Oracle)             │
-          │  Signs per-transfer EIP-712 attestations         │
-          │  Checks: KYC status, lock-up, caps, jurisdiction │
+          │          COMPLIANCE SERVICE (Oracle)            │
+          │  Signs per-transfer EIP-712 attestations        │
+          │  Checks: KYC status, lock-up, caps, jurisdiction│
           └─────────────────────────┬───────────────────────┘
                                     │
-          ┌─────────────────────────▼───────────────────────┐
-          │        HYPERLEDGER BESU (Permissioned EVM)       │
+          ┌─────────────────────────▼─────────────────────────┐ 
+          │        HYPERLEDGER BESU (Permissioned EVM)        │
           │                                                   │
-          │  ┌───────────────────┐  ┌─────────────────────┐  │
+          │  ┌───────────────────┐  ┌─────────────────────┐   │
           │  │ HKSTPSecurityToken│  │ HKSTPIdentityRegistry│  │
-          │  │  (ERC-3643 style) │  │  (KYC/AML claims)   │  │
-          │  └────────┬──────────┘  └──────────┬──────────┘  │
+          │  │  (ERC-3643 style) │  │  (KYC/AML claims)   │   │
+          │  └────────┬──────────┘  └──────────┬──────────┘   │
           │           │                         │             │
-          │  ┌────────▼──────────┐  ┌──────────▼──────────┐  │
-          │  │  HKSTPCompliance  │  │   DvPSettlement      │  │
-          │  │  (attestation +   │  │   (atomic Leg1+Leg2) │  │
-          │  │   module checks)  │  │                      │  │
-          │  └───────────────────┘  └──────────────────────┘  │
+          │  ┌────────▼──────────┐  ┌──────────▼──────────┐   │
+          │  │  HKSTPCompliance  │  │   DvPSettlement     │   │
+          │  │  (attestation +   │  │   (atomic Leg1+Leg2)│   │
+          │  │   module checks)  │  │                     │   │
+          │  └───────────────────┘  └─────────────────────┘   │
           │                                                   │
           │  ┌───────────────────┐                            │
           │  │  MockCashToken    │  (tokenized HKD / THKD)    │
