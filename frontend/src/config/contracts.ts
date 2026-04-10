@@ -17,14 +17,14 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
-  compliance: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
-  securityToken: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
-  cashToken: '0xed78Cb21Ce10A086a7973fB44e96d34F31D45cF1',
-  dvpSettlement: '0x218d5fe2E168656eBDE49e7a4A3C97E699D0be78',
-  tokenFactory: '0x3F0BE59Bc74c7368Aa049a0B064ce9Dc32890669',
-  claimIssuer: '0x290b0cFa0AC2d8959acf8009706273ffBB9F2572',
-  identityFactory: '0x6486A01e45648B1aDCc51D375Af3a7c0a5e9002a',
+  identityRegistry: '0x2b33e63E99CBB1847a2735E08C61d9034b13a171',
+  compliance: '0x2f9f1bc72ff3Bf57849d83F25348f90FB8056f75',
+  securityToken: '0x27A107A95b36c4510ea926f0f886Ff7772248E66',
+  cashToken: '0xc7555581De61F6db45EA28547d6D5E0722ED6fBe',
+  dvpSettlement: '0x99c6a236913907dCe5714cfa4a179D4f2C0b93D9',
+  tokenFactory: '0x4A6EA541263c363478da333239E38E96E2cC8653',
+  claimIssuer: '0x96C1f5d31C4c627d6e84A046D4790cAC4F17d3ED',
+  identityFactory: '0xECB550dE5c73e6690AB4521C03EC9D476617167E',
 };
 
 // -----------------------------------------------------------------
@@ -57,6 +57,11 @@ export const IDENTITY_REGISTRY_ABI = [
   'function getTrustedIssuersForTopic(uint256 topic) view returns (address[])',
   'function identityFactory() view returns (address)',
   'function isTrustedIssuer(address) view returns (bool)',
+  // Multi-wallet linking (Cap. 622 Sybil protection)
+  'function linkWallet(address wallet, address identityAddr, string country) external',
+  'function unlinkWallet(address wallet) external',
+  'function getLinkedWallets(address identityAddr) view returns (address[])',
+  'function getIdentityForWallet(address wallet) view returns (address)',
   // Constants
   'function CLAIM_KYC_VERIFIED() view returns (uint256)',
   'function CLAIM_ACCREDITED_INVESTOR() view returns (uint256)',
@@ -78,6 +83,8 @@ export const IDENTITY_REGISTRY_ABI = [
   'event ClaimIssued(address indexed investor, uint256 indexed topic, address indexed issuer, bytes32 claimId)',
   'event TrustedIssuerAdded(address indexed issuer, uint256[] topics)',
   'event TrustedIssuerRemoved(address indexed issuer)',
+  'event WalletLinked(address indexed wallet, address indexed identityContract)',
+  'event WalletUnlinked(address indexed wallet, address indexed identityContract)',
 ];
 
 export const COMPLIANCE_ABI = [
@@ -136,6 +143,12 @@ export const SECURITY_TOKEN_ABI = [
   'function compliance() view returns (address)',
   'function setIdentityRegistry(address newRegistry) external',
   'function setCompliance(address newCompliance) external',
+  // Cap. 622 shareholder cap (identity-based)
+  'function setMaxShareholders(uint256 cap) external',
+  'function maxShareholders() view returns (uint256)',
+  'function shareholderCount() view returns (uint256)',
+  'function getIdentityHolders() view returns (address[])',
+  'function aggregateBalanceByIdentity(address identityAddr) view returns (uint256)',
   // Pause
   'function pause() external',
   'function unpause() external',
@@ -152,6 +165,9 @@ export const SECURITY_TOKEN_ABI = [
   'event TokensBurned(address indexed from, uint256 amount, address indexed agent)',
   'event AddressFrozen(address indexed account, bool isFrozen, address indexed agent)',
   'event SafeListUpdated(address indexed account, bool status)',
+  'event MaxShareholdersSet(uint256 maxShareholders)',
+  'event IdentityHolderAdded(address indexed identityContract)',
+  'event IdentityHolderRemoved(address indexed identityContract)',
 ];
 
 export const CASH_TOKEN_ABI = [

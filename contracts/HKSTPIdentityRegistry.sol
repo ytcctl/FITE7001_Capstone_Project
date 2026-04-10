@@ -71,6 +71,20 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
     /// @dev Set of required claim topics
     uint256[] private _requiredClaimTopics;
 
+    // ── Multi-wallet → single identity (Sybil protection) ──────
+    //
+    // Cap. 622 requires counting **unique shareholders**, not wallets.
+    // A single investor may control multiple wallets, all linked to the
+    // same ONCHAINID Identity contract.  The reverse mapping allows the
+    // token contract to aggregate balances by identity and count unique
+    // holders rather than wallet addresses.
+
+    /// @dev identityContract => list of wallets linked to that identity
+    mapping(address => address[]) private _linkedWallets;
+
+    /// @dev wallet => index in _linkedWallets[identity] (for O(1) removal)
+    mapping(address => uint256) private _linkedWalletIndex;
+
     // ── ONCHAINID infrastructure ────────────────────────────────
 
     /// @notice The IdentityFactory that deploys per-investor Identity contracts.
@@ -94,6 +108,8 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
     event TrustedIssuerAdded(address indexed issuer, uint256[] topics);
     event TrustedIssuerRemoved(address indexed issuer);
     event IdentityFactorySet(address indexed factory);
+    event WalletLinked(address indexed wallet, address indexed identityContract);
+    event WalletUnlinked(address indexed wallet, address indexed identityContract);
 
     // ── Constructor ─────────────────────────────────────────────
     constructor(address admin) {
@@ -210,6 +226,11 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
             registered:       true
         });
 
+        // Auto-link wallet to identity for Sybil-proof holder counting
+        if (identityAddr != address(0)) {
+            _linkWalletInternal(investor, identityAddr);
+        }
+
         emit IdentityRegistered(investor, identityAddr, country);
     }
 
@@ -218,6 +239,13 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
      */
     function deleteIdentity(address investor) external onlyRole(AGENT_ROLE) whenNotPaused {
         require(_identities[investor].registered, "HKSTPIdentityRegistry: not registered");
+
+        // Unlink wallet from identity
+        address idContract = _identities[investor].identityContract;
+        if (idContract != address(0)) {
+            _unlinkWalletInternal(investor, idContract);
+        }
+
         delete _identities[investor];
 
         for (uint256 i = 0; i < _requiredClaimTopics.length; i++) {
@@ -235,6 +263,18 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
         string calldata newCountry
     ) external onlyRole(AGENT_ROLE) whenNotPaused {
         require(_identities[investor].registered, "HKSTPIdentityRegistry: not registered");
+
+        // Re-link wallet if identity contract changed
+        address oldId = _identities[investor].identityContract;
+        if (oldId != newOnchainId) {
+            if (oldId != address(0)) {
+                _unlinkWalletInternal(investor, oldId);
+            }
+            if (newOnchainId != address(0)) {
+                _linkWalletInternal(investor, newOnchainId);
+            }
+        }
+
         _identities[investor].identityContract = newOnchainId;
         _identities[investor].country = newCountry;
         emit IdentityUpdated(investor, newOnchainId, newCountry);
@@ -442,6 +482,107 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
     /// @notice Returns trusted issuers for a specific topic.
     function getTrustedIssuersForTopic(uint256 topic) external view returns (address[] memory) {
         return _trustedIssuersByTopic[topic];
+    }
+
+    // ── Multi-wallet linking (AGENT_ROLE) ───────────────────────
+
+    /**
+     * @notice Link an additional wallet to an existing investor's ONCHAINID Identity.
+     *         This allows a single natural person to hold tokens across multiple
+     *         wallets while being counted as ONE shareholder for Cap. 622 purposes.
+     *
+     * @param wallet        The new wallet address to link.
+     * @param identityAddr  The ONCHAINID Identity contract (must already have at least one wallet).
+     * @param country       ISO-3166 two-letter country code for the new wallet.
+     */
+    function linkWallet(
+        address wallet,
+        address identityAddr,
+        string calldata country
+    ) external onlyRole(AGENT_ROLE) whenNotPaused {
+        require(wallet != address(0), "HKSTPIdentityRegistry: zero address");
+        require(!_identities[wallet].registered, "HKSTPIdentityRegistry: already registered");
+        require(identityAddr != address(0), "HKSTPIdentityRegistry: zero identity");
+        require(_linkedWallets[identityAddr].length > 0, "HKSTPIdentityRegistry: identity has no primary wallet");
+
+        _identities[wallet] = InvestorIdentity({
+            identityContract: identityAddr,
+            country:          country,
+            registered:       true
+        });
+
+        _linkWalletInternal(wallet, identityAddr);
+
+        // Copy boolean claims from the primary wallet
+        address primaryWallet = _linkedWallets[identityAddr][0];
+        for (uint256 i = 0; i < _requiredClaimTopics.length; i++) {
+            uint256 topic = _requiredClaimTopics[i];
+            _claims[wallet][topic] = _claims[primaryWallet][topic];
+        }
+
+        emit IdentityRegistered(wallet, identityAddr, country);
+        emit WalletLinked(wallet, identityAddr);
+    }
+
+    /**
+     * @notice Unlink a wallet from its ONCHAINID Identity.
+     *         The wallet is de-registered but the Identity contract remains.
+     */
+    function unlinkWallet(
+        address wallet
+    ) external onlyRole(AGENT_ROLE) whenNotPaused {
+        require(_identities[wallet].registered, "HKSTPIdentityRegistry: not registered");
+        address identityAddr = _identities[wallet].identityContract;
+        require(identityAddr != address(0), "HKSTPIdentityRegistry: no identity to unlink");
+        require(_linkedWallets[identityAddr].length > 1, "HKSTPIdentityRegistry: cannot unlink last wallet");
+
+        _unlinkWalletInternal(wallet, identityAddr);
+        delete _identities[wallet];
+
+        for (uint256 i = 0; i < _requiredClaimTopics.length; i++) {
+            delete _claims[wallet][_requiredClaimTopics[i]];
+        }
+
+        emit WalletUnlinked(wallet, identityAddr);
+        emit IdentityRemoved(wallet);
+    }
+
+    // ── View: multi-wallet identity queries ─────────────────────
+
+    /**
+     * @notice Returns all wallets linked to a given ONCHAINID Identity contract.
+     */
+    function getLinkedWallets(address identityAddr) external view returns (address[] memory) {
+        return _linkedWallets[identityAddr];
+    }
+
+    /**
+     * @notice Resolves the ONCHAINID Identity contract for a wallet address.
+     *         Returns address(0) if the wallet is not registered or has no identity.
+     */
+    function getIdentityForWallet(address wallet) external view returns (address) {
+        return _identities[wallet].identityContract;
+    }
+
+    // ── Internal: wallet linking helpers ────────────────────────
+
+    function _linkWalletInternal(address wallet, address identityAddr) internal {
+        _linkedWalletIndex[wallet] = _linkedWallets[identityAddr].length;
+        _linkedWallets[identityAddr].push(wallet);
+    }
+
+    function _unlinkWalletInternal(address wallet, address identityAddr) internal {
+        uint256 idx = _linkedWalletIndex[wallet];
+        uint256 lastIdx = _linkedWallets[identityAddr].length - 1;
+
+        if (idx != lastIdx) {
+            address lastWallet = _linkedWallets[identityAddr][lastIdx];
+            _linkedWallets[identityAddr][idx] = lastWallet;
+            _linkedWalletIndex[lastWallet] = idx;
+        }
+
+        _linkedWallets[identityAddr].pop();
+        delete _linkedWalletIndex[wallet];
     }
 }
 

@@ -13,6 +13,8 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 interface IIdentityRegistry {
     function isVerified(address investor) external view returns (bool);
     function investorCountry(address investor) external view returns (string memory);
+    function getIdentityForWallet(address wallet) external view returns (address);
+    function getLinkedWallets(address identityAddr) external view returns (address[] memory);
 }
 
 /// @dev Minimal interface for HKSTPCompliance
@@ -63,6 +65,23 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
     /// @dev Frozen investor addresses — all transfers blocked.
     mapping(address => bool) public frozen;
 
+    // ── Cap. 622 shareholder cap (identity-based) ───────────────
+    //
+    // Hong Kong Companies Ordinance Cap. 622 limits private companies
+    // to 50 shareholders.  We count **unique ONCHAINID identities** with
+    // a non-zero aggregate balance (summed across all linked wallets),
+    // preventing Sybil attacks where one person splits holdings across
+    // multiple wallets to evade the cap.
+
+    /// @notice Maximum number of unique identity-holders (0 = unlimited).
+    uint256 public maxShareholders;
+
+    /// @dev Set of unique identity addresses that currently hold tokens.
+    address[] private _identityHolders;
+
+    /// @dev identityAddr => index+1 in _identityHolders (0 = not present).
+    mapping(address => uint256) private _identityHolderIndex;
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
@@ -73,6 +92,9 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
     event TokensMinted(address indexed to, uint256 amount, address indexed agent);
     event TokensBurned(address indexed from, uint256 amount, address indexed agent);
     event RecoverySuccess(address indexed lost, address indexed recovered, address indexed onchainId);
+    event MaxShareholdersSet(uint256 maxShareholders);
+    event IdentityHolderAdded(address indexed identityContract);
+    event IdentityHolderRemoved(address indexed identityContract);
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -128,6 +150,50 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
         require(newCompliance != address(0), "HKSTPSecurityToken: zero address");
         emit ComplianceSet(compliance, newCompliance);
         compliance = newCompliance;
+    }
+
+    // -------------------------------------------------------------------------
+    // Cap. 622 shareholder cap (DEFAULT_ADMIN_ROLE)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice Set the maximum number of unique identity-holders for this token.
+     *         Cap. 622 limits private companies to 50 shareholders.
+     *         Set to 0 to disable the cap.
+     * @param cap Maximum unique identity-holders allowed.
+     */
+    function setMaxShareholders(uint256 cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        maxShareholders = cap;
+        emit MaxShareholdersSet(cap);
+    }
+
+    /**
+     * @notice Returns the current number of unique identity-holders.
+     */
+    function shareholderCount() external view returns (uint256) {
+        return _identityHolders.length;
+    }
+
+    /**
+     * @notice Returns all current identity-holder addresses.
+     */
+    function getIdentityHolders() external view returns (address[] memory) {
+        return _identityHolders;
+    }
+
+    /**
+     * @notice Returns the aggregate token balance across all wallets linked
+     *         to the given identity contract.
+     * @param identityAddr The ONCHAINID Identity contract address.
+     */
+    function aggregateBalanceByIdentity(address identityAddr) public view returns (uint256) {
+        IIdentityRegistry registry = IIdentityRegistry(identityRegistry);
+        address[] memory wallets = registry.getLinkedWallets(identityAddr);
+        uint256 total = 0;
+        for (uint256 i = 0; i < wallets.length; i++) {
+            total += balanceOf(wallets[i]);
+        }
+        return total;
     }
 
     // -------------------------------------------------------------------------
@@ -253,6 +319,70 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
         }
 
         super._update(from, to, amount);
+
+        // ── Post-transfer: update identity-holder tracking ──────
+        _updateIdentityHolders(from, to);
+    }
+
+    /**
+     * @dev After a transfer/mint/burn, update the set of unique identity holders.
+     *      - If `to` is a new identity with no prior aggregate balance → add to set.
+     *      - If `from`'s identity now has zero aggregate balance → remove from set.
+     *      Enforces maxShareholders cap AFTER adding (reverts if breached).
+     */
+    function _updateIdentityHolders(address from, address to) internal {
+        IIdentityRegistry registry = IIdentityRegistry(identityRegistry);
+        bool newHolderAdded = false;
+
+        // Handle recipient (mint or transfer-in)
+        if (to != address(0)) {
+            address toIdentity = registry.getIdentityForWallet(to);
+            if (toIdentity != address(0) && _identityHolderIndex[toIdentity] == 0) {
+                // Check if this identity truly has a balance now (it should after super._update)
+                if (aggregateBalanceByIdentity(toIdentity) > 0) {
+                    _identityHolders.push(toIdentity);
+                    _identityHolderIndex[toIdentity] = _identityHolders.length; // index+1
+                    newHolderAdded = true;
+                    emit IdentityHolderAdded(toIdentity);
+                }
+            }
+        }
+
+        // Handle sender (burn or transfer-out)
+        if (from != address(0)) {
+            address fromIdentity = registry.getIdentityForWallet(from);
+            if (fromIdentity != address(0) && _identityHolderIndex[fromIdentity] != 0) {
+                if (aggregateBalanceByIdentity(fromIdentity) == 0) {
+                    _removeIdentityHolder(fromIdentity);
+                    emit IdentityHolderRemoved(fromIdentity);
+                }
+            }
+        }
+
+        // Enforce Cap. 622 shareholder cap
+        if (newHolderAdded && maxShareholders != 0) {
+            require(
+                _identityHolders.length <= maxShareholders,
+                "HKSTPSecurityToken: shareholder cap exceeded (Cap. 622)"
+            );
+        }
+    }
+
+    /**
+     * @dev Remove an identity from the holder set using swap-and-pop.
+     */
+    function _removeIdentityHolder(address identityAddr) internal {
+        uint256 idx = _identityHolderIndex[identityAddr] - 1; // convert to 0-based
+        uint256 lastIdx = _identityHolders.length - 1;
+
+        if (idx != lastIdx) {
+            address lastIdentity = _identityHolders[lastIdx];
+            _identityHolders[idx] = lastIdentity;
+            _identityHolderIndex[lastIdentity] = idx + 1; // store as 1-based
+        }
+
+        _identityHolders.pop();
+        delete _identityHolderIndex[identityAddr];
     }
 
     // -------------------------------------------------------------------------

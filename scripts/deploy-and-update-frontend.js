@@ -244,6 +244,11 @@ async function main() {
   await (await registry.addTrustedIssuer(claimIssuerAddress, [1, 2, 3, 4, 5])).wait();
   console.log("     ClaimIssuer added as Trusted Issuer for topics 1-5");
 
+  // Cap. 622: Set 50-shareholder limit on the security token
+  console.log("\nConfiguring Cap. 622 shareholder cap...");
+  await (await token.setMaxShareholders(50)).wait();
+  console.log("     maxShareholders set to 50 on HKSTPSecurityToken");
+
   // -----------------------------------------------------------------------
   // AUTO-UPDATE frontend/src/config/contracts.ts
   // -----------------------------------------------------------------------
@@ -332,6 +337,9 @@ async function main() {
   );
   console.log(
     `║ Compliance Oracle     : ${complianceOracle}  ║`
+  );
+  console.log(
+    `║ Cap. 622 Shareholder Cap : 50 (identity-based)                ║`
   );
   console.log(
     "╚══════════════════════════════════════════════════════════════╝"
