@@ -118,7 +118,7 @@ Investor (seller)                 DvPSettlement              Investor (buyer)
 ## Setup & Installation
 
 ### Prerequisites
-- Node.js ≥ 18
+- Node.js ≥ 18 (required by Hardhat ^2.22.4)
 - npm ≥ 9
 
 ### Install dependencies
