@@ -9,6 +9,8 @@ import {
   CASH_TOKEN_ABI,
   DVP_SETTLEMENT_ABI,
   TOKEN_FACTORY_ABI,
+  CLAIM_ISSUER_ABI,
+  IDENTITY_FACTORY_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -21,6 +23,8 @@ export interface Contracts {
   cashToken: ethers.Contract;
   dvpSettlement: ethers.Contract;
   tokenFactory: ethers.Contract;
+  claimIssuer: ethers.Contract;
+  identityFactory: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -109,6 +113,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       cashToken: new ethers.Contract(CONTRACT_ADDRESSES.cashToken, CASH_TOKEN_ABI, s),
       dvpSettlement: new ethers.Contract(CONTRACT_ADDRESSES.dvpSettlement, DVP_SETTLEMENT_ABI, s),
       tokenFactory: new ethers.Contract(CONTRACT_ADDRESSES.tokenFactory, TOKEN_FACTORY_ABI, s),
+      claimIssuer: new ethers.Contract(CONTRACT_ADDRESSES.claimIssuer, CLAIM_ISSUER_ABI, s),
+      identityFactory: new ethers.Contract(CONTRACT_ADDRESSES.identityFactory, IDENTITY_FACTORY_ABI, s),
     };
     setContracts(c);
     return c;

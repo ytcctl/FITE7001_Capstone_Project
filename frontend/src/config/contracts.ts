@@ -17,12 +17,14 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0xBF921f94Fd9eF1738bE25D8CeCFDFE2C822c81B0',
-  compliance: '0xBeC8a9e485a4B75d3b14249de7CA6D124fE94795',
-  securityToken: '0x3Ace09BBA3b8507681146252d3Dd33cD4E2d4F63',
-  cashToken: '0x3484B20600854091C166C062FacAd700123f5f71',
-  dvpSettlement: '0x7cA5543f9B2C35F0E972f1B45b61A2FE53fF1ed9',
-  tokenFactory: '0x63491c5363329afb6f370E9D297025481E0277e6',
+  identityRegistry: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
+  compliance: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
+  securityToken: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
+  cashToken: '0xed78Cb21Ce10A086a7973fB44e96d34F31D45cF1',
+  dvpSettlement: '0x218d5fe2E168656eBDE49e7a4A3C97E699D0be78',
+  tokenFactory: '0x3F0BE59Bc74c7368Aa049a0B064ce9Dc32890669',
+  claimIssuer: '0x290b0cFa0AC2d8959acf8009706273ffBB9F2572',
+  identityFactory: '0x6486A01e45648B1aDCc51D375Af3a7c0a5e9002a',
 };
 
 // -----------------------------------------------------------------
@@ -34,9 +36,16 @@ export const IDENTITY_REGISTRY_ABI = [
   'function registerIdentity(address investor, address onchainId, string country) external',
   'function deleteIdentity(address investor) external',
   'function updateIdentity(address investor, address newOnchainId, string newCountry) external',
-  // Claims
+  // Boolean claims (backward-compatible)
   'function setClaim(address investor, uint256 topic, bool value) external',
+  // ONCHAINID claims (cryptographic ERC-735)
+  'function issueClaim(address investor, uint256 topic, address issuer, bytes signature, bytes data) external',
+  // Required claim topics
   'function setRequiredClaimTopics(uint256[] topics) external',
+  // Trusted Issuer management
+  'function addTrustedIssuer(address issuer, uint256[] topics) external',
+  'function removeTrustedIssuer(address issuer) external',
+  'function setIdentityFactory(address factory) external',
   // Views
   'function isVerified(address investor) external view returns (bool)',
   'function contains(address investor) external view returns (bool)',
@@ -44,6 +53,10 @@ export const IDENTITY_REGISTRY_ABI = [
   'function investorCountry(address investor) external view returns (string)',
   'function hasClaim(address investor, uint256 topic) external view returns (bool)',
   'function getRequiredClaimTopics() external view returns (uint256[])',
+  'function getTrustedIssuers() view returns (address[])',
+  'function getTrustedIssuersForTopic(uint256 topic) view returns (address[])',
+  'function identityFactory() view returns (address)',
+  'function isTrustedIssuer(address) view returns (bool)',
   // Constants
   'function CLAIM_KYC_VERIFIED() view returns (uint256)',
   'function CLAIM_ACCREDITED_INVESTOR() view returns (uint256)',
@@ -59,9 +72,12 @@ export const IDENTITY_REGISTRY_ABI = [
   'function pause() external',
   'function unpause() external',
   // Events
-  'event IdentityRegistered(address indexed investor, address indexed onchainId, string country)',
+  'event IdentityRegistered(address indexed investor, address indexed identityContract, string country)',
   'event IdentityRemoved(address indexed investor)',
   'event ClaimSet(address indexed investor, uint256 indexed topic, bool value)',
+  'event ClaimIssued(address indexed investor, uint256 indexed topic, address indexed issuer, bytes32 claimId)',
+  'event TrustedIssuerAdded(address indexed issuer, uint256[] topics)',
+  'event TrustedIssuerRemoved(address indexed issuer)',
 ];
 
 export const COMPLIANCE_ABI = [
@@ -209,4 +225,59 @@ export const TOKEN_FACTORY_ABI = [
   'event TokenCreated(uint256 indexed index, string name, string symbol, address tokenAddress, address createdBy)',
   'event TokenDeactivated(uint256 indexed index, address tokenAddress)',
   'event TokenReactivated(uint256 indexed index, address tokenAddress)',
+];
+
+// -----------------------------------------------------------------
+// ONCHAINID ABIs (ERC-734 / ERC-735)
+// -----------------------------------------------------------------
+
+export const CLAIM_ISSUER_ABI = [
+  'function signingKey() view returns (address)',
+  'function setSigningKey(address newKey) external',
+  'function isClaimValid(address identityContract, uint256 topic, bytes sig, bytes data) view returns (bool)',
+  'function isClaimRevoked(bytes32 claimId) view returns (bool)',
+  'function revokeClaim(bytes32 claimId) external',
+  'function unrevokeClaim(bytes32 claimId) external',
+  'function getClaimHash(address identityContract, uint256 topic, bytes data) pure returns (bytes32)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'event ClaimRevoked(bytes32 indexed claimId)',
+  'event ClaimUnrevoked(bytes32 indexed claimId)',
+  'event SigningKeyUpdated(address indexed previous, address indexed current)',
+];
+
+export const IDENTITY_FACTORY_ABI = [
+  'function deployIdentity(address investor, address claimAgent) external returns (address)',
+  'function getIdentity(address investor) view returns (address)',
+  'function deployedIdentity(address) view returns (address)',
+  'function identityCount() view returns (uint256)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function grantRole(bytes32 role, address account) external',
+  'function DEPLOYER_ROLE() view returns (bytes32)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'event IdentityDeployed(address indexed investor, address indexed identityContract, uint256 indexed index)',
+];
+
+export const IDENTITY_ABI = [
+  // ERC-734 Key Management
+  'function getKey(bytes32 key) view returns (uint256[] purposes, uint256 keyType, bytes32 keyValue)',
+  'function keyHasPurpose(bytes32 key, uint256 purpose) view returns (bool)',
+  'function addKey(bytes32 key, uint256 purpose, uint256 keyType) external',
+  'function removeKey(bytes32 key, uint256 purpose) external',
+  'function addressToKey(address addr) pure returns (bytes32)',
+  // ERC-735 Claim Holder
+  'function addClaim(uint256 topic, uint256 scheme, address issuer, bytes signature, bytes data, string uri) external returns (bytes32)',
+  'function removeClaim(bytes32 claimId) external',
+  'function getClaim(bytes32 claimId) view returns (uint256 topic, uint256 scheme, address issuer, bytes signature, bytes data, string uri)',
+  'function getClaimIdsByTopic(uint256 topic) view returns (bytes32[])',
+  // Constants
+  'function PURPOSE_MANAGEMENT() view returns (uint256)',
+  'function PURPOSE_ACTION() view returns (uint256)',
+  'function PURPOSE_CLAIM() view returns (uint256)',
+  // Events
+  'event KeyAdded(bytes32 indexed key, uint256 indexed purpose, uint256 indexed keyType)',
+  'event KeyRemoved(bytes32 indexed key, uint256 indexed purpose, uint256 indexed keyType)',
+  'event ClaimAdded(bytes32 indexed claimId, uint256 indexed topic, address indexed issuer)',
+  'event ClaimRemoved(bytes32 indexed claimId, uint256 indexed topic, address indexed issuer)',
+  'event ClaimChanged(bytes32 indexed claimId, uint256 indexed topic, address indexed issuer)',
 ];

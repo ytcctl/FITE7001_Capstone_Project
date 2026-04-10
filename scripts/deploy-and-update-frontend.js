@@ -126,7 +126,7 @@ async function main() {
   const custodianAddress = process.env.CUSTODIAN_ADDRESS || deployer.address;
 
   // 1. IdentityRegistry
-  console.log("1/6  Deploying HKSTPIdentityRegistry...");
+  console.log("1/8  Deploying HKSTPIdentityRegistry...");
   const IdentityRegistry = await ethers.getContractFactory(
     "HKSTPIdentityRegistry"
   );
@@ -136,7 +136,7 @@ async function main() {
   console.log("     HKSTPIdentityRegistry:", registryAddress);
 
   // 2. Compliance
-  console.log("2/6  Deploying HKSTPCompliance...");
+  console.log("2/8  Deploying HKSTPCompliance...");
   const Compliance = await ethers.getContractFactory("HKSTPCompliance");
   const compliance = await Compliance.deploy(deployer.address, complianceOracle);
   await compliance.waitForDeployment();
@@ -144,7 +144,7 @@ async function main() {
   console.log("     HKSTPCompliance:", complianceAddress);
 
   // 3. SecurityToken
-  console.log("3/6  Deploying HKSTPSecurityToken...");
+  console.log("3/8  Deploying HKSTPSecurityToken...");
   const Token = await ethers.getContractFactory("HKSTPSecurityToken");
   const token = await Token.deploy(
     "HKSTP Alpha Startup Token",
@@ -159,7 +159,7 @@ async function main() {
   console.log("     HKSTPSecurityToken:", tokenAddress);
 
   // 4. MockCashToken
-  console.log("4/6  Deploying MockCashToken (tokenized HKD)...");
+  console.log("4/8  Deploying MockCashToken (tokenized HKD)...");
   const MockCash = await ethers.getContractFactory("MockCashToken");
   const cashToken = await MockCash.deploy("Tokenized HKD", "THKD", 6, deployer.address);
   await cashToken.waitForDeployment();
@@ -167,7 +167,7 @@ async function main() {
   console.log("     MockCashToken (THKD):", cashTokenAddress);
 
   // 5. DvPSettlement
-  console.log("5/6  Deploying DvPSettlement...");
+  console.log("5/8  Deploying DvPSettlement...");
   const DvP = await ethers.getContractFactory("DvPSettlement");
   const dvp = await DvP.deploy(deployer.address);
   await dvp.waitForDeployment();
@@ -175,16 +175,32 @@ async function main() {
   console.log("     DvPSettlement:", dvpAddress);
 
   // 6. TokenFactory
-  console.log("6/6  Deploying TokenFactory...");
+  console.log("6/8  Deploying TokenFactory...");
   const TokenFactory = await ethers.getContractFactory("TokenFactory");
   const tokenFactory = await TokenFactory.deploy(
-    registryAddress,
-    complianceAddress,
-    deployer.address
+    deployer.address,    // admin
+    registryAddress,     // identityRegistry
+    complianceAddress    // compliance
   );
   await tokenFactory.waitForDeployment();
   const tokenFactoryAddress = await tokenFactory.getAddress();
   console.log("     TokenFactory:", tokenFactoryAddress);
+
+  // 7. ClaimIssuer (Trusted Claim Issuer for ONCHAINID)
+  console.log("7/8  Deploying ClaimIssuer...");
+  const ClaimIssuerFactory = await ethers.getContractFactory("ClaimIssuer");
+  const claimIssuer = await ClaimIssuerFactory.deploy(deployer.address, deployer.address);
+  await claimIssuer.waitForDeployment();
+  const claimIssuerAddress = await claimIssuer.getAddress();
+  console.log("     ClaimIssuer:", claimIssuerAddress);
+
+  // 8. IdentityFactory (deploys per-investor ONCHAINID contracts)
+  console.log("8/8  Deploying IdentityFactory...");
+  const IdentityFactoryContract = await ethers.getContractFactory("IdentityFactory");
+  const identityFactory = await IdentityFactoryContract.deploy(deployer.address);
+  await identityFactory.waitForDeployment();
+  const identityFactoryAddress = await identityFactory.getAddress();
+  console.log("     IdentityFactory:", identityFactoryAddress);
 
   // Post-deployment configuration
   console.log("\nConfiguring roles and safe-list...");
@@ -212,6 +228,22 @@ async function main() {
     }
   }
 
+  // ONCHAINID wiring: IdentityFactory + ClaimIssuer → IdentityRegistry
+  console.log("\nConfiguring ONCHAINID identity system...");
+
+  // Set IdentityFactory on the registry
+  await (await registry.setIdentityFactory(identityFactoryAddress)).wait();
+  console.log("     IdentityFactory set on IdentityRegistry");
+
+  // Grant DEPLOYER_ROLE on IdentityFactory to the IdentityRegistry
+  const DEPLOYER_ROLE = await identityFactory.DEPLOYER_ROLE();
+  await (await identityFactory.grantRole(DEPLOYER_ROLE, registryAddress)).wait();
+  console.log("     DEPLOYER_ROLE granted to IdentityRegistry on IdentityFactory");
+
+  // Add ClaimIssuer as a Trusted Issuer for all 5 claim topics
+  await (await registry.addTrustedIssuer(claimIssuerAddress, [1, 2, 3, 4, 5])).wait();
+  console.log("     ClaimIssuer added as Trusted Issuer for topics 1-5");
+
   // -----------------------------------------------------------------------
   // AUTO-UPDATE frontend/src/config/contracts.ts
   // -----------------------------------------------------------------------
@@ -238,6 +270,8 @@ async function main() {
   cashToken: '${cashTokenAddress}',
   dvpSettlement: '${dvpAddress}',
   tokenFactory: '${tokenFactoryAddress}',
+  claimIssuer: '${claimIssuerAddress}',
+  identityFactory: '${identityFactoryAddress}',
 };`;
 
     if (oldBlock.test(content)) {
@@ -286,6 +320,12 @@ async function main() {
   );
   console.log(
     `║ TokenFactory          : ${tokenFactoryAddress}  ║`
+  );
+  console.log(
+    `║ ClaimIssuer           : ${claimIssuerAddress}  ║`
+  );
+  console.log(
+    `║ IdentityFactory       : ${identityFactoryAddress}  ║`
   );
   console.log(
     "╠══════════════════════════════════════════════════════════════╣"
