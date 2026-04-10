@@ -17,11 +17,11 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x0000000000000000000000000000000000000000',
-  compliance: '0x0000000000000000000000000000000000000000',
-  securityToken: '0x0000000000000000000000000000000000000000',
-  cashToken: '0x0000000000000000000000000000000000000000',
-  dvpSettlement: '0x0000000000000000000000000000000000000000',
+  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
+  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
+  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
+  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
+  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
 };
 
 // -----------------------------------------------------------------
