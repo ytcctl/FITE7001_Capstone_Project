@@ -23,7 +23,7 @@ module.exports = {
     },
     besu: {
       url: process.env.BESU_RPC_URL || "http://127.0.0.1:8545",
-      chainId: 7001,
+      chainId: parseInt(process.env.BESU_CHAIN_ID || "1337"),
       accounts: process.env.BESU_PRIVATE_KEYS
         ? process.env.BESU_PRIVATE_KEYS.split(",")
         : [],

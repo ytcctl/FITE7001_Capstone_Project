@@ -7,7 +7,7 @@
  * registers identities, and performs atomic DvP settlement — all on-chain.
  *
  * Prerequisites:
- *   1. Besu node running at http://127.0.0.1:8545 (chain ID 7001)
+ *   1. Besu node running at http://127.0.0.1:8545 (--network=dev, chain ID 1337)
  *      → .\besu\start-besu.ps1 -Detach
  *   2. Environment loaded from .env.besu
  *      → copy .env.besu to .env  OR  set vars manually
@@ -73,21 +73,39 @@ describe("Besu E2E Integration — Full TokenHub Lifecycle", function () {
   }
 
   // ------------------------------------------------------------------
-  // 1. Verify Besu connectivity
+  // 1. Verify Besu connectivity & fund accounts
   // ------------------------------------------------------------------
   describe("Phase 1 — Network Connectivity", function () {
-    it("should connect to Besu and return chain ID 7001", async function () {
+    it("should connect to Besu and return the expected chain ID", async function () {
+      const expectedChainId = parseInt(process.env.BESU_CHAIN_ID || "1337");
       const network = await ethers.provider.getNetwork();
       console.log(`    Connected to chain ID: ${network.chainId}`);
-      expect(Number(network.chainId)).to.equal(7001);
+      expect(Number(network.chainId)).to.equal(expectedChainId);
     });
 
-    it("should have signers with pre-funded balances", async function () {
+    it("should assign signers and fund them from the dev account", async function () {
       const signers = await ethers.getSigners();
       expect(signers.length).to.be.gte(5);
 
       [deployer, operator, agent, seller, buyer] = signers;
 
+      // In Besu --network=dev only account 0 is pre-funded.
+      // Send 100 ETH to each of the remaining accounts so they can transact.
+      const fundAmount = ethers.parseEther("100");
+      for (const s of [operator, agent, seller, buyer]) {
+        const bal = await ethers.provider.getBalance(s.address);
+        if (bal < fundAmount) {
+          const tx = await deployer.sendTransaction({
+            to: s.address,
+            value: fundAmount,
+          });
+          await tx.wait();
+          console.log(`    Funded ${s.address} with 100 ETH`);
+        }
+      }
+    });
+
+    it("should have signers with non-zero balances", async function () {
       for (const s of [deployer, operator, agent, seller, buyer]) {
         const bal = await ethers.provider.getBalance(s.address);
         console.log(`    ${s.address} — ${ethers.formatEther(bal)} ETH`);
