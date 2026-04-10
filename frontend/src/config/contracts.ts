@@ -17,12 +17,12 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
-  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
-  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
-  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
-  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
-  tokenFactory: '0x0000000000000000000000000000000000000000', // updated by deploy script
+  identityRegistry: '0xBF921f94Fd9eF1738bE25D8CeCFDFE2C822c81B0',
+  compliance: '0xBeC8a9e485a4B75d3b14249de7CA6D124fE94795',
+  securityToken: '0x3Ace09BBA3b8507681146252d3Dd33cD4E2d4F63',
+  cashToken: '0x3484B20600854091C166C062FacAd700123f5f71',
+  dvpSettlement: '0x7cA5543f9B2C35F0E972f1B45b61A2FE53fF1ed9',
+  tokenFactory: '0x63491c5363329afb6f370E9D297025481E0277e6',
 };
 
 // -----------------------------------------------------------------
