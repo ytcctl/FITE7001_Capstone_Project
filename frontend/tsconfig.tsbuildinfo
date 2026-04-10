@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/layout.tsx","./src/config/contracts.ts","./src/context/web3context.tsx","./src/pages/compliancerules.tsx","./src/pages/dashboard.tsx","./src/pages/kycmanagement.tsx","./src/pages/portfolio.tsx","./src/pages/settlement.tsx","./src/pages/tokenminting.tsx"],"version":"5.9.3"}
