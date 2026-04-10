@@ -21,17 +21,27 @@ export interface Contracts {
   dvpSettlement: ethers.Contract;
 }
 
+export interface UserRoles {
+  isAdmin: boolean;
+  isAgent: boolean;
+  isOperator: boolean;
+}
+
 interface Web3State {
   provider: ethers.BrowserProvider | null;
   signer: ethers.JsonRpcSigner | null;
   account: string | null;
   chainId: number | null;
   contracts: Contracts | null;
+  roles: UserRoles;
+  rolesLoading: boolean;
   isConnecting: boolean;
   error: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
 }
+
+const DEFAULT_ROLES: UserRoles = { isAdmin: false, isAgent: false, isOperator: false };
 
 const Web3Context = createContext<Web3State>({
   provider: null,
@@ -39,6 +49,8 @@ const Web3Context = createContext<Web3State>({
   account: null,
   chainId: null,
   contracts: null,
+  roles: DEFAULT_ROLES,
+  rolesLoading: false,
   isConnecting: false,
   error: null,
   connect: async () => {},
@@ -54,18 +66,49 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [contracts, setContracts] = useState<Contracts | null>(null);
+  const [roles, setRoles] = useState<UserRoles>(DEFAULT_ROLES);
+  const [rolesLoading, setRolesLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Detect on-chain roles for the given account */
+  const detectRoles = useCallback(async (addr: string, c: Contracts) => {
+    setRolesLoading(true);
+    try {
+      // Fetch role constants
+      const [adminRole, agentRole, operatorRole] = await Promise.all([
+        c.identityRegistry.DEFAULT_ADMIN_ROLE() as Promise<string>,
+        c.identityRegistry.AGENT_ROLE() as Promise<string>,
+        c.dvpSettlement.OPERATOR_ROLE() as Promise<string>,
+      ]);
+
+      // Check roles on IdentityRegistry (admin/agent) and DvP (operator)
+      const [isAdmin, isAgent, isOperator] = await Promise.all([
+        c.identityRegistry.hasRole(adminRole, addr) as Promise<boolean>,
+        c.identityRegistry.hasRole(agentRole, addr) as Promise<boolean>,
+        c.dvpSettlement.hasRole(operatorRole, addr) as Promise<boolean>,
+      ]);
+
+      setRoles({ isAdmin, isAgent, isOperator });
+    } catch {
+      // If role detection fails (e.g. wrong network), default to no roles
+      setRoles(DEFAULT_ROLES);
+    } finally {
+      setRolesLoading(false);
+    }
+  }, []);
+
   /** Build ethers contract instances bound to the signer */
   const initContracts = useCallback((s: ethers.JsonRpcSigner) => {
-    setContracts({
+    const c: Contracts = {
       identityRegistry: new ethers.Contract(CONTRACT_ADDRESSES.identityRegistry, IDENTITY_REGISTRY_ABI, s),
       compliance: new ethers.Contract(CONTRACT_ADDRESSES.compliance, COMPLIANCE_ABI, s),
       securityToken: new ethers.Contract(CONTRACT_ADDRESSES.securityToken, SECURITY_TOKEN_ABI, s),
       cashToken: new ethers.Contract(CONTRACT_ADDRESSES.cashToken, CASH_TOKEN_ABI, s),
       dvpSettlement: new ethers.Contract(CONTRACT_ADDRESSES.dvpSettlement, DVP_SETTLEMENT_ABI, s),
-    });
+    };
+    setContracts(c);
+    return c;
   }, []);
 
   /** Switch MetaMask to the Besu devnet (or add it) */
@@ -115,14 +158,15 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSigner(s);
       setAccount(accounts[0]);
       setChainId(Number(network.chainId));
-      initContracts(s);
+      const c = initContracts(s);
+      detectRoles(accounts[0], c);
     } catch (e: unknown) {
       const err = e as Error;
       setError(err.message || 'Failed to connect wallet');
     } finally {
       setIsConnecting(false);
     }
-  }, [ensureNetwork, initContracts]);
+  }, [ensureNetwork, initContracts, detectRoles]);
 
   /** Disconnect wallet */
   const disconnect = useCallback(() => {
@@ -131,6 +175,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAccount(null);
     setChainId(null);
     setContracts(null);
+    setRoles(DEFAULT_ROLES);
   }, []);
 
   /** Listen for MetaMask account / chain changes */
@@ -151,7 +196,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setSigner(s);
           setAccount(accounts[0]);
           setChainId(Number(network.chainId));
-          initContracts(s);
+          const c = initContracts(s);
+          detectRoles(accounts[0], c);
         } catch {
           // Fallback: full reconnect
           connect();
@@ -170,7 +216,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum?.removeListener('chainChanged', handleChainChanged);
     };
-  }, [connect, disconnect, initContracts]);
+  }, [connect, disconnect, initContracts, detectRoles]);
 
   /** Auto-reconnect on page load if wallet was previously connected */
   useEffect(() => {
@@ -189,7 +235,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <Web3Context.Provider
-      value={{ provider, signer, account, chainId, contracts, isConnecting, error, connect, disconnect }}
+      value={{ provider, signer, account, chainId, contracts, roles, rolesLoading, isConnecting, error, connect, disconnect }}
     >
       {children}
     </Web3Context.Provider>

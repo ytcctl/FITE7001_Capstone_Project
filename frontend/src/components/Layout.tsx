@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -10,22 +11,31 @@ import {
   Sparkles,
   LogOut,
   Wallet,
+  Lock,
 } from 'lucide-react';
 import { useWeb3 } from '../context/Web3Context';
 
-const navItems = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/kyc', label: 'KYC Management', icon: ShieldCheck },
-  { to: '/mint', label: 'Token Minting', icon: Coins },
+  { to: '/kyc', label: 'KYC Management', icon: ShieldCheck, adminOnly: true },
+  { to: '/mint', label: 'Token Minting', icon: Coins, adminOnly: true },
   { to: '/settlement', label: 'DvP Settlement', icon: ArrowRightLeft },
-  { to: '/compliance', label: 'Compliance Rules', icon: Scale },
+  { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { account, chainId, isConnecting, connect, disconnect } = useWeb3();
+  const { account, chainId, roles, rolesLoading, isConnecting, connect, disconnect } = useWeb3();
   const location = useLocation();
 
+  const isAdminOrAgent = roles.isAdmin || roles.isAgent;
   const shortAddr = account ? `${account.slice(0, 6)}…${account.slice(-4)}` : '';
 
   return (
@@ -48,6 +58,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to;
+            const isHidden = item.adminOnly && !isAdminOrAgent && !rolesLoading;
+
+            if (isHidden) return null;
+
             return (
               <NavLink
                 key={item.to}
@@ -60,6 +74,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <Icon size={20} className={isActive ? 'text-purple-400' : 'text-gray-500'} />
                 {item.label}
+                {item.adminOnly && (
+                  <Lock size={12} className="ml-auto text-yellow-500/60" />
+                )}
               </NavLink>
             );
           })}
@@ -71,6 +88,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <div className="px-4 py-2 text-xs text-gray-400 truncate">
               <span className="block text-gray-500 mb-0.5">Connected</span>
               {shortAddr} · Chain {chainId}
+              <span className={`ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                isAdminOrAgent
+                  ? 'bg-yellow-500/20 text-yellow-400'
+                  : 'bg-blue-500/20 text-blue-400'
+              }`}>
+                {rolesLoading ? '…' : isAdminOrAgent ? 'ADMIN' : 'INVESTOR'}
+              </span>
             </div>
           )}
           {account ? (
