@@ -136,25 +136,56 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /** Listen for MetaMask account / chain changes */
   useEffect(() => {
     if (!window.ethereum) return;
-    const handleAccountsChanged = (...args: unknown[]) => {
+
+    const handleAccountsChanged = async (...args: unknown[]) => {
       const accounts = args[0] as string[];
       if (accounts.length === 0) {
         disconnect();
       } else {
-        setAccount(accounts[0]);
-        connect();
+        // Re-create provider + signer for the new account
+        try {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum!);
+          const s = await browserProvider.getSigner();
+          const network = await browserProvider.getNetwork();
+          setProvider(browserProvider);
+          setSigner(s);
+          setAccount(accounts[0]);
+          setChainId(Number(network.chainId));
+          initContracts(s);
+        } catch {
+          // Fallback: full reconnect
+          connect();
+        }
       }
     };
+
     const handleChainChanged = () => {
-      connect();
+      // Chain changed — full reconnect to rebuild everything
+      window.location.reload();
     };
+
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
     return () => {
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum?.removeListener('chainChanged', handleChainChanged);
     };
-  }, [connect, disconnect]);
+  }, [connect, disconnect, initContracts]);
+
+  /** Auto-reconnect on page load if wallet was previously connected */
+  useEffect(() => {
+    if (!window.ethereum) return;
+    window.ethereum
+      .request({ method: 'eth_accounts' })
+      .then((result: unknown) => {
+        const accounts = result as string[];
+        if (accounts.length > 0) {
+          connect();
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Web3Context.Provider
