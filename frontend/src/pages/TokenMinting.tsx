@@ -1,10 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { Coins, Plus, Minus, RefreshCw, Loader2 } from 'lucide-react';
+import { SECURITY_TOKEN_ABI } from '../config/contracts';
+import { Coins, Plus, Minus, RefreshCw, Loader2, ChevronDown } from 'lucide-react';
 import { ethers } from 'ethers';
 
+interface TokenOption {
+  name: string;
+  symbol: string;
+  address: string;
+  active: boolean;
+}
+
 const TokenMinting: React.FC = () => {
-  const { account, contracts } = useWeb3();
+  const { account, contracts, provider } = useWeb3();
+
+  // Available tokens from factory
+  const [tokenOptions, setTokenOptions] = useState<TokenOption[]>([]);
+  const [selectedTokenAddr, setSelectedTokenAddr] = useState<string>('');
 
   // Security token
   const [stName, setStName] = useState('');
@@ -28,13 +40,76 @@ const TokenMinting: React.FC = () => {
   const [txStatus, setTxStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadInfo = async () => {
+  /** Helper: get a signer-backed security token contract for the selected address */
+  const getSelectedTokenContract = useCallback(() => {
+    if (!provider || !selectedTokenAddr || selectedTokenAddr === '') return null;
+    // If it's the default security token, use the one from context
+    if (contracts && selectedTokenAddr === (contracts.securityToken as ethers.Contract).target) {
+      return contracts.securityToken;
+    }
+    // Otherwise, create a new contract instance for a factory-deployed token
+    const signer = (provider as ethers.BrowserProvider).getSigner();
+    return signer.then(s => new ethers.Contract(selectedTokenAddr, SECURITY_TOKEN_ABI, s));
+  }, [provider, selectedTokenAddr, contracts]);
+
+  /** Load the list of factory-deployed tokens + the default security token */
+  const loadTokenOptions = useCallback(async () => {
     if (!contracts) return;
+    const options: TokenOption[] = [];
+
+    // Always include the default security token deployed by the deploy script
     try {
-      const [name, sym, supply, cSym, cSupply] = await Promise.all([
+      const [name, symbol] = await Promise.all([
         contracts.securityToken.name(),
         contracts.securityToken.symbol(),
-        contracts.securityToken.totalSupply(),
+      ]);
+      const addr = await contracts.securityToken.getAddress();
+      options.push({ name, symbol, address: addr, active: true });
+    } catch {
+      // fallback if the contract isn't available
+    }
+
+    // Fetch factory-deployed tokens
+    try {
+      const all = await contracts.tokenFactory.allTokens();
+      for (const t of all) {
+        // Avoid duplicate if factory deployed the same default token
+        if (options.find(o => o.address.toLowerCase() === t.tokenAddress.toLowerCase())) continue;
+        if (t.active) {
+          options.push({
+            name: t.name,
+            symbol: t.symbol,
+            address: t.tokenAddress,
+            active: t.active,
+          });
+        }
+      }
+    } catch {
+      // TokenFactory might not be deployed yet — that's fine
+    }
+
+    setTokenOptions(options);
+    // Default selection: first option
+    if (options.length > 0 && !selectedTokenAddr) {
+      setSelectedTokenAddr(options[0].address);
+    }
+  }, [contracts, selectedTokenAddr]);
+
+  const loadInfo = useCallback(async () => {
+    if (!contracts || !selectedTokenAddr) return;
+    try {
+      // Load selected security token info
+      let tokenContract: ethers.Contract;
+      if (selectedTokenAddr === (contracts.securityToken as ethers.Contract).target) {
+        tokenContract = contracts.securityToken as ethers.Contract;
+      } else {
+        tokenContract = new ethers.Contract(selectedTokenAddr, SECURITY_TOKEN_ABI, provider);
+      }
+
+      const [name, sym, supply, cSym, cSupply] = await Promise.all([
+        tokenContract.name(),
+        tokenContract.symbol(),
+        tokenContract.totalSupply(),
         contracts.cashToken.symbol(),
         contracts.cashToken.totalSupply(),
       ]);
@@ -46,18 +121,24 @@ const TokenMinting: React.FC = () => {
     } catch (e) {
       console.error('TokenMinting load error:', e);
     }
-  };
+  }, [contracts, selectedTokenAddr, provider]);
+
+  useEffect(() => {
+    loadTokenOptions();
+  }, [loadTokenOptions]);
 
   useEffect(() => {
     loadInfo();
-  }, [contracts]);
+  }, [loadInfo]);
 
   const handleMint = async () => {
-    if (!contracts || !mintTo || !mintAmount) return;
+    if (!mintTo || !mintAmount) return;
     setIsSubmitting(true);
     setTxStatus(`Minting ${mintAmount} ${stSymbol}…`);
     try {
-      const tx = await contracts.securityToken.mint(mintTo, ethers.parseUnits(mintAmount, 18));
+      const tokenContract = await getSelectedTokenContract();
+      if (!tokenContract) throw new Error('No token selected');
+      const tx = await (tokenContract as ethers.Contract).mint(mintTo, ethers.parseUnits(mintAmount, 18));
       await tx.wait();
       setTxStatus(`✓ Minted ${mintAmount} ${stSymbol} to ${mintTo.slice(0, 10)}…`);
       setMintAmount('');
@@ -70,11 +151,13 @@ const TokenMinting: React.FC = () => {
   };
 
   const handleBurn = async () => {
-    if (!contracts || !burnFrom || !burnAmount) return;
+    if (!burnFrom || !burnAmount) return;
     setIsSubmitting(true);
     setTxStatus(`Burning ${burnAmount} ${stSymbol}…`);
     try {
-      const tx = await contracts.securityToken.burn(burnFrom, ethers.parseUnits(burnAmount, 18));
+      const tokenContract = await getSelectedTokenContract();
+      if (!tokenContract) throw new Error('No token selected');
+      const tx = await (tokenContract as ethers.Contract).burn(burnFrom, ethers.parseUnits(burnAmount, 18));
       await tx.wait();
       setTxStatus(`✓ Burned ${burnAmount} ${stSymbol} from ${burnFrom.slice(0, 10)}…`);
       setBurnAmount('');
@@ -149,6 +232,27 @@ const TokenMinting: React.FC = () => {
           }`}
         >
           {txStatus}
+        </div>
+      )}
+
+      {/* Token Selector */}
+      {tokenOptions.length > 1 && (
+        <div className="glass-card p-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+            <ChevronDown size={16} />
+            Select Security Token
+          </label>
+          <select
+            value={selectedTokenAddr}
+            onChange={(e) => setSelectedTokenAddr(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm appearance-none cursor-pointer"
+          >
+            {tokenOptions.map((opt) => (
+              <option key={opt.address} value={opt.address} className="bg-gray-900">
+                {opt.name} ({opt.symbol}) — {opt.address.slice(0, 8)}…
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

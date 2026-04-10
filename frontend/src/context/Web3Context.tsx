@@ -8,6 +8,7 @@ import {
   SECURITY_TOKEN_ABI,
   CASH_TOKEN_ABI,
   DVP_SETTLEMENT_ABI,
+  TOKEN_FACTORY_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -19,6 +20,7 @@ export interface Contracts {
   securityToken: ethers.Contract;
   cashToken: ethers.Contract;
   dvpSettlement: ethers.Contract;
+  tokenFactory: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -106,6 +108,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       securityToken: new ethers.Contract(CONTRACT_ADDRESSES.securityToken, SECURITY_TOKEN_ABI, s),
       cashToken: new ethers.Contract(CONTRACT_ADDRESSES.cashToken, CASH_TOKEN_ABI, s),
       dvpSettlement: new ethers.Contract(CONTRACT_ADDRESSES.dvpSettlement, DVP_SETTLEMENT_ABI, s),
+      tokenFactory: new ethers.Contract(CONTRACT_ADDRESSES.tokenFactory, TOKEN_FACTORY_ABI, s),
     };
     setContracts(c);
     return c;

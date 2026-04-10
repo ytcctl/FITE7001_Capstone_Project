@@ -126,7 +126,7 @@ async function main() {
   const custodianAddress = process.env.CUSTODIAN_ADDRESS || deployer.address;
 
   // 1. IdentityRegistry
-  console.log("1/5  Deploying HKSTPIdentityRegistry...");
+  console.log("1/6  Deploying HKSTPIdentityRegistry...");
   const IdentityRegistry = await ethers.getContractFactory(
     "HKSTPIdentityRegistry"
   );
@@ -136,7 +136,7 @@ async function main() {
   console.log("     HKSTPIdentityRegistry:", registryAddress);
 
   // 2. Compliance
-  console.log("2/5  Deploying HKSTPCompliance...");
+  console.log("2/6  Deploying HKSTPCompliance...");
   const Compliance = await ethers.getContractFactory("HKSTPCompliance");
   const compliance = await Compliance.deploy(deployer.address, complianceOracle);
   await compliance.waitForDeployment();
@@ -144,7 +144,7 @@ async function main() {
   console.log("     HKSTPCompliance:", complianceAddress);
 
   // 3. SecurityToken
-  console.log("3/5  Deploying HKSTPSecurityToken...");
+  console.log("3/6  Deploying HKSTPSecurityToken...");
   const Token = await ethers.getContractFactory("HKSTPSecurityToken");
   const token = await Token.deploy(
     "HKSTP Alpha Startup Token",
@@ -159,7 +159,7 @@ async function main() {
   console.log("     HKSTPSecurityToken:", tokenAddress);
 
   // 4. MockCashToken
-  console.log("4/5  Deploying MockCashToken (tokenized HKD)...");
+  console.log("4/6  Deploying MockCashToken (tokenized HKD)...");
   const MockCash = await ethers.getContractFactory("MockCashToken");
   const cashToken = await MockCash.deploy("Tokenized HKD", "THKD", 6, deployer.address);
   await cashToken.waitForDeployment();
@@ -167,12 +167,24 @@ async function main() {
   console.log("     MockCashToken (THKD):", cashTokenAddress);
 
   // 5. DvPSettlement
-  console.log("5/5  Deploying DvPSettlement...");
+  console.log("5/6  Deploying DvPSettlement...");
   const DvP = await ethers.getContractFactory("DvPSettlement");
   const dvp = await DvP.deploy(deployer.address);
   await dvp.waitForDeployment();
   const dvpAddress = await dvp.getAddress();
   console.log("     DvPSettlement:", dvpAddress);
+
+  // 6. TokenFactory
+  console.log("6/6  Deploying TokenFactory...");
+  const TokenFactory = await ethers.getContractFactory("TokenFactory");
+  const tokenFactory = await TokenFactory.deploy(
+    registryAddress,
+    complianceAddress,
+    deployer.address
+  );
+  await tokenFactory.waitForDeployment();
+  const tokenFactoryAddress = await tokenFactory.getAddress();
+  console.log("     TokenFactory:", tokenFactoryAddress);
 
   // Post-deployment configuration
   console.log("\nConfiguring roles and safe-list...");
@@ -225,6 +237,7 @@ async function main() {
   securityToken: '${tokenAddress}',
   cashToken: '${cashTokenAddress}',
   dvpSettlement: '${dvpAddress}',
+  tokenFactory: '${tokenFactoryAddress}',
 };`;
 
     if (oldBlock.test(content)) {
@@ -270,6 +283,9 @@ async function main() {
   );
   console.log(
     `║ DvPSettlement         : ${dvpAddress}  ║`
+  );
+  console.log(
+    `║ TokenFactory          : ${tokenFactoryAddress}  ║`
   );
   console.log(
     "╠══════════════════════════════════════════════════════════════╣"

@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   Scale,
   Briefcase,
+  Building2,
   Sparkles,
   LogOut,
   Wallet,
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { to: '/mint', label: 'Token Minting', icon: Coins, adminOnly: true },
   { to: '/settlement', label: 'DvP Settlement', icon: ArrowRightLeft },
   { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
+  { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
 ];
 

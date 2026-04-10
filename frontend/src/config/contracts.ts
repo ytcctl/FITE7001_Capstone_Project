@@ -22,6 +22,7 @@ export const CONTRACT_ADDRESSES = {
   securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
   cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
   dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
+  tokenFactory: '0x0000000000000000000000000000000000000000', // updated by deploy script
 };
 
 // -----------------------------------------------------------------
@@ -188,3 +189,24 @@ export const CLAIM_TOPICS: Record<number, string> = {
   4: 'Source of Funds Verified',
   5: 'PEP/Sanctions Clear',
 };
+
+// -----------------------------------------------------------------
+// Token Factory ABI
+// -----------------------------------------------------------------
+export const TOKEN_FACTORY_ABI = [
+  'function createToken(string name, string symbol) returns (address)',
+  'function deactivateToken(uint256 index)',
+  'function reactivateToken(uint256 index)',
+  'function tokenCount() view returns (uint256)',
+  'function getToken(uint256 index) view returns (tuple(string name, string symbol, address tokenAddress, address createdBy, uint256 createdAt, bool active))',
+  'function allTokens() view returns (tuple(string name, string symbol, address tokenAddress, address createdBy, uint256 createdAt, bool active)[])',
+  'function activeTokens() view returns (tuple(string name, string symbol, address tokenAddress, address createdBy, uint256 createdAt, bool active)[])',
+  'function getTokenBySymbol(string symbol) view returns (tuple(string name, string symbol, address tokenAddress, address createdBy, uint256 createdAt, bool active))',
+  'function identityRegistry() view returns (address)',
+  'function compliance() view returns (address)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'event TokenCreated(uint256 indexed index, string name, string symbol, address tokenAddress, address createdBy)',
+  'event TokenDeactivated(uint256 indexed index, address tokenAddress)',
+  'event TokenReactivated(uint256 indexed index, address tokenAddress)',
+];
