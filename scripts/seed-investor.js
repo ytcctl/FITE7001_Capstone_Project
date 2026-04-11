@@ -97,8 +97,8 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
 
-  // Investor1 address (Ganache/Truffle deterministic account #1)
-  const INVESTOR1 = "0x627306090abaB3A6e1400e9345bC60c78a8BEf57";
+  // Investor1 address (your MetaMask account)
+  const INVESTOR1 = "0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3";
 
   // ── Load deployed contracts ──
   const registryAddr      = "0x2ed622769Bf53dC4E52c659Ca0E140651716e9e3";

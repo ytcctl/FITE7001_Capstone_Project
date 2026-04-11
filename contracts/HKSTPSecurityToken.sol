@@ -114,6 +114,23 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     event IdentityHolderAdded(address indexed identityContract);
     event IdentityHolderRemoved(address indexed identityContract);
 
+    /// @notice ERC-1644 Forced Transfer — emitted when the Custodian/Agent executes
+    ///         a court-ordered or liquidator-directed transfer under Cap. 32 S182.
+    /// @param controller  The agent who executed the forced transfer.
+    /// @param from        Source address (e.g. compromised/lost wallet, or insolvent entity).
+    /// @param to          Destination address (e.g. recovered wallet, or liquidator's address).
+    /// @param amount      Number of tokens transferred.
+    /// @param legalOrderHash  IPFS CID (bytes32) of the encrypted court order / legal instrument.
+    /// @param operatorData    Arbitrary operator context (e.g. case reference, nonce).
+    event ForcedTransfer(
+        address indexed controller,
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        bytes32 legalOrderHash,
+        bytes   operatorData
+    );
+
     // -------------------------------------------------------------------------
     // Constructor (backward-compatible + EIP-1167 implementation)
     // -------------------------------------------------------------------------
@@ -321,6 +338,95 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     function burn(address from, uint256 amount) external onlyRole(AGENT_ROLE) whenNotPaused {
         _burn(from, amount);
         emit TokensBurned(from, amount, msg.sender);
+    }
+
+    // -------------------------------------------------------------------------
+    // ERC-1644 Forced Transfer (AGENT_ROLE — Custodian / Liquidator directive)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice ERC-1644 `controllerTransfer` — Forced transfer of tokens by the
+     *         licensed Custodian (Agent) acting on a court order or liquidator
+     *         directive under Cap. 32 S182.
+     *
+     *         This is an ATOMIC operation: tokens move directly from `from` to `to`
+     *         without intermediate minting or burning, so `totalSupply` is invariant
+     *         and the Cap Table remains perfectly consistent.
+     *
+     *         The encrypted court order is hashed into an IPFS CID and anchored
+     *         on-chain via `legalOrderHash`, achieving Immutable Legal Anchoring.
+     *
+     *         Because a private platform does not automatically qualify for statutory
+     *         protection under Cap. 584 (Settlement Finality), contractual finality
+     *         is embedded within the Terms of Service and enforced by this function.
+     *
+     * @dev    Bypasses freeze checks and compliance modules — the Custodian is
+     *         assumed to have completed off-chain legal verification.  The frozen
+     *         status of `from` is NOT checked because the court order overrides
+     *         any platform-level restriction.
+     *
+     * @param from            Source address (lost wallet, insolvent entity).
+     * @param to              Destination address (recovered wallet, liquidator).
+     *                        Must be registered and verified in the Identity Registry.
+     * @param amount          Number of tokens to transfer.
+     * @param legalOrderHash  bytes32 IPFS CID of the encrypted court order document.
+     *                        Must not be zero — every forced transfer must have a
+     *                        legal instrument reference for audit purposes.
+     * @param operatorData    Arbitrary bytes for operator context (case reference,
+     *                        internal nonce, etc.).  May be empty.
+     */
+    function forcedTransfer(
+        address from,
+        address to,
+        uint256 amount,
+        bytes32 legalOrderHash,
+        bytes calldata operatorData
+    ) external onlyRole(AGENT_ROLE) whenNotPaused {
+        require(from != address(0), "HKSTPSecurityToken: from is zero address");
+        require(to   != address(0), "HKSTPSecurityToken: to is zero address");
+        require(amount > 0,         "HKSTPSecurityToken: zero amount");
+        require(legalOrderHash != bytes32(0), "HKSTPSecurityToken: missing legal order hash");
+        require(
+            balanceOf(from) >= amount,
+            "HKSTPSecurityToken: insufficient balance"
+        );
+        require(
+            IIdentityRegistry(identityRegistry).isVerified(to),
+            "HKSTPSecurityToken: recipient not verified"
+        );
+
+        // Atomic transfer: _update is called once (from → to).
+        // We temporarily safe-list both addresses so the compliance-aware
+        // _update hook does NOT revert — the court order overrides compliance.
+        // We also temporarily unfreeze both addresses — court orders override
+        // any administrative freeze that may be in place.
+        bool wasSafeFrom = safeListed[from];
+        bool wasSafeTo   = safeListed[to];
+        bool wasFrozenFrom = frozen[from];
+        bool wasFrozenTo   = frozen[to];
+        safeListed[from] = true;
+        safeListed[to]   = true;
+        frozen[from] = false;
+        frozen[to]   = false;
+
+        _update(from, to, amount);
+
+        // Restore original safe-list and freeze status
+        safeListed[from] = wasSafeFrom;
+        safeListed[to]   = wasSafeTo;
+        frozen[from] = wasFrozenFrom;
+        frozen[to]   = wasFrozenTo;
+
+        emit ForcedTransfer(msg.sender, from, to, amount, legalOrderHash, operatorData);
+    }
+
+    /**
+     * @notice ERC-1644 `isControllable` — signals that this token supports
+     *         controller-initiated forced transfers.
+     * @return True — the Custodian (AGENT_ROLE) can always execute forced transfers.
+     */
+    function isControllable() external pure returns (bool) {
+        return true;
     }
 
     // -------------------------------------------------------------------------

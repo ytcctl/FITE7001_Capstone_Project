@@ -185,6 +185,10 @@ export const SECURITY_TOKEN_ABI = [
   'event MaxShareholdersSet(uint256 maxShareholders)',
   'event IdentityHolderAdded(address indexed identityContract)',
   'event IdentityHolderRemoved(address indexed identityContract)',
+  // ERC-1644 Forced Transfer (Settlement Finality)
+  'function forcedTransfer(address from, address to, uint256 amount, bytes32 legalOrderHash, bytes operatorData) external',
+  'function isControllable() view returns (bool)',
+  'event ForcedTransfer(address indexed controller, address indexed from, address indexed to, uint256 amount, bytes32 legalOrderHash, bytes operatorData)',
 ];
 
 export const CASH_TOKEN_ABI = [

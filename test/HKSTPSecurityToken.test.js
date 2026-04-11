@@ -322,4 +322,150 @@ describe("HKSTPSecurityToken", function () {
       ).to.be.revertedWith("HKSTPSecurityToken: already initialized");
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // ERC-1644 Forced Transfer
+  // ---------------------------------------------------------------------------
+
+  describe("ERC-1644 Forced Transfer", function () {
+    const LEGAL_HASH = ethers.id("ipfs://QmCourtOrderCID_Cap32_S182");
+    const OPERATOR_DATA = ethers.toUtf8Bytes("CASE-2026-001");
+
+    beforeEach(async function () {
+      // Mint tokens to alice (the "from" account)
+      await token.connect(agent).mint(alice.address, MINT_AMOUNT);
+    });
+
+    it("should atomically transfer tokens from one address to another", async function () {
+      await token.connect(agent).forcedTransfer(
+        alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+      );
+      expect(await token.balanceOf(alice.address)).to.equal(MINT_AMOUNT - TRANSFER_AMOUNT);
+      expect(await token.balanceOf(bob.address)).to.equal(TRANSFER_AMOUNT);
+    });
+
+    it("should preserve totalSupply (burn+mint invariance)", async function () {
+      const supplyBefore = await token.totalSupply();
+      await token.connect(agent).forcedTransfer(
+        alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+      );
+      expect(await token.totalSupply()).to.equal(supplyBefore);
+    });
+
+    it("should emit ForcedTransfer event with legal hash and operator data", async function () {
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.emit(token, "ForcedTransfer")
+        .withArgs(
+          agent.address,
+          alice.address,
+          bob.address,
+          TRANSFER_AMOUNT,
+          LEGAL_HASH,
+          ethers.hexlify(OPERATOR_DATA)
+        );
+    });
+
+    it("should work even when 'from' is frozen (court order overrides)", async function () {
+      await token.connect(agent).setAddressFrozen(alice.address, true);
+      // Normal transfer would revert, but forcedTransfer bypasses freeze
+      await token.connect(agent).forcedTransfer(
+        alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+      );
+      expect(await token.balanceOf(bob.address)).to.equal(TRANSFER_AMOUNT);
+    });
+
+    it("should revert when 'to' is not verified in Identity Registry", async function () {
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, charlie.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: recipient not verified");
+    });
+
+    it("should revert when called by non-agent", async function () {
+      await expect(
+        token.connect(alice).forcedTransfer(
+          alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.reverted;
+    });
+
+    it("should revert with zero legal order hash", async function () {
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, bob.address, TRANSFER_AMOUNT, ethers.ZeroHash, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: missing legal order hash");
+    });
+
+    it("should revert with zero amount", async function () {
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, bob.address, 0, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: zero amount");
+    });
+
+    it("should revert when 'from' has insufficient balance", async function () {
+      const tooMuch = MINT_AMOUNT + 1n;
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, bob.address, tooMuch, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: insufficient balance");
+    });
+
+    it("should revert with zero 'from' address", async function () {
+      await expect(
+        token.connect(agent).forcedTransfer(
+          ethers.ZeroAddress, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: from is zero address");
+    });
+
+    it("should revert with zero 'to' address", async function () {
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, ethers.ZeroAddress, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: to is zero address");
+    });
+
+    it("should revert when contract is paused", async function () {
+      await token.connect(admin).pause();
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.reverted;
+    });
+
+    it("should accept empty operatorData", async function () {
+      await token.connect(agent).forcedTransfer(
+        alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, "0x"
+      );
+      expect(await token.balanceOf(bob.address)).to.equal(TRANSFER_AMOUNT);
+    });
+
+    it("should restore safe-list status after forced transfer", async function () {
+      // Verify alice and bob are NOT safe-listed before
+      expect(await token.safeListed(alice.address)).to.be.false;
+      expect(await token.safeListed(bob.address)).to.be.false;
+
+      await token.connect(agent).forcedTransfer(
+        alice.address, bob.address, TRANSFER_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+      );
+
+      // Safe-list status should be restored to original (false)
+      expect(await token.safeListed(alice.address)).to.be.false;
+      expect(await token.safeListed(bob.address)).to.be.false;
+    });
+
+    it("isControllable() should return true", async function () {
+      expect(await token.isControllable()).to.be.true;
+    });
+  });
 });
