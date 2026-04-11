@@ -19,25 +19,51 @@ const ComplianceRules: React.FC = () => {
   // Read state
   const [currentGlobalCap, setCurrentGlobalCap] = useState('0');
   const [oracle, setOracle] = useState('');
-  const [hkAllowed, setHkAllowed] = useState(false);
-  const [usAllowed, setUsAllowed] = useState(false);
+  const [jurisdictions, setJurisdictions] = useState<Record<string, boolean>>({});
 
   const [txStatus, setTxStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Default jurisdiction codes to check + any discovered via events
+  const DEFAULT_JURISDICTIONS = ['HK', 'US', 'SG', 'GB', 'CN', 'KP', 'KR', 'JP', 'IR', 'RU'];
+
   const loadState = async () => {
     if (!contracts) return;
     try {
-      const [gCap, orc, hk, us] = await Promise.all([
+      const [gCap, orc] = await Promise.all([
         contracts.compliance.globalConcentrationCap(),
         contracts.compliance.complianceOracle(),
-        contracts.compliance.allowedJurisdictions(ethers.encodeBytes32String('HK').slice(0, 6)),
-        contracts.compliance.allowedJurisdictions(ethers.encodeBytes32String('US').slice(0, 6)),
       ]);
       setCurrentGlobalCap(ethers.formatUnits(gCap, 18));
       setOracle(orc);
-      setHkAllowed(hk);
-      setUsAllowed(us);
+
+      // Discover additional jurisdictions from on-chain events
+      const discoveredCodes = new Set<string>(DEFAULT_JURISDICTIONS);
+      try {
+        const filter = contracts.compliance.filters.JurisdictionSet();
+        const events = await contracts.compliance.queryFilter(filter, 0, 'latest');
+        for (const ev of events) {
+          try {
+            const hexCode = (ev as any).args?.[0] || (ev as any).args?.jurisdiction;
+            if (hexCode) {
+              const decoded = ethers.decodeBytes32String(hexCode + '0'.repeat(66 - hexCode.length));
+              if (decoded && decoded.length === 2) discoveredCodes.add(decoded);
+            }
+          } catch { /* skip undecoded */ }
+        }
+      } catch { /* events not supported or no events */ }
+
+      // Query each jurisdiction's status
+      const jurMap: Record<string, boolean> = {};
+      await Promise.all(
+        Array.from(discoveredCodes).map(async (code) => {
+          try {
+            const b = ethers.encodeBytes32String(code).slice(0, 6);
+            jurMap[code] = await contracts.compliance.allowedJurisdictions(b);
+          } catch { /* skip */ }
+        })
+      );
+      setJurisdictions(jurMap);
     } catch (e) {
       console.error('Compliance load error:', e);
     }
@@ -56,6 +82,8 @@ const ComplianceRules: React.FC = () => {
       const tx = await contracts.compliance.setJurisdiction(code, jurAllowed);
       await tx.wait();
       setTxStatus(`✓ Jurisdiction ${jurCode} ${jurAllowed ? 'allowed' : 'blocked'}`);
+      // Immediately reflect the change in the UI before full reload
+      setJurisdictions(prev => ({ ...prev, [jurCode]: jurAllowed }));
       loadState();
     } catch (e: any) {
       setTxStatus(`✗ ${e?.reason || e?.message || 'Failed'}`);
@@ -157,13 +185,25 @@ const ComplianceRules: React.FC = () => {
         </div>
         <div className="glass-card p-6">
           <p className="text-sm text-gray-400 mb-1">Jurisdictions</p>
-          <div className="flex gap-3 mt-1">
-            <span className={`text-xs font-medium px-2 py-1 rounded-full border ${hkAllowed ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
-              HK {hkAllowed ? '✓' : '✗'}
-            </span>
-            <span className={`text-xs font-medium px-2 py-1 rounded-full border ${usAllowed ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
-              US {usAllowed ? '✓' : '✗'}
-            </span>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {Object.keys(jurisdictions).length === 0 ? (
+              <span className="text-xs text-gray-500">Loading…</span>
+            ) : (
+              Object.entries(jurisdictions)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([code, allowed]) => (
+                  <span
+                    key={code}
+                    className={`text-xs font-medium px-2 py-1 rounded-full border ${
+                      allowed
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        : 'bg-red-500/20 text-red-400 border-red-500/30'
+                    }`}
+                  >
+                    {code} {allowed ? '✓' : '✗'}
+                  </span>
+                ))
+            )}
           </div>
         </div>
       </div>
