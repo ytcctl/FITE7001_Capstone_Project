@@ -292,4 +292,17 @@ contract MultiSigWarm is ReentrancyGuard {
      * @notice Receive ETH (for native token transfers if needed).
      */
     receive() external payable {}
+
+    /**
+     * @notice Withdraw accidentally locked ETH from the contract.
+     *         Requires full multi-sig confirmation like any other transaction.
+     * @param to        Recipient of the ETH.
+     * @param amount    Amount of ETH (in wei) to withdraw.
+     */
+    function withdrawETH(address payable to, uint256 amount) external onlySigner {
+        require(to != address(0), "MultiSigWarm: zero address");
+        require(amount <= address(this).balance, "MultiSigWarm: insufficient balance");
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "MultiSigWarm: ETH transfer failed");
+    }
 }

@@ -74,6 +74,13 @@ contract IdentityFactory is AccessControl {
 
         // ── Clone + initialize with factory as initial management key ──
         identityAddr = identityImplementation.clone();
+
+        // ── Update state BEFORE external calls (CEI pattern) ──
+        deployedIdentity[investor] = identityAddr;
+        identityCount++;
+        emit IdentityDeployed(investor, identityAddr, identityCount);
+
+        // ── External calls AFTER state changes ──
         Identity id = Identity(identityAddr);
         id.initialize(address(this));
 
@@ -98,11 +105,6 @@ contract IdentityFactory is AccessControl {
         // Remove the factory's own management key — full ownership to investor
         bytes32 factoryKey = id.addressToKey(address(this));
         id.removeKey(factoryKey, 1); // remove MANAGEMENT purpose from factory
-
-        deployedIdentity[investor] = identityAddr;
-        identityCount++;
-
-        emit IdentityDeployed(investor, identityAddr, identityCount);
     }
 
     /**

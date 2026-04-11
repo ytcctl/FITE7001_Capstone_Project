@@ -1,0 +1,53 @@
+{
+  "config": {
+    "chainId": 7001,
+    "londonBlock": 0,
+    "shanghaiTime": 0,
+    "cancunTime": 0,
+    "contractSizeLimit": 2147483647,
+    "ibft2": {
+      "blockperiodseconds": 2,
+      "epochlength": 30000,
+      "requesttimeoutseconds": 4
+    }
+  },
+  "nonce": "0x0",
+  "timestamp": "0x0",
+  "gasLimit": "0x1fffffffffffff",
+  "difficulty": "0x1",
+  "baseFeePerGas": "0x0",
+  "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000f859f854941b37f3fd6f98096aafe0d27ecc8816fefdcd3d4b94ac72ba1b6720c7cc15966ed25c6f9240ef33c1779498c554fa21995a72b4dc50dfb7070d6a02ff1a3494b1f4c778c301fe1c02a703ee754c85b3261d9a22c080c0",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "alloc": {
+    "000F3df6D732807Ef1319fB7B8bB8522d0Beac02": {
+      "comment": "EIP-4788 Beacon Roots contract — required for Cancun",
+      "balance": "0x0",
+      "code": "0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500",
+      "nonce": "0x1"
+    },
+    "fe3b557e8fb62b89f4916b721be55ceb828dbd73": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 0 — deployer / admin"
+    },
+    "627306090abaB3A6e1400e9345bC60c78a8BEf57": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 1 — operator"
+    },
+    "f17f52151EbEF6C7334FAD080c5704D77216b732": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 2 — agent / custodian"
+    },
+    "C5fdf4076b8F3A5357c5E395ab970B5B54098Fef": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 3 — seller"
+    },
+    "821aEa9a577a9b44299B9c15c88cf3087F3b5544": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 4 — buyer"
+    },
+    "5e33E2E5333DD9b7b428AC38AE361E9b707046f3": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Investor1 — MetaMask account"
+    }
+  }
+}

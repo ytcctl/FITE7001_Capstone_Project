@@ -1,0 +1,165 @@
+# ============================================================================
+# TokenHub IBFT 2.0 — 4-Validator Hyperledger Besu Network
+# ============================================================================
+# Provides Byzantine Fault Tolerance (BFT): tolerates 1 faulty validator (3f+1)
+#
+# Validators:
+#   validator-1  RPC 8545  Engine 8551  P2P 30303
+#   validator-2  RPC 8645  Engine 8651  P2P 30304
+#   validator-3  RPC 8745  Engine 8751  P2P 30305
+#   validator-4  RPC 8845  Engine 8851  P2P 30306
+#
+# Usage:
+#   docker compose -f besu/ibft/docker-compose.yml up -d
+#   docker compose -f besu/ibft/docker-compose.yml down
+#   docker compose -f besu/ibft/docker-compose.yml logs -f
+# ============================================================================
+
+services:
+  # ---------- Validator 1 (primary RPC endpoint) ----------
+  validator-1:
+    image: hyperledger/besu:latest
+    container_name: tokenhub-validator-1
+    volumes:
+      - ./genesis-ibft.json:/opt/besu/genesis.json
+      - ./keys/validator1:/opt/besu/key
+      - validator1-data:/opt/besu/data
+    ports:
+      - "8545:8545"   # JSON-RPC (frontends and scripts connect here)
+      - "8546:8546"   # WebSocket
+      - "8551:8551"   # Engine API
+      - "30303:30303" # P2P
+    environment:
+      - BESU_GENESIS_FILE=/opt/besu/genesis.json
+      - BESU_NODE_PRIVATE_KEY_FILE=/opt/besu/key/key
+    command: >
+      --genesis-file=/opt/besu/genesis.json
+      --node-private-key-file=/opt/besu/key/key
+      --rpc-http-enabled
+      --rpc-http-api=ETH,NET,WEB3,DEBUG,ADMIN,TXPOOL,IBFT
+      --rpc-http-cors-origins="*"
+      --rpc-http-host=0.0.0.0
+      --rpc-ws-enabled
+      --rpc-ws-api=ETH,NET,WEB3
+      --rpc-ws-host=0.0.0.0
+      --host-allowlist="*"
+      --engine-jwt-disabled
+      --engine-rpc-enabled
+      --min-gas-price=0
+      --p2p-host=0.0.0.0
+      --bootnodes=
+      --logging=INFO
+    networks:
+      tokenhub-net:
+        ipv4_address: 172.20.0.11
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- Validator 2 ----------
+  validator-2:
+    image: hyperledger/besu:latest
+    container_name: tokenhub-validator-2
+    volumes:
+      - ./genesis-ibft.json:/opt/besu/genesis.json
+      - ./keys/validator2:/opt/besu/key
+      - validator2-data:/opt/besu/data
+    ports:
+      - "8645:8545"
+      - "8651:8551"
+      - "30304:30303"
+    command: >
+      --genesis-file=/opt/besu/genesis.json
+      --node-private-key-file=/opt/besu/key/key
+      --rpc-http-enabled
+      --rpc-http-api=ETH,NET,WEB3,DEBUG,ADMIN,TXPOOL,IBFT
+      --rpc-http-cors-origins="*"
+      --rpc-http-host=0.0.0.0
+      --host-allowlist="*"
+      --min-gas-price=0
+      --p2p-host=0.0.0.0
+      --bootnodes=enode://3bd1d905c7650f3206056b1933c441d7ef549f687527c2ec9ab0a59e9aa73e23@172.20.0.11:30303
+      --logging=INFO
+    networks:
+      tokenhub-net:
+        ipv4_address: 172.20.0.12
+    depends_on:
+      validator-1:
+        condition: service_healthy
+
+  # ---------- Validator 3 ----------
+  validator-3:
+    image: hyperledger/besu:latest
+    container_name: tokenhub-validator-3
+    volumes:
+      - ./genesis-ibft.json:/opt/besu/genesis.json
+      - ./keys/validator3:/opt/besu/key
+      - validator3-data:/opt/besu/data
+    ports:
+      - "8745:8545"
+      - "8751:8551"
+      - "30305:30303"
+    command: >
+      --genesis-file=/opt/besu/genesis.json
+      --node-private-key-file=/opt/besu/key/key
+      --rpc-http-enabled
+      --rpc-http-api=ETH,NET,WEB3,DEBUG,ADMIN,TXPOOL,IBFT
+      --rpc-http-cors-origins="*"
+      --rpc-http-host=0.0.0.0
+      --host-allowlist="*"
+      --min-gas-price=0
+      --p2p-host=0.0.0.0
+      --bootnodes=enode://3bd1d905c7650f3206056b1933c441d7ef549f687527c2ec9ab0a59e9aa73e23@172.20.0.11:30303
+      --logging=INFO
+    networks:
+      tokenhub-net:
+        ipv4_address: 172.20.0.13
+    depends_on:
+      validator-1:
+        condition: service_healthy
+
+  # ---------- Validator 4 ----------
+  validator-4:
+    image: hyperledger/besu:latest
+    container_name: tokenhub-validator-4
+    volumes:
+      - ./genesis-ibft.json:/opt/besu/genesis.json
+      - ./keys/validator4:/opt/besu/key
+      - validator4-data:/opt/besu/data
+    ports:
+      - "8845:8545"
+      - "8851:8551"
+      - "30306:30303"
+    command: >
+      --genesis-file=/opt/besu/genesis.json
+      --node-private-key-file=/opt/besu/key/key
+      --rpc-http-enabled
+      --rpc-http-api=ETH,NET,WEB3,DEBUG,ADMIN,TXPOOL,IBFT
+      --rpc-http-cors-origins="*"
+      --rpc-http-host=0.0.0.0
+      --host-allowlist="*"
+      --min-gas-price=0
+      --p2p-host=0.0.0.0
+      --bootnodes=enode://3bd1d905c7650f3206056b1933c441d7ef549f687527c2ec9ab0a59e9aa73e23@172.20.0.11:30303
+      --logging=INFO
+    networks:
+      tokenhub-net:
+        ipv4_address: 172.20.0.14
+    depends_on:
+      validator-1:
+        condition: service_healthy
+
+networks:
+  tokenhub-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+volumes:
+  validator1-data:
+  validator2-data:
+  validator3-data:
+  validator4-data:

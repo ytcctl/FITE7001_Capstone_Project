@@ -254,6 +254,98 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
     }
 
     // -------------------------------------------------------------------------
+    // Batch Settlement (P2 — Scalability)
+    // -------------------------------------------------------------------------
+
+    /// @notice Emitted when a batch settlement completes.
+    event BatchSettlementExecuted(
+        uint256[] indexed ids,
+        uint256 successCount,
+        uint256 failCount
+    );
+
+    /**
+     * @notice Execute multiple settlements atomically in a single transaction.
+     *         Gas savings: shared function entry overhead, reduced block producer load.
+     *
+     *         If `stopOnFailure` is true, the entire batch reverts on the first failure.
+     *         If false, failed settlements are marked as Failed and the batch continues.
+     *
+     * @param ids            Array of settlement IDs to execute.
+     * @param stopOnFailure  If true, revert entire batch on first failure.
+     * @return successCount  Number of successfully settled trades.
+     * @return failCount     Number of failed trades (only when stopOnFailure=false).
+     */
+    function executeBatchSettlement(
+        uint256[] calldata ids,
+        bool stopOnFailure
+    )
+        external
+        onlyRole(OPERATOR_ROLE)
+        nonReentrant
+        whenNotPaused
+        returns (uint256 successCount, uint256 failCount)
+    {
+        require(ids.length > 0, "DvPSettlement: empty batch");
+        require(ids.length <= 50, "DvPSettlement: batch too large"); // gas safety
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            Settlement storage s = settlements[ids[i]];
+
+            // Skip non-pending or expired
+            if (s.status != SettlementStatus.Pending) {
+                if (stopOnFailure) revert("DvPSettlement: not pending");
+                failCount++;
+                continue;
+            }
+            if (block.timestamp > s.settlementDeadline) {
+                s.status = SettlementStatus.Failed;
+                emit SettlementFailed(ids[i], s.matchId, "Deadline passed");
+                if (stopOnFailure) revert("DvPSettlement: deadline passed");
+                failCount++;
+                continue;
+            }
+
+            // Mark settled BEFORE external calls (CEI)
+            s.status = SettlementStatus.Settled;
+
+            // Leg 1: Security token delivery
+            bool leg1Ok;
+            try IERC20(s.securityToken).transferFrom(s.seller, s.buyer, s.tokenAmount) returns (bool result) {
+                leg1Ok = result;
+            } catch {
+                leg1Ok = false;
+            }
+
+            if (!leg1Ok) {
+                s.status = SettlementStatus.Failed;
+                emit SettlementFailed(ids[i], s.matchId, "Security token transfer failed");
+                if (stopOnFailure) revert("DvPSettlement: security token transfer failed");
+                failCount++;
+                continue;
+            }
+
+            // Leg 2: Cash payment
+            bool leg2Ok;
+            try IERC20(s.cashToken).transferFrom(s.buyer, s.seller, s.cashAmount) returns (bool result) {
+                leg2Ok = result;
+            } catch {
+                leg2Ok = false;
+            }
+
+            if (!leg2Ok) {
+                // Leg 1 succeeded but Leg 2 failed — must revert entire tx for atomicity
+                revert("DvPSettlement: cash transfer failed after security delivery");
+            }
+
+            emit SettlementExecuted(ids[i], s.matchId, s.seller, s.buyer, block.timestamp);
+            successCount++;
+        }
+
+        emit BatchSettlementExecuted(ids, successCount, failCount);
+    }
+
+    // -------------------------------------------------------------------------
     // FATF Recommendation 16 — Travel Rule (OPERATOR_ROLE)
     // -------------------------------------------------------------------------
 

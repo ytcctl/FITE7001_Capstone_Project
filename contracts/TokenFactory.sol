@@ -123,6 +123,20 @@ contract TokenFactory is AccessControl {
 
         // Deploy a new security token clone (EIP-1167 minimal proxy)
         address tokenAddress_ = tokenImplementation.clone();
+        tokenAddress = tokenAddress_;
+
+        // ── Register in the factory BEFORE external calls (CEI pattern) ──
+        _tokens.push(StartupToken({
+            name:         name_,
+            symbol:       symbol_,
+            tokenAddress: tokenAddress,
+            createdBy:    msg.sender,
+            createdAt:    block.timestamp,
+            active:       true
+        }));
+        _symbolIndex[symbolHash] = _tokens.length; // 1-based
+
+        // ── External calls AFTER state changes ──
         HKSTPSecurityToken token = HKSTPSecurityToken(tokenAddress_);
         token.initialize(
             name_,
@@ -133,8 +147,6 @@ contract TokenFactory is AccessControl {
             msg.sender        // admin of the new token = caller
         );
 
-        tokenAddress = tokenAddress_;
-
         // Grant TOKEN_ROLE on the Compliance contract so the new token
         // can call canTransfer() / checkModules()
         // NOTE: This requires the TokenFactory itself to have DEFAULT_ADMIN_ROLE
@@ -143,17 +155,6 @@ contract TokenFactory is AccessControl {
             keccak256("TOKEN_ROLE"),
             tokenAddress
         );
-
-        // Register in the factory
-        _tokens.push(StartupToken({
-            name:         name_,
-            symbol:       symbol_,
-            tokenAddress: tokenAddress,
-            createdBy:    msg.sender,
-            createdAt:    block.timestamp,
-            active:       true
-        }));
-        _symbolIndex[symbolHash] = _tokens.length; // 1-based
 
         emit TokenCreated(_tokens.length - 1, name_, symbol_, tokenAddress, msg.sender);
     }
