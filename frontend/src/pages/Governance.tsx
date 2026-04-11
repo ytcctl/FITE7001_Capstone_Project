@@ -50,6 +50,7 @@ const Governance: React.FC = () => {
   const [votingDelay, setVotingDelay] = useState<bigint>(0n);
   const [votingPeriod, setVotingPeriod] = useState<bigint>(0n);
   const [quorumPct, setQuorumPct] = useState<bigint>(0n);
+  const [proposalThresholdVal, setProposalThresholdVal] = useState<bigint>(0n);
   const [timelockDelay, setTimelockDelay] = useState<bigint>(0n);
 
   // ─── Voting power ─────────────────────────────────────────
@@ -81,17 +82,19 @@ const Governance: React.FC = () => {
   const loadGovernorInfo = useCallback(async () => {
     if (!contracts) return;
     try {
-      const [name, delay, period, qNum, tlDelay] = await Promise.all([
+      const [name, delay, period, qNum, pThresh, tlDelay] = await Promise.all([
         contracts.governor.name(),
         contracts.governor.votingDelay(),
         contracts.governor.votingPeriod(),
         contracts.governor.quorumNumerator(),
+        contracts.governor.proposalThreshold(),
         contracts.timelock.getMinDelay(),
       ]);
       setGovName(name);
       setVotingDelay(delay);
       setVotingPeriod(period);
       setQuorumPct(qNum);
+      setProposalThresholdVal(pThresh);
       setTimelockDelay(tlDelay);
     } catch (e) {
       console.error('Failed to load governor info:', e);
@@ -331,11 +334,13 @@ const Governance: React.FC = () => {
       )}
 
       {/* Governor Config Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard icon={<Shield size={20} />} label="Governor" value={govName || '—'} accent="purple" />
         <StatCard icon={<Clock size={20} />} label="Voting Delay" value={`${votingDelay.toString()} blocks`} accent="cyan" />
         <StatCard icon={<Timer size={20} />} label="Voting Period" value={`${votingPeriod.toString()} blocks`} accent="amber" />
         <StatCard icon={<Users size={20} />} label="Quorum" value={`${quorumPct.toString()}% of supply`} accent="emerald" />
+        <StatCard icon={<Vote size={20} />} label="Proposal Threshold" value={`${ethers.formatEther(proposalThresholdVal)} tokens`} accent="purple" />
+        <StatCard icon={<Shield size={20} />} label="Identity-Locked" value="KYC Required" accent="red" />
       </div>
 
       {/* Voting Power + Delegation */}
@@ -565,7 +570,9 @@ const Governance: React.FC = () => {
           <h3 className="font-bold text-white">Timelock Configuration</h3>
         </div>
         <dl className="space-y-3">
-          <InfoRow label="Timelock Delay" value={`${timelockDelay.toString()} seconds`} />
+          <InfoRow label="Timelock Delay" value={`${timelockDelay.toString()}s (${(Number(timelockDelay) / 3600).toFixed(1)}h)`} />
+          <InfoRow label="Proposal Threshold" value={`${ethers.formatEther(proposalThresholdVal)} tokens (1%)`} />
+          <InfoRow label="Identity Requirement" value="KYC verified (live check at vote time)" />
           <InfoRow label="Timelock Address" value={contracts?.timelock?.target?.toString() || '—'} mono />
           <InfoRow label="Governor Address" value={contracts?.governor?.target?.toString() || '—'} mono />
         </dl>

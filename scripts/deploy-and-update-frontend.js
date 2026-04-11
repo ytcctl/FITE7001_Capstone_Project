@@ -204,7 +204,7 @@ async function main() {
 
   // 9. Timelock (governance execution delay)
   console.log("9/10  Deploying HKSTPTimelock...");
-  const TIMELOCK_MIN_DELAY = 1; // 1 second for dev/testing; production: 86400 (24h)
+  const TIMELOCK_MIN_DELAY = 172800; // 48 hours (production)
   const Timelock = await ethers.getContractFactory("HKSTPTimelock");
   const timelock = await Timelock.deploy(
     TIMELOCK_MIN_DELAY,
@@ -218,15 +218,19 @@ async function main() {
 
   // 10. Governor (on-chain governance with snapshot voting)
   console.log("10/10 Deploying HKSTPGovernor...");
-  const VOTING_DELAY  = 1;   // 1 block
-  const VOTING_PERIOD = 50;  // 50 blocks (~50s on Besu)
-  const QUORUM_PCT    = 4;   // 4% of total supply
+  const VOTING_DELAY  = 14400;  // ~2 days at 12s/block
+  const VOTING_PERIOD = 50400;  // ~7 days at 12s/block
+  const QUORUM_PCT    = 10;     // 10% of total supply
+  // Proposal threshold = 1% of anticipated total supply (e.g. 1 000 000 tokens → 10 000)
+  const PROPOSAL_THRESHOLD = ethers.parseEther("10000"); // 1% of 1M supply
   const Governor = await ethers.getContractFactory("HKSTPGovernor");
   const governor = await Governor.deploy(
     tokenAddress,        // IVotes token
     timelockAddress,     // TimelockController
+    registryAddress,     // identityRegistry (KYC gate)
     VOTING_DELAY,
     VOTING_PERIOD,
+    PROPOSAL_THRESHOLD,
     QUORUM_PCT
   );
   await governor.waitForDeployment();
@@ -405,7 +409,13 @@ async function main() {
     `║ Cap. 622 Shareholder Cap : 50 (identity-based)                ║`
   );
   console.log(
-    `║ Governance: delay=${VOTING_DELAY}blk period=${VOTING_PERIOD}blk quorum=${QUORUM_PCT}%          ║`
+    `║ Governance: delay=${VOTING_DELAY}blk period=${VOTING_PERIOD}blk quorum=${QUORUM_PCT}%   ║`
+  );
+  console.log(
+    `║ Proposal threshold: ${ethers.formatEther(PROPOSAL_THRESHOLD)} tokens (1%)              ║`
+  );
+  console.log(
+    `║ Timelock delay: ${TIMELOCK_MIN_DELAY}s (48h) | Identity-locked voting  ║`
   );
   console.log(
     "╚══════════════════════════════════════════════════════════════╝"

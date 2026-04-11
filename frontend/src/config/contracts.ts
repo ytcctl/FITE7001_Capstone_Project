@@ -17,16 +17,16 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x9781aB39dEDDa3646cf06A1D76Ff0E9D725290D5',
-  compliance: '0x7A0Ff93834807e5f80c68F1C24fF0bff0f5635AA',
-  securityToken: '0xe93FDD0aCC94D4C9A3DB30c373fa7Fd782D6Cfc9',
-  cashToken: '0x5Bf3E7F3e4b05Cd20791090a29D20B021589c864',
-  dvpSettlement: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
-  tokenFactory: '0x605a55D15cbb5518E0863fD741aFbd9b2555D095',
-  claimIssuer: '0x65E11da4Ff5D12E8BE3AE271F825326145d15820',
-  identityFactory: '0x92Db1456e6096cae5A00334ddE53AEBb58667c35',
-  timelock: '0x5ACFa217417818E4614a2A1758036A90DF3a3F58',
-  governor: '0x7A01a65372860D3A2165060D1C471259070A1d5C',
+  identityRegistry: '0xC538fd0A079856cE824089c9210AC2dd40C844d8',
+  compliance: '0x40975C6cacC3A693EF65183afF2c3418A0297850',
+  securityToken: '0x0Be199A777EECc870a7b13045946Fef1803Dd9e1',
+  cashToken: '0xf03b5af17792D7F7707dc54474083BaCAD17e22F',
+  dvpSettlement: '0x36A8bE2C24f812ed7a95f14ffEBDB5F778F61699',
+  tokenFactory: '0x68a185CAb9607B9BEb0B210Bf7CC320f3b3A3eFB',
+  claimIssuer: '0xD6470D46e2062c4E428375e2D21a0e549B104f3B',
+  identityFactory: '0x9528a30590cA1E79d4F2dF52c97184296810Ab91',
+  timelock: '0x28EE8A8F0E4bD7aadd5C8578E15C696D36A95170',
+  governor: '0x8F0a859437A5122e2A43C6F6f6f8b54068ad464D',
 };
 
 // -----------------------------------------------------------------
@@ -348,6 +348,7 @@ export const GOVERNOR_ABI = [
   'function quorumDenominator() view returns (uint256)',
   'function timelock() view returns (address)',
   'function token() view returns (address)',
+  'function identityRegistry() view returns (address)',
   'function clock() view returns (uint48)',
   'function CLOCK_MODE() view returns (string)',
   'function COUNTING_MODE() pure returns (string)',
@@ -357,6 +358,7 @@ export const GOVERNOR_ABI = [
   'event ProposalCanceled(uint256 proposalId)',
   'event ProposalQueued(uint256 proposalId, uint256 etaSeconds)',
   'event VoteCast(address indexed voter, uint256 proposalId, uint8 support, uint256 weight, string reason)',
+  'event VoteBlockedKYC(uint256 indexed proposalId, address indexed voter)',
 ];
 
 export const TIMELOCK_ABI = [

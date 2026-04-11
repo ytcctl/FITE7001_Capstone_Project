@@ -9,8 +9,10 @@ const { ethers } = require("hardhat");
  *   - ERC20Permit gasless approvals
  *   - Governor lifecycle: propose → vote → queue → execute
  *   - Flash-loan attack defense (tokens acquired after snapshot carry 0 votes)
- *   - Quorum enforcement (4% of total supply)
- *   - Timelock delay enforcement
+ *   - Quorum enforcement (10% of total supply)
+ *   - Proposal threshold (1% of total supply)
+ *   - Timelock delay enforcement (48h in production)
+ *   - Identity-locked voting (KYC gate on every castVote)
  *   - Proposal cancellation
  *   - Voting types: For / Against / Abstain
  *   - Multiple voter scenarios
@@ -26,11 +28,12 @@ describe("Governance", function () {
   const MINT_AMOUNT = ethers.parseUnits("10000", 18);
   const SMALL_AMOUNT = ethers.parseUnits("100", 18);
 
-  // Governance params
-  const VOTING_DELAY = 1;      // 1 block
-  const VOTING_PERIOD = 50;    // 50 blocks
-  const QUORUM_PERCENT = 4;    // 4%
-  const TIMELOCK_DELAY = 1;    // 1 second (testing)
+  // Governance params (test-friendly values, not production)
+  const VOTING_DELAY = 1;      // 1 block  (production: 14400)
+  const VOTING_PERIOD = 50;    // 50 blocks (production: 50400)
+  const QUORUM_PERCENT = 10;   // 10%
+  const PROPOSAL_THRESHOLD = ethers.parseUnits("200", 18); // 1% of 20000 total
+  const TIMELOCK_DELAY = 1;    // 1 second (production: 172800)
 
   // Vote types (GovernorCountingSimple)
   const VOTE_AGAINST = 0;
@@ -100,8 +103,10 @@ describe("Governance", function () {
     governor = await Governor.deploy(
       await token.getAddress(),
       await timelock.getAddress(),
+      await registry.getAddress(),  // identityRegistry for KYC gate
       VOTING_DELAY,
       VOTING_PERIOD,
+      PROPOSAL_THRESHOLD,
       QUORUM_PERCENT
     );
 
@@ -412,9 +417,9 @@ describe("Governance", function () {
     });
 
     it("proposal should be Defeated if quorum not met", async function () {
-      // Only mint a tiny amount to charlie (not enough for 4% quorum)
+      // Mint enough for charlie to meet proposal threshold (200) but not quorum (10%)
       await registerAndVerify(charlie.address);
-      await token.connect(agent).mint(charlie.address, ethers.parseUnits("1", 18));
+      await token.connect(agent).mint(charlie.address, ethers.parseUnits("201", 18));
       await token.connect(charlie).delegate(charlie.address);
       await mineBlocks(1);
 
@@ -429,7 +434,8 @@ describe("Governance", function () {
       );
 
       await mineBlocks(VOTING_DELAY + 1);
-      // Charlie votes For — but only has 1 token out of 20001 total (~0.005%)
+      // Charlie votes For — but only has 201 tokens out of 20201 total (~1%)
+      // 10% quorum = ~2020 tokens needed
       await governor.connect(charlie).castVote(proposalId, VOTE_FOR);
 
       await mineBlocks(VOTING_PERIOD + 1);
@@ -451,7 +457,7 @@ describe("Governance", function () {
       );
 
       await mineBlocks(VOTING_DELAY + 1);
-      // Alice has 10000/20000 = 50% → well above 4% quorum
+      // Alice has 10000/20000 = 50% → well above 10% quorum
       await governor.connect(alice).castVote(proposalId, VOTE_FOR);
 
       await mineBlocks(VOTING_PERIOD + 1);
@@ -478,8 +484,10 @@ describe("Governance", function () {
       const governor2 = await Governor2.deploy(
         await token.getAddress(),
         await timelock2.getAddress(),
+        await registry.getAddress(),
         VOTING_DELAY,
         VOTING_PERIOD,
+        PROPOSAL_THRESHOLD,
         QUORUM_PERCENT
       );
 
@@ -566,7 +574,7 @@ describe("Governance", function () {
     });
 
     it("should report correct proposal threshold", async function () {
-      expect(await governor.proposalThreshold()).to.equal(0);
+      expect(await governor.proposalThreshold()).to.equal(PROPOSAL_THRESHOLD);
     });
 
     it("should report correct COUNTING_MODE", async function () {
@@ -680,7 +688,7 @@ describe("Governance", function () {
       await governor.connect(alice).castVote(proposalId, VOTE_ABSTAIN);
 
       await mineBlocks(VOTING_PERIOD + 1);
-      // Quorum met (10000 abstain > 4% of 20000 = 800) but forVotes = 0 → defeated
+      // Quorum met (10000 abstain > 10% of 20000 = 2000) but forVotes = 0 → defeated
       expect(await governor.state(proposalId)).to.equal(ProposalState.Defeated);
     });
   });
@@ -729,6 +737,200 @@ describe("Governance", function () {
     it("governor should have CANCELLER_ROLE on timelock", async function () {
       const CANCELLER_ROLE = await timelock.CANCELLER_ROLE();
       expect(await timelock.hasRole(CANCELLER_ROLE, await governor.getAddress())).to.be.true;
+    });
+  });
+
+  // =========================================================================
+  // Proposal Threshold Enforcement
+  // =========================================================================
+  describe("Proposal Threshold Enforcement", function () {
+    it("should revert propose when voting power below threshold", async function () {
+      // Charlie has insufficient tokens (< 200 threshold)
+      await registerAndVerify(charlie.address);
+      await token.connect(agent).mint(charlie.address, ethers.parseUnits("100", 18));
+      await token.connect(charlie).delegate(charlie.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "Should fail - below threshold";
+
+      await expect(
+        governor.connect(charlie).propose(targets, values, calldatas, description)
+      ).to.be.revertedWithCustomError(governor, "GovernorInsufficientProposerVotes");
+    });
+
+    it("should allow propose when voting power meets threshold", async function () {
+      await token.connect(alice).delegate(alice.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "Should succeed - above threshold";
+
+      // Alice has 10000 tokens >> 200 threshold
+      await expect(
+        governor.connect(alice).propose(targets, values, calldatas, description)
+      ).to.not.be.reverted;
+    });
+  });
+
+  // =========================================================================
+  // Identity-Locked Voting (KYC Gate)
+  // =========================================================================
+  describe("Identity-Locked Voting", function () {
+    it("should store the identity registry address", async function () {
+      expect(await governor.identityRegistry()).to.equal(await registry.getAddress());
+    });
+
+    it("verified voter can cast a vote", async function () {
+      await token.connect(alice).delegate(alice.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "KYC verified vote test";
+      await governor.connect(alice).propose(targets, values, calldatas, description);
+      const proposalId = await governor.hashProposal(
+        targets, values, calldatas,
+        ethers.keccak256(ethers.toUtf8Bytes(description))
+      );
+
+      await mineBlocks(VOTING_DELAY + 1);
+
+      // Alice is verified — vote should succeed
+      await expect(
+        governor.connect(alice).castVote(proposalId, VOTE_FOR)
+      ).to.not.be.reverted;
+      expect(await governor.hasVoted(proposalId, alice.address)).to.be.true;
+    });
+
+    it("should BLOCK vote when KYC is revoked mid-proposal", async function () {
+      await token.connect(alice).delegate(alice.address);
+      await token.connect(bob).delegate(bob.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "KYC revoked mid-vote test";
+      await governor.connect(alice).propose(targets, values, calldatas, description);
+      const proposalId = await governor.hashProposal(
+        targets, values, calldatas,
+        ethers.keccak256(ethers.toUtf8Bytes(description))
+      );
+
+      await mineBlocks(VOTING_DELAY + 1);
+
+      // Alice votes successfully first (still verified)
+      await governor.connect(alice).castVote(proposalId, VOTE_FOR);
+
+      // Now revoke Bob's KYC claims (simulate expiry)
+      for (let topic = 1; topic <= 5; topic++) {
+        await registry.connect(agent).setClaim(bob.address, topic, false);
+      }
+
+      // Bob tries to vote — should be blocked by KYC gate
+      await expect(
+        governor.connect(bob).castVote(proposalId, VOTE_FOR)
+      ).to.be.revertedWith("HKSTPGovernor: voter KYC not verified");
+    });
+
+    it("should BLOCK vote when identity is removed mid-proposal", async function () {
+      await token.connect(alice).delegate(alice.address);
+      await token.connect(bob).delegate(bob.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "Identity removed mid-vote test";
+      await governor.connect(alice).propose(targets, values, calldatas, description);
+      const proposalId = await governor.hashProposal(
+        targets, values, calldatas,
+        ethers.keccak256(ethers.toUtf8Bytes(description))
+      );
+
+      await mineBlocks(VOTING_DELAY + 1);
+
+      // Remove Bob's identity entirely
+      await registry.connect(agent).deleteIdentity(bob.address);
+
+      // Bob's vote should be blocked
+      await expect(
+        governor.connect(bob).castVote(proposalId, VOTE_FOR)
+      ).to.be.revertedWith("HKSTPGovernor: voter KYC not verified");
+    });
+
+    it("should allow vote after KYC is restored", async function () {
+      await token.connect(alice).delegate(alice.address);
+      await token.connect(bob).delegate(bob.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "KYC restore vote test";
+      await governor.connect(alice).propose(targets, values, calldatas, description);
+      const proposalId = await governor.hashProposal(
+        targets, values, calldatas,
+        ethers.keccak256(ethers.toUtf8Bytes(description))
+      );
+
+      await mineBlocks(VOTING_DELAY + 1);
+
+      // Revoke Bob's KYC
+      for (let topic = 1; topic <= 5; topic++) {
+        await registry.connect(agent).setClaim(bob.address, topic, false);
+      }
+      await expect(
+        governor.connect(bob).castVote(proposalId, VOTE_FOR)
+      ).to.be.revertedWith("HKSTPGovernor: voter KYC not verified");
+
+      // Restore Bob's KYC
+      for (let topic = 1; topic <= 5; topic++) {
+        await registry.connect(agent).setClaim(bob.address, topic, true);
+      }
+
+      // Now Bob can vote
+      await expect(
+        governor.connect(bob).castVote(proposalId, VOTE_FOR)
+      ).to.not.be.reverted;
+      expect(await governor.hasVoted(proposalId, bob.address)).to.be.true;
+    });
+
+    it("unregistered address cannot vote even with delegated power", async function () {
+      // Give attacker tokens + delegation but NO identity
+      await registerAndVerify(attacker.address);
+      await token.connect(agent).mint(attacker.address, MINT_AMOUNT);
+      await token.connect(attacker).delegate(attacker.address);
+
+      // Create proposal (alice is verified)
+      await token.connect(alice).delegate(alice.address);
+      await mineBlocks(1);
+
+      const targets = [admin.address];
+      const values = [0];
+      const calldatas = ["0x"];
+      const description = "Unregistered voter test";
+      await governor.connect(alice).propose(targets, values, calldatas, description);
+      const proposalId = await governor.hashProposal(
+        targets, values, calldatas,
+        ethers.keccak256(ethers.toUtf8Bytes(description))
+      );
+
+      await mineBlocks(VOTING_DELAY + 1);
+
+      // Remove attacker's identity
+      await registry.connect(agent).deleteIdentity(attacker.address);
+
+      // Attacker has voting power from checkpoint, but KYC is gone
+      await expect(
+        governor.connect(attacker).castVote(proposalId, VOTE_FOR)
+      ).to.be.revertedWith("HKSTPGovernor: voter KYC not verified");
     });
   });
 });
