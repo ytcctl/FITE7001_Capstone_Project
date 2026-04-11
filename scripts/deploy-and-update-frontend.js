@@ -208,6 +208,12 @@ async function main() {
   await (await compliance.grantRole(TOKEN_ROLE, tokenAddress)).wait();
   console.log("     TOKEN_ROLE granted to SecurityToken on Compliance");
 
+  // TokenFactory needs DEFAULT_ADMIN_ROLE on Compliance so it can call
+  // compliance.grantRole(TOKEN_ROLE, newClone) inside createToken()
+  const COMPLIANCE_ADMIN_ROLE = await compliance.DEFAULT_ADMIN_ROLE();
+  await (await compliance.grantRole(COMPLIANCE_ADMIN_ROLE, tokenFactoryAddress)).wait();
+  console.log("     DEFAULT_ADMIN_ROLE granted to TokenFactory on Compliance");
+
   const OPERATOR_ROLE = await dvp.OPERATOR_ROLE();
   await (await dvp.grantRole(OPERATOR_ROLE, deployer.address)).wait();
   console.log("     OPERATOR_ROLE granted to deployer on DvPSettlement");
