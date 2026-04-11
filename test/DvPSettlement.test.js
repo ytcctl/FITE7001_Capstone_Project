@@ -379,4 +379,117 @@ describe("DvPSettlement", function () {
         .to.be.reverted;
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // FATF Recommendation 16 — Travel Rule
+  // ---------------------------------------------------------------------------
+
+  describe("Travel Rule (FATF Rec. 16)", function () {
+    let id;
+    const ORIGINATOR_VASP   = ethers.id("VASP-HK-001");
+    const BENEFICIARY_VASP  = ethers.id("VASP-HK-002");
+    const ORIGINATOR_INFO   = ethers.id("originator:John Doe:ACC-123");
+    const BENEFICIARY_INFO  = ethers.id("beneficiary:Jane Smith:ACC-456");
+
+    beforeEach(async function () {
+      const deadline = await getDeadline(3600);
+      const tx = await dvp.connect(operator).createSettlement(
+        seller.address, buyer.address,
+        await securityToken.getAddress(), SECURITY_AMOUNT,
+        await cashToken.getAddress(),     CASH_AMOUNT,
+        deadline, MATCH_ID
+      );
+      id = 0;
+    });
+
+    it("should record travel rule data for a settlement", async function () {
+      await dvp.connect(operator).setTravelRuleData(
+        id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+      );
+      expect(await dvp.hasTravelRuleData(id)).to.be.true;
+    });
+
+    it("should emit TravelRuleDataRecorded event", async function () {
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+        )
+      ).to.emit(dvp, "TravelRuleDataRecorded");
+    });
+
+    it("should store and return correct travel rule data", async function () {
+      await dvp.connect(operator).setTravelRuleData(
+        id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+      );
+      const data = await dvp.getTravelRuleData(id);
+      expect(data.originatorVASP).to.equal(ORIGINATOR_VASP);
+      expect(data.beneficiaryVASP).to.equal(BENEFICIARY_VASP);
+      expect(data.originatorInfoHash).to.equal(ORIGINATOR_INFO);
+      expect(data.beneficiaryInfoHash).to.equal(BENEFICIARY_INFO);
+      expect(data.timestamp).to.be.gt(0);
+    });
+
+    it("should revert getTravelRuleData when no data set", async function () {
+      await expect(dvp.getTravelRuleData(id))
+        .to.be.revertedWith("DvPSettlement: no travel rule data");
+    });
+
+    it("should revert with zero originator VASP", async function () {
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          id, ethers.ZeroHash, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+        )
+      ).to.be.revertedWith("DvPSettlement: zero originator VASP");
+    });
+
+    it("should revert with zero beneficiary VASP", async function () {
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          id, ORIGINATOR_VASP, ethers.ZeroHash, ORIGINATOR_INFO, BENEFICIARY_INFO
+        )
+      ).to.be.revertedWith("DvPSettlement: zero beneficiary VASP");
+    });
+
+    it("should revert with zero originator info", async function () {
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          id, ORIGINATOR_VASP, BENEFICIARY_VASP, ethers.ZeroHash, BENEFICIARY_INFO
+        )
+      ).to.be.revertedWith("DvPSettlement: zero originator info");
+    });
+
+    it("should revert with zero beneficiary info", async function () {
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, ethers.ZeroHash
+        )
+      ).to.be.revertedWith("DvPSettlement: zero beneficiary info");
+    });
+
+    it("should revert when called by non-operator", async function () {
+      await expect(
+        dvp.connect(outsider).setTravelRuleData(
+          id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+        )
+      ).to.be.reverted;
+    });
+
+    it("should revert for invalid settlement ID", async function () {
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          999, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+        )
+      ).to.be.revertedWith("DvPSettlement: invalid settlement ID");
+    });
+
+    it("should revert when settlement is not pending", async function () {
+      // Execute the settlement first
+      await dvp.connect(operator).executeSettlement(id);
+      await expect(
+        dvp.connect(operator).setTravelRuleData(
+          id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
+        )
+      ).to.be.revertedWith("DvPSettlement: not pending");
+    });
+  });
 });

@@ -72,11 +72,22 @@ export const IDENTITY_REGISTRY_ABI = [
   'function CLAIM_JURISDICTION_APPROVED() view returns (uint256)',
   'function CLAIM_SOURCE_OF_FUNDS() view returns (uint256)',
   'function CLAIM_PEP_SANCTIONS_CLEAR() view returns (uint256)',
+  'function CLAIM_FPS_NAME_MATCH() view returns (uint256)',
   // Access Control
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function grantRole(bytes32 role, address account) external',
   'function AGENT_ROLE() view returns (bytes32)',
+  'function COMPLIANCE_OFFICER_ROLE() view returns (bytes32)',
+  'function MLRO_ROLE() view returns (bytes32)',
   'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  // AML / STR (MLRO_ROLE)
+  'function reportSuspiciousActivity(address account, bytes32 reportHash) external',
+  'function getSTRRecords(address account) view returns (tuple(bytes32 reportHash, address reporter, uint256 timestamp)[])',
+  'function getSTRCount(address account) view returns (uint256)',
+  // CDD Record Anchoring (COMPLIANCE_OFFICER_ROLE)
+  'function anchorCDDRecord(address investor, bytes32 cddHash, uint256 retentionYears) external',
+  'function getCDDRecords(address investor) view returns (tuple(bytes32 cddHash, uint256 issuedAt, uint256 retentionExpiry)[])',
+  'function hasCDDInRetention(address investor) view returns (bool)',
   // Pause
   'function pause() external',
   'function unpause() external',
@@ -89,6 +100,8 @@ export const IDENTITY_REGISTRY_ABI = [
   'event TrustedIssuerRemoved(address indexed issuer)',
   'event WalletLinked(address indexed wallet, address indexed identityContract)',
   'event WalletUnlinked(address indexed wallet, address indexed identityContract)',
+  'event SuspiciousActivityReported(address indexed account, address indexed reporter, bytes32 reportHash, uint256 timestamp)',
+  'event CDDRecordAnchored(address indexed investor, bytes32 indexed cddHash, uint256 issuedAt, uint256 retentionExpiry)',
 ];
 
 export const COMPLIANCE_ABI = [
@@ -232,6 +245,11 @@ export const DVP_SETTLEMENT_ABI = [
   'event SettlementExecuted(uint256 indexed id, bytes32 indexed matchId, address seller, address buyer, uint256 timestamp)',
   'event SettlementCancelled(uint256 indexed id, bytes32 indexed matchId, address indexed cancelledBy)',
   'event SettlementFailed(uint256 indexed id, bytes32 indexed matchId, string reason)',
+  // Travel Rule (FATF Rec. 16)
+  'function setTravelRuleData(uint256 settlementId, bytes32 originatorVASP, bytes32 beneficiaryVASP, bytes32 originatorInfoHash, bytes32 beneficiaryInfoHash) external',
+  'function getTravelRuleData(uint256 settlementId) view returns (tuple(bytes32 originatorVASP, bytes32 beneficiaryVASP, bytes32 originatorInfoHash, bytes32 beneficiaryInfoHash, uint256 timestamp))',
+  'function hasTravelRuleData(uint256 settlementId) view returns (bool)',
+  'event TravelRuleDataRecorded(uint256 indexed settlementId, bytes32 originatorVASP, bytes32 beneficiaryVASP, bytes32 originatorInfoHash, bytes32 beneficiaryInfoHash, uint256 timestamp)',
 ];
 
 // Claim topic mapping for display
@@ -241,6 +259,7 @@ export const CLAIM_TOPICS: Record<number, string> = {
   3: 'Jurisdiction Approved',
   4: 'Source of Funds Verified',
   5: 'PEP/Sanctions Clear',
+  6: 'FPS Name-Match Verified',
 };
 
 // -----------------------------------------------------------------

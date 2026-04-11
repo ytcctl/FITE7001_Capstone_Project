@@ -40,13 +40,18 @@ import "./identity/IClaimIssuer.sol";
  *   3 = Jurisdiction Approved (HK / non-sanctioned)
  *   4 = Source of Funds Verified
  *   5 = PEP/Sanctions Clear
+ *   6 = FPS Name-Match Verified (fiat deposit origin matches KYC legal name)
  *
  * Access Control:
- *   DEFAULT_ADMIN_ROLE  — registry owner (HKSTP platform admin)
- *   AGENT_ROLE          — licensed custodians / KYC agents
+ *   DEFAULT_ADMIN_ROLE      — registry owner (HKSTP platform admin)
+ *   AGENT_ROLE              — licensed custodians / KYC agents
+ *   COMPLIANCE_OFFICER_ROLE — designated CO; manages compliance operations
+ *   MLRO_ROLE               — Money Laundering Reporting Officer; files STRs to JFIU
  */
 contract HKSTPIdentityRegistry is AccessControl, Pausable {
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
+    bytes32 public constant COMPLIANCE_OFFICER_ROLE = keccak256("COMPLIANCE_OFFICER_ROLE");
+    bytes32 public constant MLRO_ROLE = keccak256("MLRO_ROLE");
 
     // Claim topic constants
     uint256 public constant CLAIM_KYC_VERIFIED = 1;
@@ -54,6 +59,7 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
     uint256 public constant CLAIM_JURISDICTION_APPROVED = 3;
     uint256 public constant CLAIM_SOURCE_OF_FUNDS = 4;
     uint256 public constant CLAIM_PEP_SANCTIONS_CLEAR = 5;
+    uint256 public constant CLAIM_FPS_NAME_MATCH = 6;
 
     // ── Investor identity entry ─────────────────────────────────
     struct InvestorIdentity {
@@ -111,10 +117,44 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
     event WalletLinked(address indexed wallet, address indexed identityContract);
     event WalletUnlinked(address indexed wallet, address indexed identityContract);
 
+    // ── AML / STR events (AMLO s.25A) ──────────────────────────
+    event SuspiciousActivityReported(
+        address indexed account,
+        address indexed reporter,
+        bytes32 reportHash,       // keccak256 of off-chain STR document / JFIU ref
+        uint256 timestamp
+    );
+    event CDDRecordAnchored(
+        address indexed investor,
+        bytes32 indexed cddHash,  // keccak256 of off-chain CDD bundle
+        uint256 issuedAt,
+        uint256 retentionExpiry   // issuedAt + 5 years minimum
+    );
+
+    // ── STR / CDD state ────────────────────────────────────────
+
+    /// @dev account => list of STR report hashes (immutable audit trail)
+    struct STRRecord {
+        bytes32 reportHash;
+        address reporter;
+        uint256 timestamp;
+    }
+    mapping(address => STRRecord[]) private _strRecords;
+
+    /// @dev investor => CDD record hash → anchor data
+    struct CDDRecord {
+        bytes32 cddHash;
+        uint256 issuedAt;
+        uint256 retentionExpiry;
+    }
+    mapping(address => CDDRecord[]) private _cddRecords;
+
     // ── Constructor ─────────────────────────────────────────────
     constructor(address admin) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(AGENT_ROLE, admin);
+        _grantRole(COMPLIANCE_OFFICER_ROLE, admin);
+        _grantRole(MLRO_ROLE, admin);
 
         _requiredClaimTopics = [
             CLAIM_KYC_VERIFIED,
@@ -339,6 +379,99 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
     function setRequiredClaimTopics(uint256[] calldata topics) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _requiredClaimTopics = topics;
         emit RequiredClaimTopicsSet(topics);
+    }
+
+    // ── AML / Suspicious Transaction Reporting (MLRO_ROLE) ─────
+
+    /**
+     * @notice File a Suspicious Transaction Report (STR) on-chain.
+     *         The MLRO files the actual report with the JFIU off-chain; this
+     *         function anchors an immutable hash of that filing on the blockchain
+     *         for audit and regulatory evidence purposes (AMLO s.25A).
+     *
+     * @param account    The wallet address flagged as suspicious.
+     * @param reportHash keccak256 of the off-chain STR document (e.g. JFIU reference).
+     */
+    function reportSuspiciousActivity(
+        address account,
+        bytes32 reportHash
+    ) external onlyRole(MLRO_ROLE) {
+        require(account != address(0), "HKSTPIdentityRegistry: zero address");
+        require(reportHash != bytes32(0), "HKSTPIdentityRegistry: zero report hash");
+
+        _strRecords[account].push(STRRecord({
+            reportHash: reportHash,
+            reporter:   msg.sender,
+            timestamp:  block.timestamp
+        }));
+
+        emit SuspiciousActivityReported(account, msg.sender, reportHash, block.timestamp);
+    }
+
+    /**
+     * @notice Anchor a CDD (Customer Due Diligence) record hash on-chain.
+     *         The actual CDD documents are retained off-chain for ≥ 5 years
+     *         (AMLO s.22).  This function creates an immutable on-chain timestamp
+     *         proving when the CDD was collected and when the retention period expires.
+     *
+     * @param investor       The investor wallet.
+     * @param cddHash        keccak256 of the off-chain CDD document bundle.
+     * @param retentionYears Minimum retention period in years (must be ≥ 5).
+     */
+    function anchorCDDRecord(
+        address investor,
+        bytes32 cddHash,
+        uint256 retentionYears
+    ) external onlyRole(COMPLIANCE_OFFICER_ROLE) {
+        require(_identities[investor].registered, "HKSTPIdentityRegistry: not registered");
+        require(cddHash != bytes32(0), "HKSTPIdentityRegistry: zero CDD hash");
+        require(retentionYears >= 5, "HKSTPIdentityRegistry: retention < 5 years");
+
+        uint256 issuedAt = block.timestamp;
+        uint256 retentionExpiry = issuedAt + (retentionYears * 365 days);
+
+        _cddRecords[investor].push(CDDRecord({
+            cddHash:         cddHash,
+            issuedAt:        issuedAt,
+            retentionExpiry: retentionExpiry
+        }));
+
+        emit CDDRecordAnchored(investor, cddHash, issuedAt, retentionExpiry);
+    }
+
+    // ── AML view functions ──────────────────────────────────────
+
+    /**
+     * @notice Returns all STR records for an account.
+     */
+    function getSTRRecords(address account) external view returns (STRRecord[] memory) {
+        return _strRecords[account];
+    }
+
+    /**
+     * @notice Returns the number of STR records for an account.
+     */
+    function getSTRCount(address account) external view returns (uint256) {
+        return _strRecords[account].length;
+    }
+
+    /**
+     * @notice Returns all CDD records for an investor.
+     */
+    function getCDDRecords(address investor) external view returns (CDDRecord[] memory) {
+        return _cddRecords[investor];
+    }
+
+    /**
+     * @notice Returns true if the investor has at least one CDD record
+     *         whose retention period has not yet expired.
+     */
+    function hasCDDInRetention(address investor) external view returns (bool) {
+        CDDRecord[] storage records = _cddRecords[investor];
+        for (uint256 i = 0; i < records.length; i++) {
+            if (block.timestamp <= records[i].retentionExpiry) return true;
+        }
+        return false;
     }
 
     // ── Pause ───────────────────────────────────────────────────

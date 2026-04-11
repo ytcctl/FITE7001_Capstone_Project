@@ -55,12 +55,32 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         bytes32 matchId;            // Off-chain matching engine trade ID
     }
 
+    /**
+     * @notice FATF Recommendation 16 / HKMA Travel Rule data.
+     *         For transfers ≥ HK$8,000, originator and beneficiary VASP
+     *         information must be exchanged and recorded on-chain.
+     *         The actual PII is kept off-chain; only hashes and VASP IDs
+     *         are stored here.
+     */
+    struct TravelRuleData {
+        bytes32 originatorVASP;       // keccak256 of originator VASP identifier
+        bytes32 beneficiaryVASP;      // keccak256 of beneficiary VASP identifier
+        bytes32 originatorInfoHash;   // keccak256 of originator name + account
+        bytes32 beneficiaryInfoHash;  // keccak256 of beneficiary name + account
+        uint256 timestamp;            // when travel rule data was recorded
+    }
+
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
 
     mapping(uint256 => Settlement) public settlements;
     uint256 public settlementCount;
+
+    /// @dev settlementId => TravelRuleData (FATF Rec. 16)
+    mapping(uint256 => TravelRuleData) private _travelRuleData;
+    /// @dev settlementId => whether travel rule data has been set
+    mapping(uint256 => bool) public hasTravelRuleData;
 
     // -------------------------------------------------------------------------
     // Events
@@ -92,6 +112,14 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         uint256 indexed id,
         bytes32 indexed matchId,
         string reason
+    );
+    event TravelRuleDataRecorded(
+        uint256 indexed settlementId,
+        bytes32 originatorVASP,
+        bytes32 beneficiaryVASP,
+        bytes32 originatorInfoHash,
+        bytes32 beneficiaryInfoHash,
+        uint256 timestamp
     );
 
     // -------------------------------------------------------------------------
@@ -223,6 +251,65 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         require(block.timestamp > s.settlementDeadline, "DvPSettlement: deadline not passed");
         s.status = SettlementStatus.Failed;
         emit SettlementFailed(id, s.matchId, "Deadline passed");
+    }
+
+    // -------------------------------------------------------------------------
+    // FATF Recommendation 16 — Travel Rule (OPERATOR_ROLE)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice Record Travel Rule data for a settlement (FATF Rec. 16 / HKMA).
+     *         Must be called before executeSettlement() for transfers ≥ HK$8,000.
+     *         Only hashes and VASP IDs are stored on-chain — no PII.
+     *
+     * @param settlementId        The settlement to attach travel rule data to.
+     * @param originatorVASP      keccak256 of originator VASP identifier.
+     * @param beneficiaryVASP     keccak256 of beneficiary VASP identifier.
+     * @param originatorInfoHash  keccak256 of originator name + account details.
+     * @param beneficiaryInfoHash keccak256 of beneficiary name + account details.
+     */
+    function setTravelRuleData(
+        uint256 settlementId,
+        bytes32 originatorVASP,
+        bytes32 beneficiaryVASP,
+        bytes32 originatorInfoHash,
+        bytes32 beneficiaryInfoHash
+    ) external onlyRole(OPERATOR_ROLE) {
+        require(settlementId < settlementCount, "DvPSettlement: invalid settlement ID");
+        Settlement storage s = settlements[settlementId];
+        require(s.status == SettlementStatus.Pending, "DvPSettlement: not pending");
+        require(originatorVASP != bytes32(0), "DvPSettlement: zero originator VASP");
+        require(beneficiaryVASP != bytes32(0), "DvPSettlement: zero beneficiary VASP");
+        require(originatorInfoHash != bytes32(0), "DvPSettlement: zero originator info");
+        require(beneficiaryInfoHash != bytes32(0), "DvPSettlement: zero beneficiary info");
+
+        _travelRuleData[settlementId] = TravelRuleData({
+            originatorVASP:      originatorVASP,
+            beneficiaryVASP:     beneficiaryVASP,
+            originatorInfoHash:  originatorInfoHash,
+            beneficiaryInfoHash: beneficiaryInfoHash,
+            timestamp:           block.timestamp
+        });
+        hasTravelRuleData[settlementId] = true;
+
+        emit TravelRuleDataRecorded(
+            settlementId,
+            originatorVASP,
+            beneficiaryVASP,
+            originatorInfoHash,
+            beneficiaryInfoHash,
+            block.timestamp
+        );
+    }
+
+    /**
+     * @notice Retrieve Travel Rule data for a settlement.
+     * @param settlementId The settlement ID.
+     * @return data The TravelRuleData struct.
+     */
+    function getTravelRuleData(uint256 settlementId) external view returns (TravelRuleData memory data) {
+        require(hasTravelRuleData[settlementId], "DvPSettlement: no travel rule data");
+        return _travelRuleData[settlementId];
     }
 
     // -------------------------------------------------------------------------
