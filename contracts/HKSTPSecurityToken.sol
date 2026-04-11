@@ -33,6 +33,12 @@ interface ICompliance {
  * @title HKSTPSecurityToken
  * @notice ERC-3643 (T-REX) inspired security token — one token per HKSTP portfolio startup.
  *
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │  EIP-1167 Minimal Proxy Compatible                              │
+ * │  Uses initialize() instead of constructor for clone deployment  │
+ * │  Overrides ERC-20 name()/symbol() with custom proxy-safe storage│
+ * └──────────────────────────────────────────────────────────────────┘
+ *
  * Key design decisions:
  *   - Compliance-aware transfer control: every transfer must pass Identity Registry
  *     and Compliance Contract checks before execution.
@@ -49,6 +55,15 @@ interface ICompliance {
  */
 contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
+
+    // ── EIP-1167 proxy-safe name/symbol storage ─────────────────
+    //
+    // OZ v5 ERC20 stores name/symbol in the constructor (immutable-style).
+    // EIP-1167 clones skip the constructor, so we store them here and
+    // override name()/symbol() to return these proxy-safe values.
+    string private _proxyName;
+    string private _proxySymbol;
+    bool   private _initialized;
 
     /// @notice Address of the linked Identity Registry contract.
     address public identityRegistry;
@@ -97,16 +112,15 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
     event IdentityHolderRemoved(address indexed identityContract);
 
     // -------------------------------------------------------------------------
-    // Constructor
+    // Constructor (backward-compatible + EIP-1167 implementation)
     // -------------------------------------------------------------------------
 
     /**
-     * @param name_             Token name (e.g. "HKSTP Startup Alpha Token").
-     * @param symbol_           Token symbol (e.g. "HKSA").
-     * @param identityRegistry_ Address of the HKSTPIdentityRegistry contract.
-     * @param compliance_       Address of the HKSTPCompliance contract.
-     * @param onchainId_        ONCHAINID contract address for this token (may be address(0)).
-     * @param admin             Initial admin and agent.
+     * @dev For direct deployment (backward compat), pass all params and the
+     *      contract initialises inline.
+     *      For EIP-1167 implementation deployment, pass empty strings for name
+     *      and symbol and address(0) for the other params — clones call
+     *      initialize() instead.
      */
     constructor(
         string memory name_,
@@ -115,17 +129,68 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
         address compliance_,
         address onchainId_,
         address admin
-    ) ERC20(name_, symbol_) {
+    ) ERC20("", "") {
+        // If admin is non-zero this is a direct (non-proxy) deployment
+        if (admin != address(0)) {
+            _doInitialize(name_, symbol_, identityRegistry_, compliance_, onchainId_, admin);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Initializer (called on each EIP-1167 clone)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice Initialize a cloned HKSTPSecurityToken. Can only be called once.
+     */
+    function initialize(
+        string memory name_,
+        string memory symbol_,
+        address identityRegistry_,
+        address compliance_,
+        address onchainId_,
+        address admin
+    ) external {
+        require(!_initialized, "HKSTPSecurityToken: already initialized");
+        _doInitialize(name_, symbol_, identityRegistry_, compliance_, onchainId_, admin);
+    }
+
+    function _doInitialize(
+        string memory name_,
+        string memory symbol_,
+        address identityRegistry_,
+        address compliance_,
+        address /* onchainId_ */,
+        address admin
+    ) internal {
+        require(!_initialized, "HKSTPSecurityToken: already initialized");
         require(identityRegistry_ != address(0), "HKSTPSecurityToken: zero registry");
         require(compliance_ != address(0), "HKSTPSecurityToken: zero compliance");
         require(admin != address(0), "HKSTPSecurityToken: zero admin");
 
+        _initialized = true;
+
+        _proxyName   = name_;
+        _proxySymbol = symbol_;
+
         identityRegistry = identityRegistry_;
         compliance       = compliance_;
-        onchainId        = onchainId_;
+        onchainId        = address(0);
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(AGENT_ROLE, admin);
+    }
+
+    // -------------------------------------------------------------------------
+    // ERC-20 name/symbol overrides (EIP-1167 proxy-safe)
+    // -------------------------------------------------------------------------
+
+    function name() public view virtual override returns (string memory) {
+        return _proxyName;
+    }
+
+    function symbol() public view virtual override returns (string memory) {
+        return _proxySymbol;
     }
 
     // -------------------------------------------------------------------------

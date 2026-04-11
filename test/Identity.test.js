@@ -44,9 +44,39 @@ describe("ONCHAINID Identity System", function () {
         expect(await id.keyHasPurpose(key, 1)).to.be.true;
       });
 
-      it("should revert if initialManagementKey is zero", async function () {
+      it("should create uninitialised implementation when zero address passed", async function () {
         const Identity = await ethers.getContractFactory("Identity");
-        await expect(Identity.deploy(ethers.ZeroAddress)).to.be.revertedWith("Identity: zero key");
+        // address(0) => uninitialised implementation (EIP-1167 pattern)
+        const impl = await Identity.deploy(ethers.ZeroAddress);
+        // Management key should NOT be set (uninitialised)
+        const zeroKey = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["address"], [ethers.ZeroAddress]));
+        expect(await impl.keyHasPurpose(zeroKey, 1)).to.be.false;
+      });
+
+      it("should revert initialize() with zero key", async function () {
+        const Identity = await ethers.getContractFactory("Identity");
+        const impl = await Identity.deploy(ethers.ZeroAddress);
+        await expect(impl.initialize(ethers.ZeroAddress)).to.be.revertedWith("Identity: zero key");
+      });
+
+      it("should allow initialize() on uninitialised contract", async function () {
+        const Identity = await ethers.getContractFactory("Identity");
+        const impl = await Identity.deploy(ethers.ZeroAddress);
+        await impl.initialize(investor1.address);
+        const key = await impl.addressToKey(investor1.address);
+        expect(await impl.keyHasPurpose(key, 1)).to.be.true;
+      });
+
+      it("should revert double initialize()", async function () {
+        const Identity = await ethers.getContractFactory("Identity");
+        const impl = await Identity.deploy(ethers.ZeroAddress);
+        await impl.initialize(investor1.address);
+        await expect(impl.initialize(investor2.address)).to.be.revertedWith("Identity: already initialized");
+      });
+
+      it("should revert initialize() on already-constructed identity", async function () {
+        // Deployed with non-zero address => already initialised via constructor
+        await expect(identity.initialize(investor2.address)).to.be.revertedWith("Identity: already initialized");
       });
     });
 
@@ -531,6 +561,46 @@ describe("ONCHAINID Identity System", function () {
         await factory.connect(agent).deployIdentity(investor1.address, admin.address);
         await factory.connect(agent).deployIdentity(investor2.address, admin.address);
         expect(await factory.identityCount()).to.equal(2n);
+      });
+    });
+
+    describe("EIP-1167 Minimal Proxy", function () {
+      it("should expose identityImplementation address", async function () {
+        const impl = await factory.identityImplementation();
+        expect(impl).to.not.equal(ethers.ZeroAddress);
+      });
+
+      it("should deploy clones at different addresses from implementation", async function () {
+        const impl = await factory.identityImplementation();
+        await factory.connect(agent).deployIdentity(investor1.address, admin.address);
+        const clone1 = await factory.getIdentity(investor1.address);
+        expect(clone1).to.not.equal(impl);
+        expect(clone1).to.not.equal(ethers.ZeroAddress);
+      });
+
+      it("should deploy clones at different addresses from each other", async function () {
+        await factory.connect(agent).deployIdentity(investor1.address, admin.address);
+        await factory.connect(agent).deployIdentity(investor2.address, admin.address);
+        const clone1 = await factory.getIdentity(investor1.address);
+        const clone2 = await factory.getIdentity(investor2.address);
+        expect(clone1).to.not.equal(clone2);
+      });
+
+      it("each clone should have independent state", async function () {
+        await factory.connect(agent).deployIdentity(investor1.address, admin.address);
+        await factory.connect(agent).deployIdentity(investor2.address, admin.address);
+
+        const Identity = await ethers.getContractFactory("Identity");
+        const id1 = Identity.attach(await factory.getIdentity(investor1.address));
+        const id2 = Identity.attach(await factory.getIdentity(investor2.address));
+
+        const key1 = await id1.addressToKey(investor1.address);
+        const key2 = await id2.addressToKey(investor2.address);
+
+        expect(await id1.keyHasPurpose(key1, 1)).to.be.true;
+        expect(await id1.keyHasPurpose(key2, 1)).to.be.false;
+        expect(await id2.keyHasPurpose(key2, 1)).to.be.true;
+        expect(await id2.keyHasPurpose(key1, 1)).to.be.false;
       });
     });
   });

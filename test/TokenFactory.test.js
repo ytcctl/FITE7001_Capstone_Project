@@ -285,4 +285,52 @@ describe("TokenFactory", function () {
       );
     });
   });
+
+  describe("EIP-1167 Minimal Proxy", function () {
+    it("should expose tokenImplementation address", async function () {
+      const impl = await tokenFactory.tokenImplementation();
+      expect(impl).to.not.equal(ethers.ZeroAddress);
+    });
+
+    it("should deploy clones at different addresses from implementation", async function () {
+      const impl = await tokenFactory.tokenImplementation();
+      await tokenFactory.createToken("Clone A", "CLA");
+      const info = await tokenFactory.getToken(0);
+      expect(info.tokenAddress).to.not.equal(impl);
+    });
+
+    it("should deploy clones at different addresses from each other", async function () {
+      await tokenFactory.createToken("Clone A", "CLA");
+      await tokenFactory.createToken("Clone B", "CLB");
+      const a = await tokenFactory.getToken(0);
+      const b = await tokenFactory.getToken(1);
+      expect(a.tokenAddress).to.not.equal(b.tokenAddress);
+    });
+
+    it("each clone should have independent name/symbol", async function () {
+      await tokenFactory.createToken("First Token", "FT");
+      await tokenFactory.createToken("Second Token", "ST");
+
+      const HKSTPSecurityToken = await ethers.getContractFactory("HKSTPSecurityToken");
+      const t1 = HKSTPSecurityToken.attach((await tokenFactory.getToken(0)).tokenAddress);
+      const t2 = HKSTPSecurityToken.attach((await tokenFactory.getToken(1)).tokenAddress);
+
+      expect(await t1.name()).to.equal("First Token");
+      expect(await t1.symbol()).to.equal("FT");
+      expect(await t2.name()).to.equal("Second Token");
+      expect(await t2.symbol()).to.equal("ST");
+    });
+
+    it("should revert initialize() on a factory-created clone (already initialised)", async function () {
+      await tokenFactory.createToken("Clone", "CLN");
+      const info = await tokenFactory.getToken(0);
+
+      const HKSTPSecurityToken = await ethers.getContractFactory("HKSTPSecurityToken");
+      const clone = HKSTPSecurityToken.attach(info.tokenAddress);
+
+      await expect(
+        clone.initialize("X", "X", await identityRegistry.getAddress(), await compliance.getAddress(), ethers.ZeroAddress, deployer.address)
+      ).to.be.revertedWith("HKSTPSecurityToken: already initialized");
+    });
+  });
 });

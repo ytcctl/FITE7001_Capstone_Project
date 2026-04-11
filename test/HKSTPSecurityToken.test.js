@@ -280,4 +280,46 @@ describe("HKSTPSecurityToken", function () {
       await expect(token.connect(alice).pause()).to.be.reverted;
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // EIP-1167 Minimal Proxy / Initialize
+  // ---------------------------------------------------------------------------
+  describe("EIP-1167 Minimal Proxy", function () {
+    it("should support initialize() on a fresh (uninitialised) contract", async function () {
+      const Token = await ethers.getContractFactory("HKSTPSecurityToken");
+      // Deploy as implementation (admin=0 => skip init)
+      const impl = await Token.deploy("", "", ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress);
+      // Now initialize it
+      await impl.initialize(
+        "Proxy Token", "PTK",
+        await registry.getAddress(),
+        await compliance.getAddress(),
+        ethers.ZeroAddress,
+        admin.address
+      );
+      expect(await impl.name()).to.equal("Proxy Token");
+      expect(await impl.symbol()).to.equal("PTK");
+    });
+
+    it("should revert double initialize()", async function () {
+      const Token = await ethers.getContractFactory("HKSTPSecurityToken");
+      const impl = await Token.deploy("", "", ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress);
+      await impl.initialize(
+        "P", "P",
+        await registry.getAddress(),
+        await compliance.getAddress(),
+        ethers.ZeroAddress,
+        admin.address
+      );
+      await expect(
+        impl.initialize("X", "X", await registry.getAddress(), await compliance.getAddress(), ethers.ZeroAddress, admin.address)
+      ).to.be.revertedWith("HKSTPSecurityToken: already initialized");
+    });
+
+    it("should revert initialize() on already-constructed token", async function () {
+      await expect(
+        token.initialize("X", "X", await registry.getAddress(), await compliance.getAddress(), ethers.ZeroAddress, admin.address)
+      ).to.be.revertedWith("HKSTPSecurityToken: already initialized");
+    });
+  });
 });

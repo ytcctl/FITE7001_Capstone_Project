@@ -236,6 +236,7 @@ export const TOKEN_FACTORY_ABI = [
   'function getTokenBySymbol(string symbol) view returns (tuple(string name, string symbol, address tokenAddress, address createdBy, uint256 createdAt, bool active))',
   'function identityRegistry() view returns (address)',
   'function compliance() view returns (address)',
+  'function tokenImplementation() view returns (address)',
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
   'event TokenCreated(uint256 indexed index, string name, string symbol, address tokenAddress, address createdBy)',
@@ -267,6 +268,7 @@ export const IDENTITY_FACTORY_ABI = [
   'function getIdentity(address investor) view returns (address)',
   'function deployedIdentity(address) view returns (address)',
   'function identityCount() view returns (uint256)',
+  'function identityImplementation() view returns (address)',
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function grantRole(bytes32 role, address account) external',
   'function DEPLOYER_ROLE() view returns (bytes32)',
@@ -275,6 +277,8 @@ export const IDENTITY_FACTORY_ABI = [
 ];
 
 export const IDENTITY_ABI = [
+  // EIP-1167 initializer
+  'function initialize(address initialManagementKey) external',
   // ERC-734 Key Management
   'function getKey(bytes32 key) view returns (uint256[] purposes, uint256 keyType, bytes32 keyValue)',
   'function keyHasPurpose(bytes32 key, uint256 purpose) view returns (bool)',

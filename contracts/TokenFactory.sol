@@ -2,12 +2,21 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./HKSTPSecurityToken.sol";
 
 /**
  * @title TokenFactory
  * @notice Factory contract that allows HKSTP admins to deploy new
- *         HKSTPSecurityToken instances — one per approved startup company.
+ *         HKSTPSecurityToken instances — one per approved startup company —
+ *         using EIP-1167 Minimal Proxy (Clone) pattern for gas savings.
+ *
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │  EIP-1167 Minimal Proxy Pattern                                 │
+ * │  One HKSTPSecurityToken implementation deployed at construction.│
+ * │  Each clone costs ~45 bytes on-chain + a delegatecall stub.     │
+ * │  Gas savings: ~90 % per token deployment.                       │
+ * └──────────────────────────────────────────────────────────────────┘
  *
  *         Each token is automatically linked to the shared IdentityRegistry
  *         and Compliance contracts, and granted TOKEN_ROLE on Compliance so
@@ -23,10 +32,14 @@ import "./HKSTPSecurityToken.sol";
  *   4. The new token appears in allTokens() and tokensByStartup()
  */
 contract TokenFactory is AccessControl {
+    using Clones for address;
 
     // ── Shared infrastructure (set once at deploy time) ─────────────
     address public identityRegistry;
     address public compliance;
+
+    /// @notice Address of the HKSTPSecurityToken implementation (EIP-1167 master copy).
+    address public immutable tokenImplementation;
 
     // ── Token registry ──────────────────────────────────────────────
     struct StartupToken {
@@ -79,6 +92,12 @@ contract TokenFactory is AccessControl {
         compliance       = compliance_;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
+
+        // Deploy the implementation contract (admin = address(0) means it
+        // stays uninitialised — clones will call initialize())
+        tokenImplementation = address(new HKSTPSecurityToken(
+            "", "", address(0), address(0), address(0), address(0)
+        ));
     }
 
     // ── Admin: Create a new startup token ───────────────────────────
@@ -102,8 +121,10 @@ contract TokenFactory is AccessControl {
             revert SymbolAlreadyExists(symbol_);
         }
 
-        // Deploy a new security token
-        HKSTPSecurityToken token = new HKSTPSecurityToken(
+        // Deploy a new security token clone (EIP-1167 minimal proxy)
+        address tokenAddress_ = tokenImplementation.clone();
+        HKSTPSecurityToken token = HKSTPSecurityToken(tokenAddress_);
+        token.initialize(
             name_,
             symbol_,
             identityRegistry,
@@ -112,7 +133,7 @@ contract TokenFactory is AccessControl {
             msg.sender        // admin of the new token = caller
         );
 
-        tokenAddress = address(token);
+        tokenAddress = tokenAddress_;
 
         // Grant TOKEN_ROLE on the Compliance contract so the new token
         // can call canTransfer() / checkModules()

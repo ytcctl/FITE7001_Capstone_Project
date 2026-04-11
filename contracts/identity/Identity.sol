@@ -8,8 +8,14 @@ import "./IIdentity.sol";
  * @notice Per-investor ONCHAINID contract implementing ERC-734 (Key Management)
  *         and ERC-735 (Claim Holder).
  *
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │  EIP-1167 Minimal Proxy Compatible                              │
+ * │  Uses initialize() instead of constructor for clone deployment  │
+ * └──────────────────────────────────────────────────────────────────┘
+ *
  * Architecture:
- *   - Each investor wallet gets its own Identity contract deployed via IdentityFactory.
+ *   - Each investor wallet gets its own Identity contract deployed via
+ *     IdentityFactory using EIP-1167 Minimal Proxy (Clones).
  *   - The investor's wallet address is the initial MANAGEMENT key (purpose 1).
  *   - The platform admin / KYC agent can be added as a CLAIM key (purpose 3)
  *     so they can add claims on behalf of the investor.
@@ -36,12 +42,18 @@ contract Identity is IIdentity {
     // topic => list of claimIds
     mapping(uint256 => bytes32[]) private _claimsByTopic;
 
-    // ── Modifiers ───────────────────────────────────────────────
+    // ── Constants ───────────────────────────────────────────────
 
     uint256 public constant PURPOSE_MANAGEMENT = 1;
     uint256 public constant PURPOSE_ACTION     = 2;
     uint256 public constant PURPOSE_CLAIM      = 3;
     uint256 public constant KEY_TYPE_ECDSA     = 1;
+
+    // ── Initializable guard (EIP-1167 compatible) ───────────────
+
+    bool private _initialized;
+
+    // ── Modifiers ───────────────────────────────────────────────
 
     modifier onlyManagementOrSelf() {
         require(
@@ -62,14 +74,37 @@ contract Identity is IIdentity {
         _;
     }
 
-    // ── Constructor ─────────────────────────────────────────────
+    // ── Constructor (backward-compatible + EIP-1167 implementation) ─
 
     /**
-     * @param initialManagementKey The investor's wallet address — becomes the
-     *        MANAGEMENT key owner. This is the self-sovereign owner of the identity.
+     * @dev When used as an EIP-1167 implementation, pass address(0) so the
+     *      implementation contract stays uninitialised.  Clones call
+     *      initialize() instead.
+     *      For direct deployment (backward compat), pass the management key
+     *      address and the contract initialises inline.
      */
     constructor(address initialManagementKey) {
+        if (initialManagementKey != address(0)) {
+            _doInitialize(initialManagementKey);
+        }
+    }
+
+    // ── Initializer (called on each EIP-1167 clone) ─────────────
+
+    /**
+     * @notice Initialize a cloned Identity contract. Can only be called once.
+     * @param initialManagementKey The investor's wallet address — becomes the
+     *        MANAGEMENT key owner.
+     */
+    function initialize(address initialManagementKey) external {
+        require(!_initialized, "Identity: already initialized");
         require(initialManagementKey != address(0), "Identity: zero key");
+        _doInitialize(initialManagementKey);
+    }
+
+    function _doInitialize(address initialManagementKey) internal {
+        require(!_initialized, "Identity: already initialized");
+        _initialized = true;
 
         bytes32 key = _addressToKey(initialManagementKey);
         uint256[] memory purposes = new uint256[](1);
