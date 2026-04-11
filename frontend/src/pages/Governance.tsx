@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
-import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer } from 'lucide-react';
 
 // Proposal state enum (matches GovernorCountingSimple)
 const PROPOSAL_STATES = [
@@ -15,16 +15,16 @@ const PROPOSAL_STATES = [
   'Executed',   // 7
 ];
 
-const STATE_COLORS: Record<string, string> = {
-  Pending: 'bg-yellow-100 text-yellow-800',
-  Active: 'bg-blue-100 text-blue-800',
-  Canceled: 'bg-gray-100 text-gray-800',
-  Defeated: 'bg-red-100 text-red-800',
-  Succeeded: 'bg-green-100 text-green-800',
-  Queued: 'bg-purple-100 text-purple-800',
-  Expired: 'bg-gray-100 text-gray-600',
-  Executed: 'bg-emerald-100 text-emerald-800',
-};
+const STATE_COLORS: string[] = [
+  'bg-amber-500/20 text-amber-400 border-amber-500/30',     // Pending
+  'bg-blue-500/20 text-blue-400 border-blue-500/30',        // Active
+  'bg-gray-500/20 text-gray-400 border-gray-500/30',        // Canceled
+  'bg-red-500/20 text-red-400 border-red-500/30',           // Defeated
+  'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', // Succeeded
+  'bg-purple-500/20 text-purple-400 border-purple-500/30',  // Queued
+  'bg-gray-500/20 text-gray-400 border-gray-500/30',        // Expired
+  'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',        // Executed
+];
 
 interface ProposalInfo {
   id: string;
@@ -282,118 +282,122 @@ const Governance: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading governance data...</span>
+      <div className="glass-card p-12 text-center">
+        <Loader2 size={48} className="mx-auto mb-4 text-purple-400 animate-spin" />
+        <h2 className="text-2xl font-bold text-white mb-2">Governance</h2>
+        <p className="text-gray-400">Loading governance data…</p>
       </div>
     );
   }
 
+  if (!account) {
+    return (
+      <div className="glass-card p-12 text-center">
+        <Shield size={48} className="mx-auto mb-4 text-purple-400" />
+        <h2 className="text-2xl font-bold text-white mb-2">Governance</h2>
+        <p className="text-gray-400">Connect your wallet to participate in on-chain governance.</p>
+      </div>
+    );
+  }
+
+  const refreshAll = async () => {
+    setLoading(true);
+    await Promise.all([loadGovernorInfo(), loadVotingInfo(), loadProposals()]);
+    setLoading(false);
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-        <Shield className="w-7 h-7 text-blue-600" />
-        Governance
-      </h1>
+      {/* Header */}
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Governance</h2>
+          <p className="text-gray-400">On-chain voting with snapshot-based governance ({govName}).</p>
+        </div>
+        <button onClick={refreshAll} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Refresh">
+          <RefreshCw size={18} className="text-gray-400" />
+        </button>
+      </header>
 
       {/* Status banner */}
       {status && (
-        <div className={`p-4 rounded-lg flex items-center gap-2 ${
-          status.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
-          status.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
-          'bg-blue-50 text-blue-800 border border-blue-200'
-        }`}>
-          {status.type === 'success' ? <CheckCircle className="w-5 h-5" /> :
-           status.type === 'error' ? <XCircle className="w-5 h-5" /> :
-           <AlertTriangle className="w-5 h-5" />}
-          <span>{status.message}</span>
+        <div
+          className={`glass-card px-4 py-3 text-sm font-medium ${
+            status.type === 'success' ? 'text-emerald-400' : status.type === 'error' ? 'text-red-400' : 'text-purple-300'
+          }`}
+        >
+          {status.type === 'success' ? '✓ ' : status.type === 'error' ? '✗ ' : ''}{status.message}
         </div>
       )}
 
       {/* Governor Config Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Governor</p>
-          <p className="text-lg font-semibold">{govName}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Voting Delay</p>
-          <p className="text-lg font-semibold">{votingDelay.toString()} blocks</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Voting Period</p>
-          <p className="text-lg font-semibold">{votingPeriod.toString()} blocks</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Quorum</p>
-          <p className="text-lg font-semibold">{quorumPct.toString()}% of supply</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={<Shield size={20} />} label="Governor" value={govName || '—'} accent="purple" />
+        <StatCard icon={<Clock size={20} />} label="Voting Delay" value={`${votingDelay.toString()} blocks`} accent="cyan" />
+        <StatCard icon={<Timer size={20} />} label="Voting Period" value={`${votingPeriod.toString()} blocks`} accent="amber" />
+        <StatCard icon={<Users size={20} />} label="Quorum" value={`${quorumPct.toString()}% of supply`} accent="emerald" />
       </div>
 
       {/* Voting Power + Delegation */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Your Voting Power */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Vote className="w-5 h-5 text-blue-600" />
-            Your Voting Power
-          </h2>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Token Balance:</span>
-              <span className="font-medium">{ethers.formatEther(tokenBalance)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Voting Power:</span>
-              <span className="font-medium text-blue-600">{ethers.formatEther(votingPower)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Delegated To:</span>
-              <span className="font-mono text-sm">
-                {delegatee === ethers.ZeroAddress ? '(none — delegate to activate!)' :
-                 delegatee === account ? '(self)' :
-                 `${delegatee.slice(0, 8)}...${delegatee.slice(-6)}`}
-              </span>
-            </div>
-            {delegatee === ethers.ZeroAddress && tokenBalance > 0n && (
-              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                <AlertTriangle className="w-4 h-4 inline mr-1" />
-                You must self-delegate to activate voting power!
-              </div>
-            )}
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Vote size={20} className="text-purple-400" />
+            <h3 className="font-bold text-white">Your Voting Power</h3>
           </div>
+          <dl className="space-y-3">
+            <InfoRow label="Token Balance" value={ethers.formatEther(tokenBalance)} />
+            <InfoRow label="Voting Power" value={ethers.formatEther(votingPower)} highlight />
+            <InfoRow
+              label="Delegated To"
+              value={
+                delegatee === ethers.ZeroAddress
+                  ? '(none — delegate to activate!)'
+                  : delegatee === account
+                  ? '(self)'
+                  : `${delegatee.slice(0, 8)}…${delegatee.slice(-6)}`
+              }
+            />
+          </dl>
+          {delegatee === ethers.ZeroAddress && tokenBalance > 0n && (
+            <div className="mt-4 glass-card px-4 py-3 text-sm text-amber-400 flex items-center gap-2">
+              <AlertTriangle size={16} />
+              You must self-delegate to activate voting power!
+            </div>
+          )}
         </div>
 
         {/* Delegation */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            Delegate Votes
-          </h2>
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={20} className="text-purple-400" />
+            <h3 className="font-bold text-white">Delegate Votes</h3>
+          </div>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Delegate to address</label>
+              <label className="block text-sm text-gray-400 mb-1">Delegate to address</label>
               <input
                 type="text"
                 value={delegateAddr}
                 onChange={(e) => setDelegateAddr(e.target.value)}
-                placeholder="0x... or 'self'"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0x… or 'self'"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
               />
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => { setDelegateAddr('self'); }}
-                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                onClick={() => setDelegateAddr('self')}
+                className="px-4 py-2.5 text-sm bg-white/5 border border-white/10 text-gray-300 rounded-xl hover:bg-white/10 transition-colors"
               >
                 Self
               </button>
               <button
                 onClick={handleDelegate}
                 disabled={delegating || !delegateAddr}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {delegating && <Loader2 className="w-4 h-4 animate-spin" />}
+                {delegating && <Loader2 size={16} className="animate-spin" />}
                 Delegate
               </button>
             </div>
@@ -402,52 +406,55 @@ const Governance: React.FC = () => {
       </div>
 
       {/* Create Proposal */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-blue-600" />
-          Create Proposal
-        </h2>
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Plus size={20} className="text-purple-400" />
+          <h3 className="font-bold text-white">Create Proposal</h3>
+        </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Description</label>
+            <label className="block text-sm text-gray-400 mb-1">Description</label>
             <textarea
               value={proposalDescription}
               onChange={(e) => setProposalDescription(e.target.value)}
-              placeholder="Describe the governance proposal..."
+              placeholder="Describe the governance proposal…"
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm resize-none"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Target address (optional)</label>
+            <label className="block text-sm text-gray-400 mb-1">Target address (optional)</label>
             <input
               type="text"
               value={proposalTarget}
               onChange={(e) => setProposalTarget(e.target.value)}
-              placeholder="0x... (leave empty for signaling proposal)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="0x… (leave empty for signaling proposal)"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
             />
           </div>
           <button
             onClick={handlePropose}
             disabled={proposing || !proposalDescription}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 px-6 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {proposing && <Loader2 className="w-4 h-4 animate-spin" />}
+            {proposing && <Loader2 size={16} className="animate-spin" />}
             Submit Proposal
           </button>
         </div>
       </div>
 
       {/* Proposals List */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          Proposals ({proposals.length})
-        </h2>
+      <div className="glass-card overflow-hidden">
+        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText size={20} className="text-purple-400" />
+            <h3 className="font-bold text-white">Proposals ({proposals.length})</h3>
+          </div>
+        </div>
         {proposals.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No proposals yet.</p>
+          <div className="p-8 text-center text-gray-500 text-sm">No proposals yet.</div>
         ) : (
-          <div className="space-y-4">
+          <div className="divide-y divide-white/5">
             {proposals.map((p) => {
               const totalVotes = p.forVotes + p.againstVotes + p.abstainVotes;
               const forPct = totalVotes > 0n ? Number((p.forVotes * 100n) / totalVotes) : 0;
@@ -456,55 +463,33 @@ const Governance: React.FC = () => {
               const isExpanded = expandedProposal === p.id;
 
               return (
-                <div key={p.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div key={p.id} className="p-6 hover:bg-white/5 transition-colors">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <span className={`px-2 py-1 text-xs font-medium rounded ${STATE_COLORS[p.stateName] || 'bg-gray-100'}`}>
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATE_COLORS[p.state] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
                         {p.stateName}
                       </span>
-                      <span className="text-sm text-gray-500">
-                        ID: {p.id.slice(0, 12)}...
+                      <span className="text-sm text-gray-500 font-mono">
+                        #{p.id.slice(0, 12)}…
                       </span>
                     </div>
                     <button
                       onClick={() => setExpandedProposal(isExpanded ? null : p.id)}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="p-1 hover:bg-white/10 rounded-lg transition-colors text-gray-400"
                     >
-                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   </div>
 
-                  <p className="text-gray-900 font-medium mb-2">{p.description}</p>
+                  {/* Description */}
+                  <p className="text-white font-medium mb-3 text-sm">{p.description}</p>
 
                   {/* Vote bars */}
-                  <div className="space-y-1 mb-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="w-16 text-green-700">For</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-3">
-                        <div className="bg-green-500 h-3 rounded-full" style={{ width: `${forPct}%` }} />
-                      </div>
-                      <span className="w-24 text-right text-xs text-gray-500">
-                        {ethers.formatEther(p.forVotes)} ({forPct}%)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="w-16 text-red-700">Against</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-3">
-                        <div className="bg-red-500 h-3 rounded-full" style={{ width: `${againstPct}%` }} />
-                      </div>
-                      <span className="w-24 text-right text-xs text-gray-500">
-                        {ethers.formatEther(p.againstVotes)} ({againstPct}%)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="w-16 text-gray-600">Abstain</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-3">
-                        <div className="bg-gray-400 h-3 rounded-full" style={{ width: `${abstainPct}%` }} />
-                      </div>
-                      <span className="w-24 text-right text-xs text-gray-500">
-                        {ethers.formatEther(p.abstainVotes)} ({abstainPct}%)
-                      </span>
-                    </div>
+                  <div className="space-y-2 mb-4">
+                    <VoteBar label="For" pct={forPct} amount={ethers.formatEther(p.forVotes)} color="emerald" />
+                    <VoteBar label="Against" pct={againstPct} amount={ethers.formatEther(p.againstVotes)} color="red" />
+                    <VoteBar label="Abstain" pct={abstainPct} amount={ethers.formatEther(p.abstainVotes)} color="gray" />
                   </div>
 
                   {/* Action buttons based on state */}
@@ -514,51 +499,56 @@ const Governance: React.FC = () => {
                         <button
                           onClick={() => handleVote(p.id, 1)}
                           disabled={voting === p.id}
-                          className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20 flex items-center gap-1"
                         >
-                          {voting === p.id ? '...' : '👍 For'}
+                          {voting === p.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                          For
                         </button>
                         <button
                           onClick={() => handleVote(p.id, 0)}
                           disabled={voting === p.id}
-                          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                          className="text-xs bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/20 flex items-center gap-1"
                         >
-                          {voting === p.id ? '...' : '👎 Against'}
+                          {voting === p.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+                          Against
                         </button>
                         <button
                           onClick={() => handleVote(p.id, 2)}
                           disabled={voting === p.id}
-                          className="px-3 py-1.5 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                          className="text-xs bg-gray-500/20 text-gray-400 px-3 py-1.5 rounded-lg hover:bg-gray-500/30 transition-colors border border-gray-500/20 flex items-center gap-1"
                         >
-                          {voting === p.id ? '...' : '🤷 Abstain'}
+                          {voting === p.id ? <Loader2 size={12} className="animate-spin" /> : <AlertTriangle size={12} />}
+                          Abstain
                         </button>
                       </>
                     )}
                     {p.state === 4 && ( /* Succeeded */
                       <button
                         onClick={() => handleQueue(p)}
-                        className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
+                        className="text-xs bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-lg hover:bg-purple-500/30 transition-colors border border-purple-500/20 flex items-center gap-1"
                       >
-                        ⏳ Queue for Execution
+                        <Clock size={12} />
+                        Queue for Execution
                       </button>
                     )}
                     {p.state === 5 && ( /* Queued */
                       <button
                         onClick={() => handleExecute(p)}
-                        className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                        className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20 flex items-center gap-1"
                       >
-                        🚀 Execute
+                        <Play size={12} />
+                        Execute
                       </button>
                     )}
                   </div>
 
                   {/* Expanded details */}
                   {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600 space-y-1">
-                      <p><strong>Proposer:</strong> {p.proposer}</p>
-                      <p><strong>Snapshot Block:</strong> {p.snapshot.toString()}</p>
-                      <p><strong>Deadline Block:</strong> {p.deadline.toString()}</p>
-                      <p><strong>Target(s):</strong> {p.targets.join(', ')}</p>
+                    <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+                      <DetailRow label="Proposer" value={p.proposer} mono />
+                      <DetailRow label="Snapshot Block" value={p.snapshot.toString()} />
+                      <DetailRow label="Deadline Block" value={p.deadline.toString()} />
+                      <DetailRow label="Target(s)" value={p.targets.join(', ')} mono />
                     </div>
                   )}
                 </div>
@@ -568,15 +558,78 @@ const Governance: React.FC = () => {
         )}
       </div>
 
-      {/* Timelock info */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Timelock Configuration</h2>
-        <div className="text-sm text-gray-600 space-y-1">
-          <p><strong>Timelock Delay:</strong> {timelockDelay.toString()} seconds</p>
-          <p><strong>Timelock Address:</strong> <span className="font-mono">{contracts?.timelock?.target?.toString()}</span></p>
-          <p><strong>Governor Address:</strong> <span className="font-mono">{contracts?.governor?.target?.toString()}</span></p>
+      {/* Timelock Configuration */}
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Timer size={20} className="text-purple-400" />
+          <h3 className="font-bold text-white">Timelock Configuration</h3>
         </div>
+        <dl className="space-y-3">
+          <InfoRow label="Timelock Delay" value={`${timelockDelay.toString()} seconds`} />
+          <InfoRow label="Timelock Address" value={contracts?.timelock?.target?.toString() || '—'} mono />
+          <InfoRow label="Governor Address" value={contracts?.governor?.target?.toString() || '—'} mono />
+        </dl>
       </div>
+    </div>
+  );
+};
+
+// ── Helper Components ──
+
+const accentColors: Record<string, string> = {
+  purple: 'text-purple-400',
+  cyan: 'text-cyan-400',
+  amber: 'text-amber-400',
+  emerald: 'text-emerald-400',
+  red: 'text-red-400',
+};
+
+const StatCard: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent: string;
+}> = ({ icon, label, value, accent }) => (
+  <div className="glass-card p-6 hover:border-purple-500/30 transition-colors">
+    <div className="flex items-center gap-2 mb-2">
+      <span className={accentColors[accent] || 'text-gray-400'}>{icon}</span>
+      <span className="text-sm text-gray-400 font-medium">{label}</span>
+    </div>
+    <p className="text-2xl font-bold text-white">{value}</p>
+  </div>
+);
+
+const InfoRow: React.FC<{ label: string; value: string; highlight?: boolean; mono?: boolean }> = ({ label, value, highlight, mono }) => (
+  <div className="flex justify-between items-center">
+    <dt className="text-sm text-gray-400">{label}</dt>
+    <dd className={`text-sm font-medium ${highlight ? 'text-purple-400' : 'text-white'} ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
+  </div>
+);
+
+const DetailRow: React.FC<{ label: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
+  <div className="flex justify-between items-start gap-4">
+    <span className="text-xs text-gray-500 shrink-0">{label}</span>
+    <span className={`text-xs text-gray-300 text-right break-all ${mono ? 'font-mono' : ''}`}>{value}</span>
+  </div>
+);
+
+const barColors: Record<string, { bg: string; fill: string }> = {
+  emerald: { bg: 'bg-emerald-500/10', fill: 'bg-emerald-500' },
+  red: { bg: 'bg-red-500/10', fill: 'bg-red-500' },
+  gray: { bg: 'bg-gray-500/10', fill: 'bg-gray-500' },
+};
+
+const VoteBar: React.FC<{ label: string; pct: number; amount: string; color: string }> = ({ label, pct, amount, color }) => {
+  const colors = barColors[color] || barColors.gray;
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className={`w-14 text-xs ${color === 'emerald' ? 'text-emerald-400' : color === 'red' ? 'text-red-400' : 'text-gray-400'}`}>{label}</span>
+      <div className={`flex-1 ${colors.bg} rounded-full h-2.5`}>
+        <div className={`${colors.fill} h-2.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="w-28 text-right text-xs text-gray-500">
+        {amount} ({pct}%)
+      </span>
     </div>
   );
 };
