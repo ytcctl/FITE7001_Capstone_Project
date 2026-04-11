@@ -126,7 +126,7 @@ async function main() {
   const custodianAddress = process.env.CUSTODIAN_ADDRESS || deployer.address;
 
   // 1. IdentityRegistry
-  console.log("1/8  Deploying HKSTPIdentityRegistry...");
+  console.log("1/12  Deploying HKSTPIdentityRegistry...");
   const IdentityRegistry = await ethers.getContractFactory(
     "HKSTPIdentityRegistry"
   );
@@ -136,7 +136,7 @@ async function main() {
   console.log("     HKSTPIdentityRegistry:", registryAddress);
 
   // 2. Compliance
-  console.log("2/8  Deploying HKSTPCompliance...");
+  console.log("2/12  Deploying HKSTPCompliance...");
   const Compliance = await ethers.getContractFactory("HKSTPCompliance");
   const compliance = await Compliance.deploy(deployer.address, complianceOracle);
   await compliance.waitForDeployment();
@@ -144,7 +144,7 @@ async function main() {
   console.log("     HKSTPCompliance:", complianceAddress);
 
   // 3. SecurityToken
-  console.log("3/8  Deploying HKSTPSecurityToken...");
+  console.log("3/12  Deploying HKSTPSecurityToken...");
   const Token = await ethers.getContractFactory("HKSTPSecurityToken");
   const token = await Token.deploy(
     "HKSTP Alpha Startup Token",
@@ -159,7 +159,7 @@ async function main() {
   console.log("     HKSTPSecurityToken:", tokenAddress);
 
   // 4. MockCashToken
-  console.log("4/8  Deploying MockCashToken (tokenized HKD)...");
+  console.log("4/12  Deploying MockCashToken (tokenized HKD)...");
   const MockCash = await ethers.getContractFactory("MockCashToken");
   const cashToken = await MockCash.deploy("Tokenized HKD", "THKD", 6, deployer.address);
   await cashToken.waitForDeployment();
@@ -167,7 +167,7 @@ async function main() {
   console.log("     MockCashToken (THKD):", cashTokenAddress);
 
   // 5. DvPSettlement
-  console.log("5/8  Deploying DvPSettlement...");
+  console.log("5/12  Deploying DvPSettlement...");
   const DvP = await ethers.getContractFactory("DvPSettlement");
   const dvp = await DvP.deploy(deployer.address);
   await dvp.waitForDeployment();
@@ -175,7 +175,7 @@ async function main() {
   console.log("     DvPSettlement:", dvpAddress);
 
   // 6. TokenFactory
-  console.log("6/8  Deploying TokenFactory...");
+  console.log("6/12  Deploying TokenFactory...");
   const TokenFactory = await ethers.getContractFactory("TokenFactory");
   const tokenFactory = await TokenFactory.deploy(
     deployer.address,    // admin
@@ -187,7 +187,7 @@ async function main() {
   console.log("     TokenFactory:", tokenFactoryAddress);
 
   // 7. ClaimIssuer (Trusted Claim Issuer for ONCHAINID)
-  console.log("7/8  Deploying ClaimIssuer...");
+  console.log("7/12  Deploying ClaimIssuer...");
   const ClaimIssuerFactory = await ethers.getContractFactory("ClaimIssuer");
   const claimIssuer = await ClaimIssuerFactory.deploy(deployer.address, deployer.address);
   await claimIssuer.waitForDeployment();
@@ -195,7 +195,7 @@ async function main() {
   console.log("     ClaimIssuer:", claimIssuerAddress);
 
   // 8. IdentityFactory (deploys per-investor ONCHAINID contracts)
-  console.log("8/10  Deploying IdentityFactory...");
+  console.log("8/12  Deploying IdentityFactory...");
   const IdentityFactoryContract = await ethers.getContractFactory("IdentityFactory");
   const identityFactory = await IdentityFactoryContract.deploy(deployer.address);
   await identityFactory.waitForDeployment();
@@ -203,7 +203,7 @@ async function main() {
   console.log("     IdentityFactory:", identityFactoryAddress);
 
   // 9. Timelock (governance execution delay)
-  console.log("9/10  Deploying HKSTPTimelock...");
+  console.log("9/12  Deploying HKSTPTimelock...");
   const TIMELOCK_MIN_DELAY = 172800; // 48 hours (production)
   const Timelock = await ethers.getContractFactory("HKSTPTimelock");
   const timelock = await Timelock.deploy(
@@ -217,7 +217,7 @@ async function main() {
   console.log("     HKSTPTimelock:", timelockAddress);
 
   // 10. Governor (on-chain governance with snapshot voting)
-  console.log("10/10 Deploying HKSTPGovernor...");
+  console.log("10/12 Deploying HKSTPGovernor...");
   const VOTING_DELAY  = 14400;  // ~2 days at 12s/block
   const VOTING_PERIOD = 50400;  // ~7 days at 12s/block
   const QUORUM_PCT    = 10;     // 10% of total supply
@@ -236,6 +236,27 @@ async function main() {
   await governor.waitForDeployment();
   const governorAddress = await governor.getAddress();
   console.log("     HKSTPGovernor:", governorAddress);
+
+  // 11. WalletRegistry (98/2 custody rule enforcement)
+  console.log("11/12 Deploying WalletRegistry...");
+  const WalletRegistry = await ethers.getContractFactory("WalletRegistry");
+  const walletRegistry = await WalletRegistry.deploy(deployer.address);
+  await walletRegistry.waitForDeployment();
+  const walletRegistryAddress = await walletRegistry.getAddress();
+  console.log("     WalletRegistry:", walletRegistryAddress);
+
+  // 12. MultiSigWarm (2-of-3 multi-sig for warm wallet)
+  console.log("12/12 Deploying MultiSigWarm...");
+  // Use deployer + first two deterministic Besu accounts as initial signers
+  // In production, replace with actual custody officer keys
+  const warmSigner1 = deployer.address;
+  const warmSigner2 = process.env.WARM_SIGNER_2 || "0x627306090abaB3A6e1400e9345bC60c78a8BEf57";
+  const warmSigner3 = process.env.WARM_SIGNER_3 || "0xf17f52151EbEF6C7334FAD080c5704D77216b732";
+  const MultiSigWarm = await ethers.getContractFactory("MultiSigWarm");
+  const multiSigWarm = await MultiSigWarm.deploy([warmSigner1, warmSigner2, warmSigner3]);
+  await multiSigWarm.waitForDeployment();
+  const multiSigWarmAddress = await multiSigWarm.getAddress();
+  console.log("     MultiSigWarm:", multiSigWarmAddress);
 
   // Post-deployment configuration
   console.log("\nConfiguring roles and safe-list...");
@@ -308,6 +329,29 @@ async function main() {
   await (await token.grantRole(TOKEN_ADMIN_ROLE, timelockAddress)).wait();
   console.log("     DEFAULT_ADMIN_ROLE granted to Timelock on SecurityToken");
 
+  // Custody: WalletRegistry + MultiSigWarm wiring
+  console.log("\nConfiguring Custody (WalletRegistry + MultiSigWarm)...");
+
+  // Track security token + cash token on WalletRegistry
+  await (await walletRegistry.addTrackedToken(tokenAddress)).wait();
+  console.log("     Tracked SecurityToken on WalletRegistry");
+  await (await walletRegistry.addTrackedToken(cashTokenAddress)).wait();
+  console.log("     Tracked CashToken on WalletRegistry");
+
+  // Register the multi-sig as a WARM wallet
+  await (await walletRegistry.registerWallet(multiSigWarmAddress, 2, "Warm-MultiSig")).wait();
+  console.log("     MultiSigWarm registered as WARM wallet");
+
+  // Register deployer as a placeholder HOT wallet (replace in production)
+  await (await walletRegistry.registerWallet(deployer.address, 1, "Hot-Deployer")).wait();
+  console.log("     Deployer registered as HOT wallet (placeholder)");
+
+  // Safe-list the WalletRegistry and MultiSigWarm on the security token
+  await (await token.setSafeList(walletRegistryAddress, true)).wait();
+  console.log("     WalletRegistry safe-listed on SecurityToken");
+  await (await token.setSafeList(multiSigWarmAddress, true)).wait();
+  console.log("     MultiSigWarm safe-listed on SecurityToken");
+
   // -----------------------------------------------------------------------
   // AUTO-UPDATE frontend/src/config/contracts.ts
   // -----------------------------------------------------------------------
@@ -338,6 +382,8 @@ async function main() {
   identityFactory: '${identityFactoryAddress}',
   timelock: '${timelockAddress}',
   governor: '${governorAddress}',
+  walletRegistry: '${walletRegistryAddress}',
+  multiSigWarm: '${multiSigWarmAddress}',
 };`;
 
     if (oldBlock.test(content)) {
@@ -398,6 +444,12 @@ async function main() {
   );
   console.log(
     `║ HKSTPGovernor         : ${governorAddress}  ║`
+  );
+  console.log(
+    `║ WalletRegistry        : ${walletRegistryAddress}  ║`
+  );
+  console.log(
+    `║ MultiSigWarm          : ${multiSigWarmAddress}  ║`
   );
   console.log(
     "╠══════════════════════════════════════════════════════════════╣"

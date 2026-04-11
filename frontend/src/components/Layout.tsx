@@ -14,6 +14,7 @@ import {
   Wallet,
   Lock,
   Vote,
+  Vault,
 } from 'lucide-react';
 import { useWeb3 } from '../context/Web3Context';
 
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { to: '/settlement', label: 'DvP Settlement', icon: ArrowRightLeft },
   { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
   { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
+  { to: '/custody', label: 'Wallet Custody', icon: Vault, adminOnly: true },
   { to: '/governance', label: 'Governance', icon: Vote },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
 ];

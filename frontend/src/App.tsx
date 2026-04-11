@@ -9,6 +9,7 @@ import ComplianceRules from './pages/ComplianceRules';
 import Portfolio from './pages/Portfolio';
 import TokenManagement from './pages/TokenManagement';
 import Governance from './pages/Governance';
+import WalletCustody from './pages/WalletCustody';
 import { useWeb3 } from './context/Web3Context';
 
 /** Route guard — redirects non-admin users to the dashboard */
@@ -30,6 +31,7 @@ const App: React.FC = () => {
         <Route path="/settlement" element={<Settlement />} />
         <Route path="/compliance" element={<AdminRoute><ComplianceRules /></AdminRoute>} />
         <Route path="/tokens" element={<AdminRoute><TokenManagement /></AdminRoute>} />
+        <Route path="/custody" element={<AdminRoute><WalletCustody /></AdminRoute>} />
         <Route path="/governance" element={<Governance />} />
         <Route path="/portfolio" element={<Portfolio />} />
       </Routes>

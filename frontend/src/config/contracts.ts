@@ -27,6 +27,8 @@ export const CONTRACT_ADDRESSES = {
   identityFactory: '0x9528a30590cA1E79d4F2dF52c97184296810Ab91',
   timelock: '0x28EE8A8F0E4bD7aadd5C8578E15C696D36A95170',
   governor: '0x8F0a859437A5122e2A43C6F6f6f8b54068ad464D',
+  walletRegistry: '0x0000000000000000000000000000000000000000',
+  multiSigWarm: '0x0000000000000000000000000000000000000000',
 };
 
 // -----------------------------------------------------------------
@@ -377,4 +379,90 @@ export const TIMELOCK_ABI = [
   'event CallExecuted(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data)',
   'event Cancelled(bytes32 indexed id)',
   'event MinDelayChange(uint256 oldDuration, uint256 newDuration)',
+];
+
+// -----------------------------------------------------------------
+// Wallet Architecture (98/2 Rule) ABIs
+// -----------------------------------------------------------------
+
+export const WALLET_REGISTRY_ABI = [
+  // Wallet registration
+  'function registerWallet(address wallet, uint8 tier, string label) external',
+  'function deactivateWallet(address wallet) external',
+  'function reactivateWallet(address wallet) external',
+  'function changeWalletTier(address wallet, uint8 newTier) external',
+  // Token tracking
+  'function addTrackedToken(address token) external',
+  'function removeTrackedToken(address token) external',
+  // Hot cap
+  'function setHotCapBps(uint256 newCapBps) external',
+  'function hotCapBps() view returns (uint256)',
+  // AUM & Balance queries
+  'function totalAUM(address token) view returns (uint256)',
+  'function hotBalance(address token) view returns (uint256)',
+  'function warmBalance(address token) view returns (uint256)',
+  'function coldBalance(address token) view returns (uint256)',
+  'function hotCap(address token) view returns (uint256)',
+  'function isHotOverCap(address token) view returns (bool)',
+  'function tierBreakdown(address token) view returns (uint256 hotBal, uint256 warmBal, uint256 coldBal, uint256 total, uint256 hotCapVal, bool overCap)',
+  // Cold wallet check
+  'function canTransferFrom(address from) view returns (bool allowed, string reason)',
+  // Sweep
+  'function checkAndEmitSweep() external',
+  'function recordSweep(address token, address from, address to, uint256 amount, string reason) external',
+  // View helpers
+  'function walletCount() view returns (uint256)',
+  'function getWalletList() view returns (address[])',
+  'function getTrackedTokens() view returns (address[])',
+  'function sweepCount() view returns (uint256)',
+  'function getWalletsByTier(uint8 tier) view returns (address[])',
+  'function wallets(address) view returns (uint8 tier, string label, uint256 registeredAt, bool active)',
+  'function sweepHistory(uint256) view returns (address token, address from, address to, uint256 amount, uint256 timestamp, string reason)',
+  'function isTrackedToken(address) view returns (bool)',
+  // Access control
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'function OPERATOR_ROLE() view returns (bytes32)',
+  // Pause
+  'function pause() external',
+  'function unpause() external',
+  // Events
+  'event WalletRegistered(address indexed wallet, uint8 tier, string label)',
+  'event WalletDeactivated(address indexed wallet)',
+  'event WalletReactivated(address indexed wallet)',
+  'event WalletTierChanged(address indexed wallet, uint8 oldTier, uint8 newTier)',
+  'event HotCapUpdated(uint256 oldBps, uint256 newBps)',
+  'event SweepRequired(address indexed token, uint256 hotBalance, uint256 cap, uint256 excess)',
+  'event SweepExecuted(uint256 indexed recordId, address indexed token, address from, address to, uint256 amount, string reason)',
+  'event ColdTransferBlocked(address indexed wallet, address indexed token, uint256 amount)',
+];
+
+export const MULTI_SIG_WARM_ABI = [
+  // Propose / Confirm / Execute
+  'function proposeTx(address token, address to, uint256 amount, string reason) returns (uint256)',
+  'function confirmTx(uint256 txId) external',
+  'function revokeConfirmation(uint256 txId) external',
+  'function executeTx(uint256 txId) external',
+  'function cancelTx(uint256 txId) external',
+  // Signer management
+  'function replaceSigner(uint256 index, address newSigner) external',
+  // View helpers
+  'function REQUIRED_CONFIRMATIONS() view returns (uint256)',
+  'function MAX_SIGNERS() view returns (uint256)',
+  'function EXPIRY_PERIOD() view returns (uint256)',
+  'function transactionCount() view returns (uint256)',
+  'function pendingCount() view returns (uint256)',
+  'function getSigners() view returns (address[3])',
+  'function isSigner(address) view returns (bool)',
+  'function signers(uint256) view returns (address)',
+  'function transactions(uint256) view returns (address token, address to, uint256 amount, string reason, uint256 proposedAt, bool executed, bool cancelled, uint256 confirmations)',
+  'function confirmed(uint256, address) view returns (bool)',
+  'function isExpired(uint256 txId) view returns (bool)',
+  // Events
+  'event TxProposed(uint256 indexed txId, address indexed proposer, address token, address to, uint256 amount, string reason)',
+  'event TxConfirmed(uint256 indexed txId, address indexed signer)',
+  'event TxRevoked(uint256 indexed txId, address indexed signer)',
+  'event TxExecuted(uint256 indexed txId, address indexed executor)',
+  'event TxCancelled(uint256 indexed txId, address indexed canceller)',
+  'event SignerReplaced(uint256 indexed index, address indexed oldSigner, address indexed newSigner)',
 ];

@@ -13,6 +13,8 @@ import {
   IDENTITY_FACTORY_ABI,
   GOVERNOR_ABI,
   TIMELOCK_ABI,
+  WALLET_REGISTRY_ABI,
+  MULTI_SIG_WARM_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -29,6 +31,8 @@ export interface Contracts {
   identityFactory: ethers.Contract;
   governor: ethers.Contract;
   timelock: ethers.Contract;
+  walletRegistry: ethers.Contract;
+  multiSigWarm: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -121,6 +125,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       identityFactory: new ethers.Contract(CONTRACT_ADDRESSES.identityFactory, IDENTITY_FACTORY_ABI, s),
       governor: new ethers.Contract(CONTRACT_ADDRESSES.governor, GOVERNOR_ABI, s),
       timelock: new ethers.Contract(CONTRACT_ADDRESSES.timelock, TIMELOCK_ABI, s),
+      walletRegistry: new ethers.Contract(CONTRACT_ADDRESSES.walletRegistry, WALLET_REGISTRY_ABI, s),
+      multiSigWarm: new ethers.Contract(CONTRACT_ADDRESSES.multiSigWarm, MULTI_SIG_WARM_ABI, s),
     };
     setContracts(c);
     return c;
