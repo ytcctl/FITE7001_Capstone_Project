@@ -11,6 +11,8 @@ import {
   TOKEN_FACTORY_ABI,
   CLAIM_ISSUER_ABI,
   IDENTITY_FACTORY_ABI,
+  GOVERNOR_ABI,
+  TIMELOCK_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -25,6 +27,8 @@ export interface Contracts {
   tokenFactory: ethers.Contract;
   claimIssuer: ethers.Contract;
   identityFactory: ethers.Contract;
+  governor: ethers.Contract;
+  timelock: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -115,6 +119,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       tokenFactory: new ethers.Contract(CONTRACT_ADDRESSES.tokenFactory, TOKEN_FACTORY_ABI, s),
       claimIssuer: new ethers.Contract(CONTRACT_ADDRESSES.claimIssuer, CLAIM_ISSUER_ABI, s),
       identityFactory: new ethers.Contract(CONTRACT_ADDRESSES.identityFactory, IDENTITY_FACTORY_ABI, s),
+      governor: new ethers.Contract(CONTRACT_ADDRESSES.governor, GOVERNOR_ABI, s),
+      timelock: new ethers.Contract(CONTRACT_ADDRESSES.timelock, TIMELOCK_ABI, s),
     };
     setContracts(c);
     return c;

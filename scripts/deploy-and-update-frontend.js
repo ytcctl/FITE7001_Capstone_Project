@@ -195,12 +195,43 @@ async function main() {
   console.log("     ClaimIssuer:", claimIssuerAddress);
 
   // 8. IdentityFactory (deploys per-investor ONCHAINID contracts)
-  console.log("8/8  Deploying IdentityFactory...");
+  console.log("8/10  Deploying IdentityFactory...");
   const IdentityFactoryContract = await ethers.getContractFactory("IdentityFactory");
   const identityFactory = await IdentityFactoryContract.deploy(deployer.address);
   await identityFactory.waitForDeployment();
   const identityFactoryAddress = await identityFactory.getAddress();
   console.log("     IdentityFactory:", identityFactoryAddress);
+
+  // 9. Timelock (governance execution delay)
+  console.log("9/10  Deploying HKSTPTimelock...");
+  const TIMELOCK_MIN_DELAY = 1; // 1 second for dev/testing; production: 86400 (24h)
+  const Timelock = await ethers.getContractFactory("HKSTPTimelock");
+  const timelock = await Timelock.deploy(
+    TIMELOCK_MIN_DELAY,
+    [],                  // proposers — will grant to governor
+    [],                  // executors — will grant to governor
+    deployer.address     // bootstrap admin
+  );
+  await timelock.waitForDeployment();
+  const timelockAddress = await timelock.getAddress();
+  console.log("     HKSTPTimelock:", timelockAddress);
+
+  // 10. Governor (on-chain governance with snapshot voting)
+  console.log("10/10 Deploying HKSTPGovernor...");
+  const VOTING_DELAY  = 1;   // 1 block
+  const VOTING_PERIOD = 50;  // 50 blocks (~50s on Besu)
+  const QUORUM_PCT    = 4;   // 4% of total supply
+  const Governor = await ethers.getContractFactory("HKSTPGovernor");
+  const governor = await Governor.deploy(
+    tokenAddress,        // IVotes token
+    timelockAddress,     // TimelockController
+    VOTING_DELAY,
+    VOTING_PERIOD,
+    QUORUM_PCT
+  );
+  await governor.waitForDeployment();
+  const governorAddress = await governor.getAddress();
+  console.log("     HKSTPGovernor:", governorAddress);
 
   // Post-deployment configuration
   console.log("\nConfiguring roles and safe-list...");
@@ -255,6 +286,24 @@ async function main() {
   await (await token.setMaxShareholders(50)).wait();
   console.log("     maxShareholders set to 50 on HKSTPSecurityToken");
 
+  // Governance: wire Timelock roles → Governor
+  console.log("\nConfiguring Governance (Timelock + Governor)...");
+  const PROPOSER_ROLE  = await timelock.PROPOSER_ROLE();
+  const EXECUTOR_ROLE  = await timelock.EXECUTOR_ROLE();
+  const CANCELLER_ROLE = await timelock.CANCELLER_ROLE();
+  await (await timelock.grantRole(PROPOSER_ROLE, governorAddress)).wait();
+  console.log("     PROPOSER_ROLE granted to Governor on Timelock");
+  await (await timelock.grantRole(EXECUTOR_ROLE, governorAddress)).wait();
+  console.log("     EXECUTOR_ROLE granted to Governor on Timelock");
+  await (await timelock.grantRole(CANCELLER_ROLE, governorAddress)).wait();
+  console.log("     CANCELLER_ROLE granted to Governor on Timelock");
+
+  // Grant DEFAULT_ADMIN_ROLE on the SecurityToken to the Timelock
+  // so governance proposals can call admin-only functions (e.g. pause, setCompliance)
+  const TOKEN_ADMIN_ROLE = await token.DEFAULT_ADMIN_ROLE();
+  await (await token.grantRole(TOKEN_ADMIN_ROLE, timelockAddress)).wait();
+  console.log("     DEFAULT_ADMIN_ROLE granted to Timelock on SecurityToken");
+
   // -----------------------------------------------------------------------
   // AUTO-UPDATE frontend/src/config/contracts.ts
   // -----------------------------------------------------------------------
@@ -283,6 +332,8 @@ async function main() {
   tokenFactory: '${tokenFactoryAddress}',
   claimIssuer: '${claimIssuerAddress}',
   identityFactory: '${identityFactoryAddress}',
+  timelock: '${timelockAddress}',
+  governor: '${governorAddress}',
 };`;
 
     if (oldBlock.test(content)) {
@@ -339,6 +390,12 @@ async function main() {
     `║ IdentityFactory       : ${identityFactoryAddress}  ║`
   );
   console.log(
+    `║ HKSTPTimelock         : ${timelockAddress}  ║`
+  );
+  console.log(
+    `║ HKSTPGovernor         : ${governorAddress}  ║`
+  );
+  console.log(
     "╠══════════════════════════════════════════════════════════════╣"
   );
   console.log(
@@ -346,6 +403,9 @@ async function main() {
   );
   console.log(
     `║ Cap. 622 Shareholder Cap : 50 (identity-based)                ║`
+  );
+  console.log(
+    `║ Governance: delay=${VOTING_DELAY}blk period=${VOTING_PERIOD}blk quorum=${QUORUM_PCT}%          ║`
   );
   console.log(
     "╚══════════════════════════════════════════════════════════════╝"

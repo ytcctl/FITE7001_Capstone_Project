@@ -17,14 +17,16 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x2b33e63E99CBB1847a2735E08C61d9034b13a171',
-  compliance: '0x2f9f1bc72ff3Bf57849d83F25348f90FB8056f75',
-  securityToken: '0x27A107A95b36c4510ea926f0f886Ff7772248E66',
-  cashToken: '0xc7555581De61F6db45EA28547d6D5E0722ED6fBe',
-  dvpSettlement: '0x99c6a236913907dCe5714cfa4a179D4f2C0b93D9',
-  tokenFactory: '0x4A6EA541263c363478da333239E38E96E2cC8653',
-  claimIssuer: '0x96C1f5d31C4c627d6e84A046D4790cAC4F17d3ED',
-  identityFactory: '0xECB550dE5c73e6690AB4521C03EC9D476617167E',
+  identityRegistry: '0x9781aB39dEDDa3646cf06A1D76Ff0E9D725290D5',
+  compliance: '0x7A0Ff93834807e5f80c68F1C24fF0bff0f5635AA',
+  securityToken: '0xe93FDD0aCC94D4C9A3DB30c373fa7Fd782D6Cfc9',
+  cashToken: '0x5Bf3E7F3e4b05Cd20791090a29D20B021589c864',
+  dvpSettlement: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
+  tokenFactory: '0x605a55D15cbb5518E0863fD741aFbd9b2555D095',
+  claimIssuer: '0x65E11da4Ff5D12E8BE3AE271F825326145d15820',
+  identityFactory: '0x92Db1456e6096cae5A00334ddE53AEBb58667c35',
+  timelock: '0x5ACFa217417818E4614a2A1758036A90DF3a3F58',
+  governor: '0x7A01a65372860D3A2165060D1C471259070A1d5C',
 };
 
 // -----------------------------------------------------------------
@@ -153,6 +155,19 @@ export const SECURITY_TOKEN_ABI = [
   'function pause() external',
   'function unpause() external',
   'function paused() view returns (bool)',
+  // ERC20Votes — Checkpoint-based snapshot voting
+  'function delegate(address delegatee) external',
+  'function delegateBySig(address delegatee, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s) external',
+  'function delegates(address account) view returns (address)',
+  'function getVotes(address account) view returns (uint256)',
+  'function getPastVotes(address account, uint256 blockNumber) view returns (uint256)',
+  'function getPastTotalSupply(uint256 blockNumber) view returns (uint256)',
+  'function numCheckpoints(address account) view returns (uint32)',
+  'function clock() view returns (uint48)',
+  'function CLOCK_MODE() view returns (string)',
+  // ERC20Permit
+  'function nonces(address owner) view returns (uint256)',
+  'function DOMAIN_SEPARATOR() view returns (bytes32)',
   // Access Control
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function grantRole(bytes32 role, address account) external',
@@ -300,4 +315,64 @@ export const IDENTITY_ABI = [
   'event ClaimAdded(bytes32 indexed claimId, uint256 indexed topic, address indexed issuer)',
   'event ClaimRemoved(bytes32 indexed claimId, uint256 indexed topic, address indexed issuer)',
   'event ClaimChanged(bytes32 indexed claimId, uint256 indexed topic, address indexed issuer)',
+];
+
+// -----------------------------------------------------------------
+// Governance ABIs
+// -----------------------------------------------------------------
+
+export const GOVERNOR_ABI = [
+  // Proposal lifecycle
+  'function propose(address[] targets, uint256[] values, bytes[] calldatas, string description) returns (uint256)',
+  'function queue(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) returns (uint256)',
+  'function execute(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) payable returns (uint256)',
+  'function cancel(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) returns (uint256)',
+  'function castVote(uint256 proposalId, uint8 support) returns (uint256)',
+  'function castVoteWithReason(uint256 proposalId, uint8 support, string reason) returns (uint256)',
+  // Views
+  'function name() view returns (string)',
+  'function version() view returns (string)',
+  'function hashProposal(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) pure returns (uint256)',
+  'function state(uint256 proposalId) view returns (uint8)',
+  'function proposalSnapshot(uint256 proposalId) view returns (uint256)',
+  'function proposalDeadline(uint256 proposalId) view returns (uint256)',
+  'function proposalProposer(uint256 proposalId) view returns (address)',
+  'function proposalEta(uint256 proposalId) view returns (uint256)',
+  'function proposalVotes(uint256 proposalId) view returns (uint256 againstVotes, uint256 forVotes, uint256 abstainVotes)',
+  'function hasVoted(uint256 proposalId, address account) view returns (bool)',
+  'function votingDelay() view returns (uint256)',
+  'function votingPeriod() view returns (uint256)',
+  'function proposalThreshold() view returns (uint256)',
+  'function quorum(uint256 blockNumber) view returns (uint256)',
+  'function quorumNumerator() view returns (uint256)',
+  'function quorumDenominator() view returns (uint256)',
+  'function timelock() view returns (address)',
+  'function token() view returns (address)',
+  'function clock() view returns (uint48)',
+  'function CLOCK_MODE() view returns (string)',
+  'function COUNTING_MODE() pure returns (string)',
+  // Events
+  'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
+  'event ProposalExecuted(uint256 proposalId)',
+  'event ProposalCanceled(uint256 proposalId)',
+  'event ProposalQueued(uint256 proposalId, uint256 etaSeconds)',
+  'event VoteCast(address indexed voter, uint256 proposalId, uint8 support, uint256 weight, string reason)',
+];
+
+export const TIMELOCK_ABI = [
+  'function getMinDelay() view returns (uint256)',
+  'function isOperation(bytes32 id) view returns (bool)',
+  'function isOperationPending(bytes32 id) view returns (bool)',
+  'function isOperationReady(bytes32 id) view returns (bool)',
+  'function isOperationDone(bytes32 id) view returns (bool)',
+  'function getOperationState(bytes32 id) view returns (uint8)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function PROPOSER_ROLE() view returns (bytes32)',
+  'function EXECUTOR_ROLE() view returns (bytes32)',
+  'function CANCELLER_ROLE() view returns (bytes32)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'event CallScheduled(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data, bytes32 predecessor, uint256 delay)',
+  'event CallExecuted(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data)',
+  'event Cancelled(bytes32 indexed id)',
+  'event MinDelayChange(uint256 oldDuration, uint256 newDuration)',
 ];

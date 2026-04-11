@@ -2,8 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/Nonces.sol";
 
 // -------------------------------------------------------------------------
 // External interface declarations (T-REX compatible)
@@ -53,7 +56,7 @@ interface ICompliance {
  *   DEFAULT_ADMIN_ROLE  — platform admin (HKSTP); manages agents and safe-list
  *   AGENT_ROLE          — licensed custodians; may mint, burn, freeze addresses
  */
-contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
+contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pausable {
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
 
     // ── EIP-1167 proxy-safe name/symbol storage ─────────────────
@@ -129,7 +132,7 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
         address compliance_,
         address onchainId_,
         address admin
-    ) ERC20("", "") {
+    ) ERC20("", "") ERC20Permit("") {
         // If admin is non-zero this is a direct (non-proxy) deployment
         if (admin != address(0)) {
             _doInitialize(name_, symbol_, identityRegistry_, compliance_, onchainId_, admin);
@@ -345,7 +348,7 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
         address from,
         address to,
         uint256 amount
-    ) internal virtual override whenNotPaused {
+    ) internal virtual override(ERC20, ERC20Votes) whenNotPaused {
         // Mint/burn operations: skip investor checks for address(0)
         if (from != address(0) && to != address(0)) {
             require(!frozen[from], "HKSTPSecurityToken: sender is frozen");
@@ -466,8 +469,21 @@ contract HKSTPSecurityToken is ERC20, AccessControl, Pausable {
     }
 
     // -------------------------------------------------------------------------
-    // ERC-165 support
+    // ERC-165 support + ERC20Permit/Nonces override resolution
     // -------------------------------------------------------------------------
+
+    /**
+     * @dev Override nonces to resolve ERC20Permit / Nonces linearization conflict.
+     */
+    function nonces(address owner)
+        public
+        view
+        override(ERC20Permit, Nonces)
+        returns (uint256)
+    {
+        return super.nonces(owner);
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
