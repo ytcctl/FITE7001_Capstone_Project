@@ -29,6 +29,7 @@ export const CONTRACT_ADDRESSES = {
   governor: '0x5cE576A3D9111FC8b1cD6494E01d2c13B9cb230C',
   walletRegistry: '0x0aF1B3F6e2B7512ae8E6ad5Ae415D18E1919A0FE',
   multiSigWarm: '0x8CC15C26BC072cA8e396f906CEA6743fAD316EF0',
+  systemHealthCheck: '0x4d2792f2F00D7C4BC5A9CC148Bfe1d4ec829f20C',
 };
 
 // -----------------------------------------------------------------
@@ -250,6 +251,10 @@ export const DVP_SETTLEMENT_ABI = [
   'function getTravelRuleData(uint256 settlementId) view returns (tuple(bytes32 originatorVASP, bytes32 beneficiaryVASP, bytes32 originatorInfoHash, bytes32 beneficiaryInfoHash, uint256 timestamp))',
   'function hasTravelRuleData(uint256 settlementId) view returns (bool)',
   'event TravelRuleDataRecorded(uint256 indexed settlementId, bytes32 originatorVASP, bytes32 beneficiaryVASP, bytes32 originatorInfoHash, bytes32 beneficiaryInfoHash, uint256 timestamp)',
+  // Batch Settlement
+  'function executeBatchSettlement(uint256[] ids, bool stopOnFailure) external returns (uint256 successCount, uint256 failCount)',
+  'function markFailed(uint256 id) external',
+  'event BatchSettlementExecuted(uint256[] indexed ids, uint256 successCount, uint256 failCount)',
 ];
 
 // Claim topic mapping for display
@@ -489,3 +494,8 @@ export const MULTI_SIG_WARM_ABI = [
   'event TxCancelled(uint256 indexed txId, address indexed canceller)',
   'event SignerReplaced(uint256 indexed index, address indexed oldSigner, address indexed newSigner)',
 ];
+
+export const SYSTEM_HEALTH_CHECK_ABI = [
+  'function fullHealthCheck(tuple(address identityRegistry, address compliance, address securityToken, address cashToken, address dvpSettlement, address tokenFactory, address claimIssuer, address identityFactory, address timelock, address governor, address walletRegistry, address multiSigWarm, address expectedAdmin) a) view returns (tuple(uint256 timestamp, uint256 blockNumber, uint256 totalChecks, uint256 passedChecks, uint256 failedChecks, bool healthy) report, tuple(string name, bool passed, string detail)[] results)',
+];
+

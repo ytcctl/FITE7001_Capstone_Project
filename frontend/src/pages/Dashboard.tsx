@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { CLAIM_TOPICS } from '../config/contracts';
-import { TrendingUp, Coins, ShieldCheck, Users, AlertCircle } from 'lucide-react';
+import { CLAIM_TOPICS, CONTRACT_ADDRESSES } from '../config/contracts';
+import { TrendingUp, Coins, ShieldCheck, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { ethers } from 'ethers';
 
 const Dashboard: React.FC = () => {
@@ -16,6 +16,44 @@ const Dashboard: React.FC = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [claimStatus, setClaimStatus] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
+
+  // System Health state
+  interface HealthResult { name: string; passed: boolean; detail: string }
+  interface HealthReport { timestamp: bigint; blockNumber: bigint; totalChecks: bigint; passedChecks: bigint; failedChecks: bigint; healthy: boolean }
+  const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
+  const [healthResults, setHealthResults] = useState<HealthResult[]>([]);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  const runHealthCheck = async () => {
+    if (!contracts) return;
+    setHealthLoading(true);
+    setHealthError(null);
+    try {
+      const addresses = {
+        identityRegistry: CONTRACT_ADDRESSES.identityRegistry,
+        compliance: CONTRACT_ADDRESSES.compliance,
+        securityToken: CONTRACT_ADDRESSES.securityToken,
+        cashToken: CONTRACT_ADDRESSES.cashToken,
+        dvpSettlement: CONTRACT_ADDRESSES.dvpSettlement,
+        tokenFactory: CONTRACT_ADDRESSES.tokenFactory,
+        claimIssuer: CONTRACT_ADDRESSES.claimIssuer,
+        identityFactory: CONTRACT_ADDRESSES.identityFactory,
+        timelock: CONTRACT_ADDRESSES.timelock,
+        governor: CONTRACT_ADDRESSES.governor,
+        walletRegistry: CONTRACT_ADDRESSES.walletRegistry,
+        multiSigWarm: CONTRACT_ADDRESSES.multiSigWarm,
+        expectedAdmin: account!,
+      };
+      const [report, results] = await contracts.systemHealthCheck.fullHealthCheck(addresses);
+      setHealthReport(report);
+      setHealthResults(results.map((r: any) => ({ name: r.name, passed: r.passed, detail: r.detail })));
+    } catch (e: any) {
+      setHealthError(e?.reason || e?.message || 'Health check failed');
+    } finally {
+      setHealthLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!contracts || !account) {
@@ -140,6 +178,81 @@ const Dashboard: React.FC = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* System Health Check */}
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Activity size={20} className="text-purple-400" />
+            <h3 className="font-bold text-white">System Health</h3>
+            {healthReport && (
+              <span
+                className={`ml-2 text-xs font-medium px-2.5 py-1 rounded-full border ${
+                  healthReport.healthy
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : 'bg-red-500/20 text-red-400 border-red-500/30'
+                }`}
+              >
+                {healthReport.healthy ? '● Healthy' : '● Issues Detected'}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={runHealthCheck}
+            disabled={healthLoading}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {healthLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            Run Health Check
+          </button>
+        </div>
+
+        {healthError && (
+          <div className="text-sm text-red-400 mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+            ✗ {healthError}
+          </div>
+        )}
+
+        {healthReport && (
+          <div className="mb-4 flex items-center gap-6 text-sm text-gray-400">
+            <span>Total: <strong className="text-white">{Number(healthReport.totalChecks)}</strong></span>
+            <span>Passed: <strong className="text-emerald-400">{Number(healthReport.passedChecks)}</strong></span>
+            <span>Failed: <strong className="text-red-400">{Number(healthReport.failedChecks)}</strong></span>
+            <span>Block: <strong className="text-gray-300">#{Number(healthReport.blockNumber)}</strong></span>
+          </div>
+        )}
+
+        {healthResults.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {healthResults.map((r, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-sm ${
+                  r.passed
+                    ? 'bg-emerald-500/5 border-emerald-500/20'
+                    : 'bg-red-500/5 border-red-500/20'
+                }`}
+              >
+                {r.passed ? (
+                  <CheckCircle2 size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <XCircle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+                )}
+                <div>
+                  <span className={r.passed ? 'text-emerald-300' : 'text-red-300'}>{r.name}</span>
+                  <p className="text-gray-500 text-xs mt-0.5">{r.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          !healthLoading && (
+            <p className="text-gray-500 text-sm text-center py-4">
+              Click "Run Health Check" to verify all on-chain contracts.
+            </p>
+          )
+        )}
       </div>
     </div>
   );

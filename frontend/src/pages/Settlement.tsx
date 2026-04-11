@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES } from '../config/contracts';
-import { ArrowRightLeft, Plus, Play, XCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowRightLeft, Plus, Play, XCircle, RefreshCw, Loader2, CheckSquare } from 'lucide-react';
 import { ethers } from 'ethers';
 
 interface SettlementData {
@@ -38,6 +38,8 @@ const Settlement: React.FC = () => {
   const [settlements, setSettlements] = useState<SettlementData[]>([]);
   const [txStatus, setTxStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Batch execute
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const loadSettlements = async () => {
     if (!contracts) return;
@@ -123,6 +125,43 @@ const Settlement: React.FC = () => {
       loadSettlements();
     } catch (e: any) {
       setTxStatus(`✗ ${e?.reason || e?.message || 'Cancel failed'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const pendingIds = settlements.filter((s) => s.status === 0).map((s) => s.id);
+
+  const toggleSelectAll = () => {
+    if (pendingIds.every((id) => selectedIds.has(id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingIds));
+    }
+  };
+
+  const handleBatchExecute = async () => {
+    if (!contracts || selectedIds.size === 0) return;
+    setIsSubmitting(true);
+    const ids = Array.from(selectedIds);
+    setTxStatus(`Batch executing ${ids.length} settlement(s)…`);
+    try {
+      const tx = await contracts.dvpSettlement.executeBatchSettlement(ids, false);
+      const receipt = await tx.wait();
+      setTxStatus(`✓ Batch execute complete — ${ids.length} settlement(s) processed`);
+      setSelectedIds(new Set());
+      loadSettlements();
+    } catch (e: any) {
+      setTxStatus(`✗ ${e?.reason || e?.message || 'Batch execute failed'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -229,6 +268,27 @@ const Settlement: React.FC = () => {
         </div>
       </div>
 
+      {/* Batch Execute Bar */}
+      {pendingIds.length > 0 && (
+        <div className="glass-card px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckSquare size={18} className="text-purple-400" />
+            <span className="text-sm text-gray-300">
+              {selectedIds.size} of {pendingIds.length} pending settlement(s) selected
+            </span>
+          </div>
+          <button
+            onClick={handleBatchExecute}
+            disabled={isSubmitting || selectedIds.size === 0}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-2 px-5 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+            <Play size={14} />
+            Batch Execute ({selectedIds.size})
+          </button>
+        </div>
+      )}
+
       {/* Settlements List */}
       <div className="glass-card overflow-hidden">
         <div className="p-6 border-b border-white/10">
@@ -241,6 +301,17 @@ const Settlement: React.FC = () => {
             <table className="w-full">
               <thead className="bg-white/5 text-xs text-gray-400 text-left">
                 <tr>
+                  <th className="px-4 py-3 font-medium w-10">
+                    {pendingIds.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id))}
+                        onChange={toggleSelectAll}
+                        className="accent-purple-500 w-4 h-4 cursor-pointer"
+                        title="Select all pending"
+                      />
+                    )}
+                  </th>
                   <th className="px-6 py-3 font-medium">ID</th>
                   <th className="px-6 py-3 font-medium">Seller</th>
                   <th className="px-6 py-3 font-medium">Buyer</th>
@@ -253,6 +324,16 @@ const Settlement: React.FC = () => {
               <tbody className="divide-y divide-white/5">
                 {settlements.map((s) => (
                   <tr key={s.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-4">
+                      {s.status === 0 && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(s.id)}
+                          onChange={() => toggleSelect(s.id)}
+                          className="accent-purple-500 w-4 h-4 cursor-pointer"
+                        />
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300">#{s.id}</td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300">{s.seller.slice(0, 8)}…</td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300">{s.buyer.slice(0, 8)}…</td>

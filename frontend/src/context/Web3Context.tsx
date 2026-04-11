@@ -15,6 +15,7 @@ import {
   TIMELOCK_ABI,
   WALLET_REGISTRY_ABI,
   MULTI_SIG_WARM_ABI,
+  SYSTEM_HEALTH_CHECK_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -33,6 +34,7 @@ export interface Contracts {
   timelock: ethers.Contract;
   walletRegistry: ethers.Contract;
   multiSigWarm: ethers.Contract;
+  systemHealthCheck: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -127,6 +129,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       timelock: new ethers.Contract(CONTRACT_ADDRESSES.timelock, TIMELOCK_ABI, s),
       walletRegistry: new ethers.Contract(CONTRACT_ADDRESSES.walletRegistry, WALLET_REGISTRY_ABI, s),
       multiSigWarm: new ethers.Contract(CONTRACT_ADDRESSES.multiSigWarm, MULTI_SIG_WARM_ABI, s),
+      systemHealthCheck: new ethers.Contract(CONTRACT_ADDRESSES.systemHealthCheck, SYSTEM_HEALTH_CHECK_ABI, s),
     };
     setContracts(c);
     return c;
