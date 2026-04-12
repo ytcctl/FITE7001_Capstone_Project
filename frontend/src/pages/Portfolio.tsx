@@ -51,7 +51,7 @@ const Portfolio: React.FC = () => {
       setIsSafeListed(safe);
 
       const c: Record<number, boolean> = {};
-      for (const t of [1, 2, 3, 4, 5]) {
+      for (const t of Object.keys(CLAIM_TOPICS).map(Number)) {
         c[t] = await contracts.identityRegistry.hasClaim(account, t);
       }
       setClaims(c);

@@ -125,7 +125,7 @@ const KYCManagement: React.FC = () => {
         contracts.identityRegistry.identity(lookupAddress),
       ]);
       const claims: Record<number, boolean> = {};
-      for (const t of [1, 2, 3, 4, 5]) {
+      for (const t of Object.keys(CLAIM_TOPICS).map(Number)) {
         claims[t] = await contracts.identityRegistry.hasClaim(lookupAddress, t);
       }
       setLookupResult({ registered, verified, country, identityContract, claims });

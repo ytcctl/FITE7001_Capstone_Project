@@ -26,9 +26,15 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 /** Banner shown when MetaMask is on the wrong network */
 const WrongNetworkBanner: React.FC = () => {
   const { wrongNetwork, switchNetwork, chainId } = useWeb3();
+
+  // Debug — remove after confirming fix works
+  React.useEffect(() => {
+    console.log('[WrongNetworkBanner] wrongNetwork =', wrongNetwork, '| chainId =', chainId);
+  }, [wrongNetwork, chainId]);
+
   if (!wrongNetwork) return null;
   return (
-    <div className="bg-red-600/90 text-white px-4 py-3 flex items-center justify-center gap-3 text-sm font-medium backdrop-blur z-50">
+    <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-3 flex items-center justify-center gap-3 text-sm font-medium z-[9999] shadow-lg">
       <AlertTriangle size={18} />
       <span>
         Wrong network detected (Chain ID: {chainId ?? '?'}). Please switch to{' '}

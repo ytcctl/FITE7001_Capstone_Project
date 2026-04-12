@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
 
         // Load claim status
         const claims: Record<number, boolean> = {};
-        for (const topic of [1, 2, 3, 4, 5]) {
+        for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
           claims[topic] = await contracts.identityRegistry.hasClaim(account, topic);
         }
         setClaimStatus(claims);

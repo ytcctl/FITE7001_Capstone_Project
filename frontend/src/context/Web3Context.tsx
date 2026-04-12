@@ -169,16 +169,51 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /** Public: prompt user to switch network, then reconnect */
   const switchNetwork = useCallback(async () => {
     await ensureNetwork();
-    // After switch, reconnect
-    const browserProvider = new ethers.BrowserProvider(window.ethereum!);
-    const network = await browserProvider.getNetwork();
-    if (Number(network.chainId) === NETWORK_CONFIG.chainId) {
-      setWrongNetwork(false);
-      // Full reconnect will happen via handleChainChanged
-    }
+    // handleChainChanged will fire and call reconnect() automatically
   }, [ensureNetwork]);
 
-  /** Connect wallet */
+  /**
+   * Internal reconnect — reads current wallet state WITHOUT prompting a
+   * network switch.  Used on page-load auto-reconnect and chainChanged events
+   * so the wrong-network banner stays visible until the user explicitly clicks
+   * "Switch Network".
+   */
+  const reconnect = useCallback(async () => {
+    if (!window.ethereum) return;
+    try {
+      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = (await window.ethereum.request({
+        method: 'eth_accounts',
+      })) as string[];
+      if (accounts.length === 0) return;
+
+      const network = await browserProvider.getNetwork();
+      const currentChainId = Number(network.chainId);
+      const s = await browserProvider.getSigner();
+
+      setProvider(browserProvider);
+      setSigner(s);
+      setAccount(accounts[0]);
+      setChainId(currentChainId);
+      setError(null);
+
+      if (currentChainId !== NETWORK_CONFIG.chainId) {
+        setWrongNetwork(true);
+        setContracts(null);
+        setRoles(DEFAULT_ROLES);
+        return;
+      }
+
+      setWrongNetwork(false);
+      const c = initContracts(s);
+      detectRoles(accounts[0], c);
+    } catch {
+      // Ignore — wallet may not be ready
+    }
+  }, [initContracts, detectRoles]);
+
+  /** Connect wallet — interactive, called by the "Connect Wallet" button.
+   *  This is the ONLY path that calls ensureNetwork(). */
   const connect = useCallback(async () => {
     if (!window.ethereum) {
       setError('MetaMask not detected. Please install MetaMask.');
@@ -187,26 +222,36 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsConnecting(true);
     setError(null);
     try {
-      await ensureNetwork();
+      // Prompt wallet connection first (so MetaMask unlocks)
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const accounts = (await window.ethereum.request({
         method: 'eth_requestAccounts',
       })) as string[];
       const network = await browserProvider.getNetwork();
-      const s = await browserProvider.getSigner();
+      const currentChainId = Number(network.chainId);
 
+      // If wrong chain, try to switch (user may reject)
+      if (currentChainId !== NETWORK_CONFIG.chainId) {
+        try {
+          await ensureNetwork();
+          // handleChainChanged will fire → reconnect() will run
+        } catch {
+          // User rejected — just show the banner
+          setAccount(accounts[0]);
+          setChainId(currentChainId);
+          setWrongNetwork(true);
+          setContracts(null);
+          setRoles(DEFAULT_ROLES);
+        }
+        return;
+      }
+
+      // Correct chain — finish connecting
+      const s = await browserProvider.getSigner();
       setProvider(browserProvider);
       setSigner(s);
       setAccount(accounts[0]);
-      setChainId(Number(network.chainId));
-
-      // Check if we ended up on the correct network
-      if (Number(network.chainId) !== NETWORK_CONFIG.chainId) {
-        setWrongNetwork(true);
-        setContracts(null);
-        setRoles(DEFAULT_ROLES);
-        return;
-      }
+      setChainId(currentChainId);
       setWrongNetwork(false);
       const c = initContracts(s);
       detectRoles(accounts[0], c);
@@ -237,43 +282,14 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (accounts.length === 0) {
         disconnect();
       } else {
-        // Re-create provider + signer for the new account
-        try {
-          const browserProvider = new ethers.BrowserProvider(window.ethereum!);
-          const s = await browserProvider.getSigner();
-          const network = await browserProvider.getNetwork();
-          setProvider(browserProvider);
-          setSigner(s);
-          setAccount(accounts[0]);
-          setChainId(Number(network.chainId));
-          if (Number(network.chainId) !== NETWORK_CONFIG.chainId) {
-            setWrongNetwork(true);
-            setContracts(null);
-            setRoles(DEFAULT_ROLES);
-            return;
-          }
-          setWrongNetwork(false);
-          const c = initContracts(s);
-          detectRoles(accounts[0], c);
-        } catch {
-          // Fallback: full reconnect
-          connect();
-        }
+        // Silent reconnect — never prompts a network switch
+        reconnect();
       }
     };
 
-    const handleChainChanged = (newChainIdHex: unknown) => {
-      const newChainId = parseInt(newChainIdHex as string, 16);
-      setChainId(newChainId);
-      if (newChainId !== NETWORK_CONFIG.chainId) {
-        setWrongNetwork(true);
-        setContracts(null);
-        setRoles(DEFAULT_ROLES);
-      } else {
-        // Correct network — full reconnect to rebuild contracts
-        setWrongNetwork(false);
-        connect();
-      }
+    const handleChainChanged = (_newChainIdHex: unknown) => {
+      // Silent reconnect — reads the new chain and sets wrongNetwork accordingly
+      reconnect();
     };
 
     window.ethereum.on('accountsChanged', handleAccountsChanged);
@@ -282,20 +298,34 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum?.removeListener('chainChanged', handleChainChanged);
     };
-  }, [connect, disconnect, initContracts, detectRoles]);
+  }, [reconnect, disconnect]);
 
-  /** Auto-reconnect on page load if wallet was previously connected */
+  /** Passive chain check on mount — detect wrong network even when wallet is
+   *  not connected (eth_accounts may return []).  reconnect() handles the
+   *  connected case; this covers the disconnected case. */
   useEffect(() => {
     if (!window.ethereum) return;
-    window.ethereum
-      .request({ method: 'eth_accounts' })
-      .then((result: unknown) => {
-        const accounts = result as string[];
-        if (accounts.length > 0) {
-          connect();
+    (async () => {
+      try {
+        const hexChainId = (await window.ethereum!.request({
+          method: 'eth_chainId',
+        })) as string;
+        const cid = parseInt(hexChainId, 16);
+        setChainId(cid);
+        if (cid !== NETWORK_CONFIG.chainId) {
+          setWrongNetwork(true);
         }
-      })
-      .catch(() => {});
+      } catch {
+        // MetaMask not ready — ignore
+      }
+    })();
+  }, []);
+
+  /** Auto-reconnect on page load if wallet was previously connected.
+   *  Uses reconnect() (silent) — never prompts a network switch popup. */
+  useEffect(() => {
+    if (!window.ethereum) return;
+    reconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

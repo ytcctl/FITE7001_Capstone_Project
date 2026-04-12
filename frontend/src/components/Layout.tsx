@@ -38,16 +38,19 @@ const navItems: NavItem[] = [
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { account, chainId, roles, rolesLoading, isConnecting, connect, disconnect } = useWeb3();
+  const { account, chainId, roles, rolesLoading, isConnecting, wrongNetwork, connect, disconnect } = useWeb3();
   const location = useLocation();
 
   const isAdminOrAgent = roles.isAdmin || roles.isAgent;
   const shortAddr = account ? `${account.slice(0, 6)}…${account.slice(-4)}` : '';
 
+  // Push everything down when the wrong-network banner is visible
+  const bannerOffset = wrongNetwork ? 'pt-12' : '';
+
   return (
-    <div className="min-h-screen flex">
+    <div className={`min-h-screen flex ${bannerOffset}`}>
       {/* ── Sidebar ── */}
-      <aside className="w-64 bg-black/20 backdrop-blur-xl border-r border-white/10 h-screen flex flex-col fixed left-0 top-0 z-50">
+      <aside className={`w-64 bg-black/20 backdrop-blur-xl border-r border-white/10 h-screen flex flex-col fixed left-0 ${wrongNetwork ? 'top-12' : 'top-0'} z-50`}>
         {/* Brand */}
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
           <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-900/20">
