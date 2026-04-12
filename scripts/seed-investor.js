@@ -100,13 +100,22 @@ async function main() {
   // Investor1 address (your MetaMask account)
   const INVESTOR1 = "0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3";
 
-  // ── Load deployed contracts ──
-  const registryAddr      = "0x2ed622769Bf53dC4E52c659Ca0E140651716e9e3";
-  const complianceAddr    = "0x42aeb727C3D7E4eF8ccde8039bDF9bE804B3B9FF";
-  const tokenAddr         = "0x4cf5ff8672BC73A108744927083893662b3C38D5";
-  const cashAddr          = "0xfa584f21aEE65BfE18033224A0c45B5636556564";
-  const claimIssuerAddr   = "0xd9c5C8bC185b59Fe9f5C6574b7873aF7DF3F7f22";
-  const identityFactoryAddr = "0xbc02C1Ad0De6620a19594B1667043626211Db0fA";
+  // ── Load deployed contracts (read from frontend config) ──
+  const fs = require("fs");
+  const path = require("path");
+  const configPath = path.join(__dirname, "..", "frontend", "src", "config", "contracts.ts");
+  const configSrc = fs.readFileSync(configPath, "utf8");
+  const pick = (key) => {
+    const m = configSrc.match(new RegExp(`${key}:\\s*'(0x[0-9a-fA-F]+)'`));
+    if (!m) throw new Error(`Address not found for ${key} in contracts.ts`);
+    return m[1];
+  };
+  const registryAddr        = pick("identityRegistry");
+  const complianceAddr      = pick("compliance");
+  const tokenAddr           = pick("securityToken");
+  const cashAddr            = pick("cashToken");
+  const claimIssuerAddr     = pick("claimIssuer");
+  const identityFactoryAddr = pick("identityFactory");
 
   const registry       = await ethers.getContractAt("HKSTPIdentityRegistry", registryAddr);
   const token          = await ethers.getContractAt("HKSTPSecurityToken", tokenAddr);

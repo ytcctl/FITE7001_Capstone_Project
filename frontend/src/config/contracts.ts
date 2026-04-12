@@ -17,19 +17,19 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x2ed622769Bf53dC4E52c659Ca0E140651716e9e3',
-  compliance: '0x42aeb727C3D7E4eF8ccde8039bDF9bE804B3B9FF',
-  securityToken: '0x4cf5ff8672BC73A108744927083893662b3C38D5',
-  cashToken: '0xfa584f21aEE65BfE18033224A0c45B5636556564',
-  dvpSettlement: '0x532664FBa45daB814DE78A00803F96281a72cdAe',
-  tokenFactory: '0x07523c66084F92a2E47A86B10902a0197D6F5e1D',
-  claimIssuer: '0xd9c5C8bC185b59Fe9f5C6574b7873aF7DF3F7f22',
-  identityFactory: '0xbc02C1Ad0De6620a19594B1667043626211Db0fA',
-  timelock: '0xE1D5CE69Fa455DAe0FfC9A35Aa690C0A0E599f74',
-  governor: '0x5cE576A3D9111FC8b1cD6494E01d2c13B9cb230C',
-  walletRegistry: '0x0aF1B3F6e2B7512ae8E6ad5Ae415D18E1919A0FE',
-  multiSigWarm: '0x8CC15C26BC072cA8e396f906CEA6743fAD316EF0',
-  systemHealthCheck: '0x4d2792f2F00D7C4BC5A9CC148Bfe1d4ec829f20C',
+  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
+  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
+  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
+  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
+  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
+  tokenFactory: '0x05d91B9031A655d08E654177336d08543ac4B711',
+  claimIssuer: '0xfeae27388A65eE984F452f86efFEd42AaBD438FD',
+  identityFactory: '0xe135783649BfA7c9c4c6F8E528C7f56166efC8a6',
+  timelock: '0xC9Bc439c8723c5c6fdbBE14E5fF3a1224f8A0f7C',
+  governor: '0xDE87AF9156a223404885002669D3bE239313Ae33',
+  walletRegistry: '0x686AfD6e502A81D2e77f2e038A23C0dEf4949A20',
+  multiSigWarm: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
+  systemHealthCheck: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
 };
 
 // -----------------------------------------------------------------
