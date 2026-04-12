@@ -401,7 +401,35 @@ test/
 
 ## 7  Setup & Installation
 
-### Prerequisites
+### Option A — GitHub Codespaces (One-Click)
+
+The fastest way to get a running instance with zero local setup:
+
+1. Go to [github.com/ytcctl/FITE7001_Capstone_Project](https://github.com/ytcctl/FITE7001_Capstone_Project)
+2. Click **Code → Codespaces → Create codespace on main**
+3. Wait ~3 minutes — the `postCreateCommand` automatically:
+   - Installs all Node dependencies
+   - Compiles Solidity contracts
+   - Starts Hyperledger Besu in Docker
+   - Starts the Engine API block producer
+   - Deploys all 13 contracts
+   - Seeds Investor1 (KYC + 10,000 HKSAT + 5,000,000 THKD)
+   - Launches the Vite frontend on port 3000
+4. Codespaces auto-forwards port 3000 — click the URL to open the frontend
+5. Import the admin key in MetaMask and connect to the forwarded RPC URL
+
+| Port | Service |
+|------|---------|
+| 3000 | Frontend (Vite) — auto-opens in browser |
+| 8545 | Besu JSON-RPC |
+| 8546 | Besu WebSocket |
+| 8551 | Besu Engine API |
+
+> **MetaMask in Codespaces:** Point MetaMask to the Codespaces-forwarded port 8545 URL (e.g. `https://<codespace>-8545.app.github.dev`), chain ID **7001**.
+
+### Option B — Local Setup
+
+#### Prerequisites
 - Node.js ≥ 18 (required by Hardhat ^2.22.4)
 - npm ≥ 9
 - Docker (for Hyperledger Besu local network)

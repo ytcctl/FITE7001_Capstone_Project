@@ -1,0 +1,27 @@
+{
+  "name": "HKSTP TokenHub Devnet",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  "forwardPorts": [3000, 8545, 8546, 8551],
+  "portsAttributes": {
+    "3000": { "label": "Frontend (Vite)", "onAutoForward": "openBrowser" },
+    "8545": { "label": "Besu JSON-RPC" },
+    "8546": { "label": "Besu WebSocket" },
+    "8551": { "label": "Besu Engine API" }
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "NomicFoundation.hardhat-solidity",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
