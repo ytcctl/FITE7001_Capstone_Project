@@ -48,7 +48,9 @@ if (!(Test-Path $dataPath)) { New-Item -ItemType Directory -Path $dataPath -Forc
 # Stop & remove existing container if running
 docker rm -f $containerName 2>$null
 
-$detachFlag = if ($Detach) { "-d" } else { "" }
+# Convert Windows paths to Docker-compatible format (forward slashes)
+$genesisDocker = $genesisPath -replace '\\','/'
+$dataDocker    = $dataPath    -replace '\\','/'
 
 Write-Host "Starting Hyperledger Besu (Cancun, chain ID 7001)..." -ForegroundColor Cyan
 Write-Host "  RPC    : http://127.0.0.1:$rpcPort" -ForegroundColor Green
@@ -56,28 +58,36 @@ Write-Host "  WS     : ws://127.0.0.1:$wsPort" -ForegroundColor Green
 Write-Host "  Engine : http://127.0.0.1:$enginePort" -ForegroundColor Green
 Write-Host "  Data   : $dataPath" -ForegroundColor Green
 
-docker run $detachFlag `
-    --name $containerName `
-    -p "${rpcPort}:8545" `
-    -p "${wsPort}:8546" `
-    -p "${enginePort}:8551" `
-    -v "${genesisPath}:/opt/besu/genesis.json" `
-    -v "${dataPath}:/opt/besu/data" `
-    hyperledger/besu:latest `
-    --genesis-file=/opt/besu/genesis.json `
-    --data-path=/opt/besu/data `
-    --rpc-http-enabled `
-    --rpc-http-api=ETH,NET,WEB3,DEBUG,ADMIN,TXPOOL `
-    --rpc-http-cors-origins="*" `
-    --rpc-http-host=0.0.0.0 `
-    --rpc-ws-enabled `
-    --rpc-ws-api=ETH,NET,WEB3 `
-    --rpc-ws-host=0.0.0.0 `
-    --host-allowlist="*" `
-    --engine-jwt-disabled `
-    --engine-rpc-enabled `
-    --min-gas-price=0 `
-    --logging=INFO
+# Build argument list (avoids empty-string issues with $detachFlag)
+$dockerArgs = @(
+    "run"
+)
+if ($Detach) { $dockerArgs += "-d" }
+$dockerArgs += @(
+    "--name", $containerName,
+    "-p", "${rpcPort}:8545",
+    "-p", "${wsPort}:8546",
+    "-p", "${enginePort}:8551",
+    "-v", "${genesisDocker}:/opt/besu/genesis.json",
+    "-v", "${dataDocker}:/opt/besu/data",
+    "hyperledger/besu:latest",
+    "--genesis-file=/opt/besu/genesis.json",
+    "--data-path=/opt/besu/data",
+    "--rpc-http-enabled",
+    "--rpc-http-api=ETH,NET,WEB3,DEBUG,ADMIN,TXPOOL",
+    "--rpc-http-cors-origins=*",
+    "--rpc-http-host=0.0.0.0",
+    "--rpc-ws-enabled",
+    "--rpc-ws-api=ETH,NET,WEB3",
+    "--rpc-ws-host=0.0.0.0",
+    "--host-allowlist=*",
+    "--engine-jwt-disabled",
+    "--engine-rpc-enabled",
+    "--min-gas-price=0",
+    "--logging=INFO"
+)
+
+& docker @dockerArgs
 
 if ($Detach) {
     Write-Host ""

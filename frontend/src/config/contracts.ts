@@ -17,19 +17,19 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
-  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
-  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
-  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
-  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
-  tokenFactory: '0x05d91B9031A655d08E654177336d08543ac4B711',
-  claimIssuer: '0xfeae27388A65eE984F452f86efFEd42AaBD438FD',
-  identityFactory: '0xe135783649BfA7c9c4c6F8E528C7f56166efC8a6',
-  timelock: '0xC9Bc439c8723c5c6fdbBE14E5fF3a1224f8A0f7C',
-  governor: '0xDE87AF9156a223404885002669D3bE239313Ae33',
-  walletRegistry: '0x686AfD6e502A81D2e77f2e038A23C0dEf4949A20',
-  multiSigWarm: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
-  systemHealthCheck: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
+  identityRegistry: '0x619A83c9368aDa9fFb98c3F14b662724dD19E943',
+  compliance: '0x7eF84473a4E772fB6aDfA1B0C6728A3dbf268Dd7',
+  securityToken: '0x6aA8b700cD034Ab4B897B59447f268b33B8cF699',
+  cashToken: '0xc83003B2AD5C3EF3e93Cc3Ef0a48E84dc8DBD718',
+  dvpSettlement: '0xF216B6b2D9E76F94f97bE597e2Cec81730520585',
+  tokenFactory: '0x0F095aeA9540468B19829d02cC811Ebe5173D615',
+  claimIssuer: '0x51D4903ef5F871273e5B4172898B18809CFd7881',
+  identityFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
+  timelock: '0xe52155361a36C7d445F2c6784B14Bf7A3C306e15',
+  governor: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
+  walletRegistry: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
+  multiSigWarm: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
+  systemHealthCheck: '0xECB550dE5c73e6690AB4521C03EC9D476617167E',
 };
 
 // -----------------------------------------------------------------
@@ -496,6 +496,6 @@ export const MULTI_SIG_WARM_ABI = [
 ];
 
 export const SYSTEM_HEALTH_CHECK_ABI = [
-  'function fullHealthCheck(tuple(address identityRegistry, address compliance, address securityToken, address cashToken, address dvpSettlement, address tokenFactory, address claimIssuer, address identityFactory, address timelock, address governor, address walletRegistry, address multiSigWarm, address expectedAdmin) a) view returns (tuple(uint256 timestamp, uint256 blockNumber, uint256 totalChecks, uint256 passedChecks, uint256 failedChecks, bool healthy) report, tuple(string name, bool passed, string detail)[] results)',
+  'function fullHealthCheck(tuple(address identityRegistry, address compliance, address securityToken, address cashToken, address dvpSettlement, address tokenFactory, address identityFactory, address governor, address timelock, address walletRegistry, address multiSigWarm, address expectedAdmin) a) view returns (tuple(uint256 timestamp, uint256 blockNumber, uint256 totalChecks, uint256 passedChecks, uint256 failedChecks, bool healthy) report, tuple(string name, bool passed, string detail)[] results)',
 ];
 
