@@ -447,6 +447,7 @@ Investor (buyer)                OrderBook (escrow)            Investor (seller)
 │                  Layer 3: Frontend (Trading.tsx)                    │
 │  identityRegistry.isVerified(account) checked on page load         │
 │  Red banner + disabled order form for non-KYC users                │
+│  Last Traded Price + 24 h % Change derived from on-chain trades    │
 │  Defense-in-depth — UX layer, not the enforcement layer            │
 └────────────────────────────────────────────────────────────────────┘
 ```

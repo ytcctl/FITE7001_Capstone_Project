@@ -143,6 +143,10 @@ const Trading: React.FC = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalTrades, setTotalTrades] = useState(0);
 
+  // Price stats
+  const [lastTradePrice, setLastTradePrice] = useState<bigint>(0n);
+  const [dailyChange, setDailyChange] = useState<number | null>(null); // % change
+
   // Token balances
   const [secBalance, setSecBalance] = useState<bigint>(0n);
   const [cashBalance, setCashBalance] = useState<bigint>(0n);
@@ -234,6 +238,8 @@ const Trading: React.FC = () => {
     setSpreadVal(0n);
     setTotalOrders(0);
     setTotalTrades(0);
+    setLastTradePrice(0n);
+    setDailyChange(null);
     setSecBalance(0n);
     setLoading(true);
   }, [selectedMarket, signer]);
@@ -283,11 +289,54 @@ const Trading: React.FC = () => {
 
       const tradeTotal = Number(tc);
       if (tradeTotal > 0) {
+        // Fetch last 20 trades for the Recent Trades panel
         const from = Math.max(0, tradeTotal - 20);
         const batch = await obContract.getTradesBatch(from, tradeTotal) as TradeData[];
-        setRecentTrades(batch.slice().reverse());
+        const sortedDesc = batch.slice().reverse();
+        setRecentTrades(sortedDesc);
+
+        // ── Last Traded Price ──
+        const latestTrade = sortedDesc[0];
+        setLastTradePrice(latestTrade.price);
+
+        // ── Daily % Change ──
+        // Walk backwards through ALL trades to find the earliest trade within 24 h
+        const now = Math.floor(Date.now() / 1000);
+        const oneDayAgo = now - 86_400;
+
+        // We already have the last 20; fetch more if the oldest one is still < 24 h old
+        let allRecent = batch.slice(); // ascending order (oldest→newest)
+        if (allRecent.length > 0 && Number(allRecent[0].timestamp) > oneDayAgo && from > 0) {
+          // Need older trades — fetch the rest (up to 200 max for gas/perf)
+          const olderFrom = Math.max(0, from - 200);
+          const olderBatch = await obContract.getTradesBatch(olderFrom, from) as TradeData[];
+          allRecent = [...olderBatch, ...allRecent];
+        }
+
+        // Find the last trade that occurred AT or BEFORE the 24-hour boundary.
+        // If no such trade exists it means ALL trades happened within the last
+        // 24 h and we lack a true 24-hour reference point → show "—" instead
+        // of a misleading partial-window percentage.
+        let refPrice: bigint | null = null;
+        for (const t of allRecent) {
+          if (Number(t.timestamp) <= oneDayAgo) {
+            refPrice = t.price; // keeps overwriting → last trade at or before boundary
+          }
+        }
+
+        if (refPrice !== null && refPrice > 0n) {
+          // True 24 h change: compare latest price vs the reference price
+          const latest = Number(latestTrade.price);
+          const ref = Number(refPrice);
+          setDailyChange(((latest - ref) / ref) * 100);
+        } else {
+          // Not enough history to compute a full 24 h change
+          setDailyChange(null);
+        }
       } else {
         setRecentTrades([]);
+        setLastTradePrice(0n);
+        setDailyChange(null);
       }
 
       // Balances
@@ -519,7 +568,9 @@ const Trading: React.FC = () => {
           )}
 
           {/* Market Overview Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <StatCard label="Last Price" value={lastTradePrice > 0n ? `$${fmtPrice(lastTradePrice)}` : '—'} color="text-white" />
+            <DailyChangeCard change={dailyChange} />
             <StatCard label="Best Bid" value={bestBidPrice > 0n ? `$${fmtPrice(bestBidPrice)}` : '—'} color="text-green-400" />
             <StatCard label="Best Ask" value={bestAskPrice > 0n ? `$${fmtPrice(bestAskPrice)}` : '—'} color="text-red-400" />
             <StatCard label="Spread" value={spreadVal > 0n ? `$${fmtPrice(spreadVal)}` : '—'} color="text-yellow-400" />
@@ -809,5 +860,38 @@ const StatCard: React.FC<{ label: string; value: string; color: string }> = ({ l
     <p className={`text-lg font-bold ${color}`}>{value}</p>
   </div>
 );
+
+/** Dedicated card for Daily % Change with up/down arrow & colour coding */
+const DailyChangeCard: React.FC<{ change: number | null }> = ({ change }) => {
+  let display: string;
+  let color: string;
+  let Icon: typeof TrendingUp | null = null;
+
+  if (change === null || change === undefined) {
+    display = '—';
+    color = 'text-gray-400';
+  } else if (change > 0) {
+    display = `+${change.toFixed(2)}%`;
+    color = 'text-green-400';
+    Icon = TrendingUp;
+  } else if (change < 0) {
+    display = `${change.toFixed(2)}%`;
+    color = 'text-red-400';
+    Icon = TrendingDown;
+  } else {
+    display = '0.00%';
+    color = 'text-gray-400';
+  }
+
+  return (
+    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+      <p className="text-xs text-gray-500 mb-1">24h Change</p>
+      <p className={`text-lg font-bold ${color} flex items-center gap-1`}>
+        {Icon && <Icon size={18} />}
+        {display}
+      </p>
+    </div>
+  );
+};
 
 export default Trading;

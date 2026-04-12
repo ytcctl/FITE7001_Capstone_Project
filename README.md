@@ -424,6 +424,7 @@ Investor (buyer)                OrderBook (escrow)            Investor (seller)
 │                  Layer 3: Frontend (Trading.tsx)                    │
 │  identityRegistry.isVerified(account) checked on page load         │
 │  Red banner + disabled order form for non-KYC users                │
+│  Last Traded Price + 24 h % Change derived from on-chain trades    │
 │  Defense-in-depth — UX layer, not the enforcement layer            │
 └────────────────────────────────────────────────────────────────────┘
 ```
@@ -480,7 +481,7 @@ frontend/
 │   │   └── Web3Context.tsx       # MetaMask provider + contract instances
 │   └── pages/
 │       ├── Dashboard.tsx         # Platform overview
-│       ├── Trading.tsx           # Multi-market order book trading (KYC-gated)
+│       ├── Trading.tsx           # Multi-market order book trading (KYC-gated, last price + 24h change)
 │       ├── MarketManagement.tsx  # Admin: create/manage order book markets
 │       ├── Portfolio.tsx         # Token portfolio view
 │       ├── Settlement.tsx        # DvP settlement management
