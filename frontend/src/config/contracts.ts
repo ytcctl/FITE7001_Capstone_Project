@@ -29,7 +29,7 @@ export const CONTRACT_ADDRESSES = {
   governor: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
   walletRegistry: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
   multiSigWarm: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
-  systemHealthCheck: '0xECB550dE5c73e6690AB4521C03EC9D476617167E',
+  systemHealthCheck: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
 };
 
 // -----------------------------------------------------------------

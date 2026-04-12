@@ -25,6 +25,10 @@ interface IComplianceHealth {
     function complianceOracle() external view returns (address);
 }
 
+interface IMultiSigWarm {
+    function isSigner(address) external view returns (bool);
+}
+
 contract SystemHealthCheck {
 
     struct CheckResult {
@@ -254,15 +258,15 @@ contract SystemHealthCheck {
         Addresses calldata a,
         CheckResult[] memory results
     ) internal view returns (uint256 passed) {
-        // 15. MultiSigWarm admin
+        // 15. MultiSigWarm signer (uses custom isSigner, not AccessControl)
         {
             bool ok;
             if (_isContract(a.multiSigWarm)) {
-                try IAccessControl(a.multiSigWarm).hasRole(bytes32(0), a.expectedAdmin) returns (bool has) {
-                    ok = has;
+                try IMultiSigWarm(a.multiSigWarm).isSigner(a.expectedAdmin) returns (bool isSgn) {
+                    ok = isSgn;
                 } catch { ok = false; }
             }
-            results[15] = CheckResult("MultiSigWarm admin role", ok, ok ? "Correct admin" : "Admin missing");
+            results[15] = CheckResult("MultiSigWarm signer role", ok, ok ? "Is signer" : "Not a signer");
             if (ok) passed++;
         }
 
