@@ -10,6 +10,8 @@ import Portfolio from './pages/Portfolio';
 import TokenManagement from './pages/TokenManagement';
 import Governance from './pages/Governance';
 import WalletCustody from './pages/WalletCustody';
+import Trading from './pages/Trading';
+import MarketManagement from './pages/MarketManagement';
 import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
 import { AlertTriangle } from 'lucide-react';
@@ -65,6 +67,8 @@ const App: React.FC = () => {
           <Route path="/custody" element={<AdminRoute><WalletCustody /></AdminRoute>} />
           <Route path="/governance" element={<Governance />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/trading" element={<Trading />} />
+          <Route path="/markets" element={<AdminRoute><MarketManagement /></AdminRoute>} />
         </Routes>
       </Layout>
     </>

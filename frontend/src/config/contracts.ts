@@ -30,6 +30,8 @@ export const CONTRACT_ADDRESSES = {
   walletRegistry: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
   multiSigWarm: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
   systemHealthCheck: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
+  orderBook: '',  // UPDATE after running deploy-orderbook.js
+  orderBookFactory: '0x36A8bE2C24f812ed7a95f14ffEBDB5F778F61699',
 };
 
 // -----------------------------------------------------------------
@@ -497,5 +499,74 @@ export const MULTI_SIG_WARM_ABI = [
 
 export const SYSTEM_HEALTH_CHECK_ABI = [
   'function fullHealthCheck(tuple(address identityRegistry, address compliance, address securityToken, address cashToken, address dvpSettlement, address tokenFactory, address identityFactory, address governor, address timelock, address walletRegistry, address multiSigWarm, address expectedAdmin) a) view returns (tuple(uint256 timestamp, uint256 blockNumber, uint256 totalChecks, uint256 passedChecks, uint256 failedChecks, bool healthy) report, tuple(string name, bool passed, string detail)[] results)',
+];
+
+// -----------------------------------------------------------------
+// OrderBook ABI
+// -----------------------------------------------------------------
+export const ORDER_BOOK_ABI = [
+  // Place orders
+  'function placeBuyOrder(uint256 price, uint256 quantity) returns (uint256)',
+  'function placeSellOrder(uint256 price, uint256 quantity) returns (uint256)',
+  // Cancel
+  'function cancelOrder(uint256 orderId) external',
+  // Views — order book
+  'function getBuyOrderIds() view returns (uint256[])',
+  'function getSellOrderIds() view returns (uint256[])',
+  'function getTraderOrders(address trader) view returns (uint256[])',
+  'function getOrder(uint256 orderId) view returns (tuple(uint256 id, address trader, uint8 side, uint256 price, uint256 quantity, uint256 filled, uint256 timestamp, uint8 status))',
+  'function getOrdersBatch(uint256[] ids) view returns (tuple(uint256 id, address trader, uint8 side, uint256 price, uint256 quantity, uint256 filled, uint256 timestamp, uint8 status)[])',
+  // Views — trades
+  'function getTrade(uint256 tradeId) view returns (tuple(uint256 id, uint256 buyOrderId, uint256 sellOrderId, address buyer, address seller, uint256 price, uint256 quantity, uint256 cashAmount, uint256 timestamp))',
+  'function getTradesBatch(uint256 from, uint256 to) view returns (tuple(uint256 id, uint256 buyOrderId, uint256 sellOrderId, address buyer, address seller, uint256 price, uint256 quantity, uint256 cashAmount, uint256 timestamp)[])',
+  'function tradeCount() view returns (uint256)',
+  'function orderCount() view returns (uint256)',
+  // Views — market summary
+  'function bestBid() view returns (uint256)',
+  'function bestAsk() view returns (uint256)',
+  'function spread() view returns (uint256)',
+  // Token addresses
+  'function securityToken() view returns (address)',
+  'function cashToken() view returns (address)',
+  'function securityDecimals() view returns (uint8)',
+  'function cashDecimals() view returns (uint8)',
+  'function identityRegistry() view returns (address)',
+  // Pause
+  'function pause() external',
+  'function unpause() external',
+  // Access Control
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  // Events
+  'event OrderPlaced(uint256 indexed orderId, address indexed trader, uint8 side, uint256 price, uint256 quantity, uint256 timestamp)',
+  'event OrderCancelled(uint256 indexed orderId, address indexed trader, uint256 timestamp)',
+  'event TradeExecuted(uint256 indexed tradeId, uint256 indexed buyOrderId, uint256 indexed sellOrderId, address buyer, address seller, uint256 price, uint256 quantity, uint256 cashAmount, uint256 timestamp)',
+];
+
+// -----------------------------------------------------------------
+// OrderBookFactory ABI
+// -----------------------------------------------------------------
+export const ORDER_BOOK_FACTORY_ABI = [
+  // Create market
+  'function createOrderBook(address securityToken, uint8 secDecimals, string name, string symbol) returns (address)',
+  // Deactivate / Reactivate
+  'function deactivateMarket(uint256 index) external',
+  'function reactivateMarket(uint256 index) external',
+  // Views
+  'function getOrderBook(address securityToken) view returns (address)',
+  'function getMarket(uint256 index) view returns (tuple(address securityToken, address orderBook, string name, string symbol, uint256 createdAt, bool active))',
+  'function allMarkets() view returns (tuple(address securityToken, address orderBook, string name, string symbol, uint256 createdAt, bool active)[])',
+  'function activeMarkets() view returns (tuple(address securityToken, address orderBook, string name, string symbol, uint256 createdAt, bool active)[])',
+  'function marketCount() view returns (uint256)',
+  'function cashToken() view returns (address)',
+  'function cashDecimals() view returns (uint8)',
+  'function identityRegistry() view returns (address)',
+  // Access Control
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  // Events
+  'event MarketCreated(uint256 indexed index, address indexed securityToken, address indexed orderBook, string name, string symbol)',
+  'event MarketDeactivated(uint256 indexed index, address securityToken)',
+  'event MarketReactivated(uint256 indexed index, address securityToken)',
 ];
 

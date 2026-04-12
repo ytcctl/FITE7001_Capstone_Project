@@ -16,6 +16,8 @@ import {
   WALLET_REGISTRY_ABI,
   MULTI_SIG_WARM_ABI,
   SYSTEM_HEALTH_CHECK_ABI,
+  ORDER_BOOK_ABI,
+  ORDER_BOOK_FACTORY_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -35,6 +37,8 @@ export interface Contracts {
   walletRegistry: ethers.Contract;
   multiSigWarm: ethers.Contract;
   systemHealthCheck: ethers.Contract;
+  orderBook: ethers.Contract;
+  orderBookFactory: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -135,6 +139,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       walletRegistry: new ethers.Contract(CONTRACT_ADDRESSES.walletRegistry, WALLET_REGISTRY_ABI, s),
       multiSigWarm: new ethers.Contract(CONTRACT_ADDRESSES.multiSigWarm, MULTI_SIG_WARM_ABI, s),
       systemHealthCheck: new ethers.Contract(CONTRACT_ADDRESSES.systemHealthCheck, SYSTEM_HEALTH_CHECK_ABI, s),
+      orderBook: new ethers.Contract(CONTRACT_ADDRESSES.orderBook, ORDER_BOOK_ABI, s),
+      orderBookFactory: new ethers.Contract(CONTRACT_ADDRESSES.orderBookFactory, ORDER_BOOK_FACTORY_ABI, s),
     };
     setContracts(c);
     return c;

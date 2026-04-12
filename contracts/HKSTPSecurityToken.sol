@@ -460,26 +460,44 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
             require(!frozen[from], "HKSTPSecurityToken: sender is frozen");
             require(!frozen[to],   "HKSTPSecurityToken: recipient is frozen");
 
-            // Safe-listed operational addresses bypass compliance pipeline
-            bool safeTransfer = safeListed[from] && safeListed[to];
+            // Safe-listed operational addresses (OrderBook escrow, treasury,
+            // custody) bypass their OWN compliance attestation.  If BOTH sides
+            // are safe-listed the entire compliance pipeline is skipped.
+            bool fromSafe = safeListed[from];
+            bool toSafe   = safeListed[to];
 
-            if (!safeTransfer) {
-                // Both parties must be registered and verified
+            if (!(fromSafe && toSafe)) {
                 IIdentityRegistry registry = IIdentityRegistry(identityRegistry);
-                require(
-                    registry.isVerified(from),
-                    "HKSTPSecurityToken: sender not verified"
-                );
-                require(
-                    registry.isVerified(to),
-                    "HKSTPSecurityToken: recipient not verified"
-                );
 
-                // Derive country codes from registry
-                string memory fromCountryStr = registry.investorCountry(from);
-                string memory toCountryStr   = registry.investorCountry(to);
-                bytes2 fromCountry = _toBytes2(fromCountryStr);
-                bytes2 toCountry   = _toBytes2(toCountryStr);
+                // Non-safe-listed parties must be registered and KYC-verified
+                if (!fromSafe) {
+                    require(
+                        registry.isVerified(from),
+                        "HKSTPSecurityToken: sender not verified"
+                    );
+                }
+                if (!toSafe) {
+                    require(
+                        registry.isVerified(to),
+                        "HKSTPSecurityToken: recipient not verified"
+                    );
+                }
+
+                // Compliance module checks use the real addresses.
+                // For a safe-listed party we use a neutral country "XX" to
+                // ensure jurisdiction checks don't block escrow flows.
+                bytes2 fromCountry;
+                bytes2 toCountry;
+                if (!fromSafe) {
+                    fromCountry = _toBytes2(registry.investorCountry(from));
+                } else {
+                    fromCountry = bytes2("XX");
+                }
+                if (!toSafe) {
+                    toCountry = _toBytes2(registry.investorCountry(to));
+                } else {
+                    toCountry = bytes2("XX");
+                }
 
                 // Post-transfer balance of recipient
                 uint256 toBalance = balanceOf(to) + amount;
