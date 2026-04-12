@@ -53,6 +53,8 @@ interface Web3State {
   rolesLoading: boolean;
   isConnecting: boolean;
   error: string | null;
+  wrongNetwork: boolean;
+  switchNetwork: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => void;
 }
@@ -69,6 +71,8 @@ const Web3Context = createContext<Web3State>({
   rolesLoading: false,
   isConnecting: false,
   error: null,
+  wrongNetwork: false,
+  switchNetwork: async () => {},
   connect: async () => {},
   disconnect: () => {},
 });
@@ -86,6 +90,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [rolesLoading, setRolesLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wrongNetwork, setWrongNetwork] = useState(false);
 
   /** Detect on-chain roles for the given account */
   const detectRoles = useCallback(async (addr: string, c: Contracts) => {
@@ -161,6 +166,18 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  /** Public: prompt user to switch network, then reconnect */
+  const switchNetwork = useCallback(async () => {
+    await ensureNetwork();
+    // After switch, reconnect
+    const browserProvider = new ethers.BrowserProvider(window.ethereum!);
+    const network = await browserProvider.getNetwork();
+    if (Number(network.chainId) === NETWORK_CONFIG.chainId) {
+      setWrongNetwork(false);
+      // Full reconnect will happen via handleChainChanged
+    }
+  }, [ensureNetwork]);
+
   /** Connect wallet */
   const connect = useCallback(async () => {
     if (!window.ethereum) {
@@ -182,6 +199,15 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSigner(s);
       setAccount(accounts[0]);
       setChainId(Number(network.chainId));
+
+      // Check if we ended up on the correct network
+      if (Number(network.chainId) !== NETWORK_CONFIG.chainId) {
+        setWrongNetwork(true);
+        setContracts(null);
+        setRoles(DEFAULT_ROLES);
+        return;
+      }
+      setWrongNetwork(false);
       const c = initContracts(s);
       detectRoles(accounts[0], c);
     } catch (e: unknown) {
@@ -220,6 +246,13 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setSigner(s);
           setAccount(accounts[0]);
           setChainId(Number(network.chainId));
+          if (Number(network.chainId) !== NETWORK_CONFIG.chainId) {
+            setWrongNetwork(true);
+            setContracts(null);
+            setRoles(DEFAULT_ROLES);
+            return;
+          }
+          setWrongNetwork(false);
           const c = initContracts(s);
           detectRoles(accounts[0], c);
         } catch {
@@ -229,9 +262,18 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     };
 
-    const handleChainChanged = () => {
-      // Chain changed — full reconnect to rebuild everything
-      window.location.reload();
+    const handleChainChanged = (newChainIdHex: unknown) => {
+      const newChainId = parseInt(newChainIdHex as string, 16);
+      setChainId(newChainId);
+      if (newChainId !== NETWORK_CONFIG.chainId) {
+        setWrongNetwork(true);
+        setContracts(null);
+        setRoles(DEFAULT_ROLES);
+      } else {
+        // Correct network — full reconnect to rebuild contracts
+        setWrongNetwork(false);
+        connect();
+      }
     };
 
     window.ethereum.on('accountsChanged', handleAccountsChanged);
@@ -259,7 +301,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <Web3Context.Provider
-      value={{ provider, signer, account, chainId, contracts, roles, rolesLoading, isConnecting, error, connect, disconnect }}
+      value={{ provider, signer, account, chainId, contracts, roles, rolesLoading, isConnecting, error, wrongNetwork, switchNetwork, connect, disconnect }}
     >
       {children}
     </Web3Context.Provider>
