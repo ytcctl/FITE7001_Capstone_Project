@@ -12,10 +12,13 @@ const { ethers } = require("hardhat");
  *   - Safe-list bypass for operational addresses
  *   - Pause/unpause functionality
  *   - Unauthorized minting rejection
+ *   - Supply cap enforcement (maxSupply)
+ *   - Tiered minting threshold (mintThreshold + TIMELOCK_MINTER_ROLE)
+ *   - Self-dealing prevention (cannot mint/force-transfer to caller)
  */
 describe("HKSTPSecurityToken", function () {
   let token, registry, compliance;
-  let admin, agent, treasury, alice, bob, charlie;
+  let admin, agent, treasury, alice, bob, charlie, timelockMinter;
 
   const TOKEN_NAME    = "HKSTP Alpha Token";
   const TOKEN_SYMBOL  = "HKSAT";
@@ -23,7 +26,7 @@ describe("HKSTPSecurityToken", function () {
   const TRANSFER_AMOUNT = ethers.parseUnits("100", 18);
 
   beforeEach(async function () {
-    [admin, agent, treasury, alice, bob, charlie] = await ethers.getSigners();
+    [admin, agent, treasury, alice, bob, charlie, timelockMinter] = await ethers.getSigners();
 
     // Deploy Identity Registry
     const IdentityRegistry = await ethers.getContractFactory("HKSTPIdentityRegistry");
@@ -466,6 +469,217 @@ describe("HKSTPSecurityToken", function () {
 
     it("isControllable() should return true", async function () {
       expect(await token.isControllable()).to.be.true;
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Supply Cap (maxSupply)
+  // ---------------------------------------------------------------------------
+
+  describe("Supply Cap (maxSupply)", function () {
+    const SUPPLY_CAP = ethers.parseUnits("5000", 18);
+
+    it("should default maxSupply to 0 (unlimited)", async function () {
+      expect(await token.maxSupply()).to.equal(0n);
+    });
+
+    it("should allow admin to set maxSupply", async function () {
+      await token.connect(admin).setMaxSupply(SUPPLY_CAP);
+      expect(await token.maxSupply()).to.equal(SUPPLY_CAP);
+    });
+
+    it("should emit MaxSupplySet event", async function () {
+      await expect(token.connect(admin).setMaxSupply(SUPPLY_CAP))
+        .to.emit(token, "MaxSupplySet")
+        .withArgs(0n, SUPPLY_CAP);
+    });
+
+    it("should allow minting up to the cap", async function () {
+      await token.connect(admin).setMaxSupply(SUPPLY_CAP);
+      await token.connect(agent).mint(alice.address, SUPPLY_CAP);
+      expect(await token.totalSupply()).to.equal(SUPPLY_CAP);
+    });
+
+    it("should reject minting that would exceed the cap", async function () {
+      await token.connect(admin).setMaxSupply(SUPPLY_CAP);
+      await token.connect(agent).mint(alice.address, SUPPLY_CAP);
+      await expect(
+        token.connect(agent).mint(bob.address, 1n)
+      ).to.be.revertedWith("HKSTPSecurityToken: mint would exceed max supply");
+    });
+
+    it("should reject setting cap below current totalSupply", async function () {
+      await token.connect(agent).mint(alice.address, MINT_AMOUNT);
+      const tooLow = MINT_AMOUNT - 1n;
+      await expect(
+        token.connect(admin).setMaxSupply(tooLow)
+      ).to.be.revertedWith("HKSTPSecurityToken: cap below current supply");
+    });
+
+    it("should allow setting cap back to 0 (unlimited)", async function () {
+      await token.connect(admin).setMaxSupply(SUPPLY_CAP);
+      await token.connect(admin).setMaxSupply(0n);
+      expect(await token.maxSupply()).to.equal(0n);
+      // Minting should work beyond the old cap
+      const bigAmount = SUPPLY_CAP + ethers.parseUnits("1000", 18);
+      await token.connect(agent).mint(alice.address, bigAmount);
+      expect(await token.totalSupply()).to.equal(bigAmount);
+    });
+
+    it("should reject setMaxSupply from non-admin", async function () {
+      await expect(
+        token.connect(alice).setMaxSupply(SUPPLY_CAP)
+      ).to.be.reverted;
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Tiered Minting Threshold (mintThreshold + TIMELOCK_MINTER_ROLE)
+  // ---------------------------------------------------------------------------
+
+  describe("Tiered Minting Threshold", function () {
+    const THRESHOLD = ethers.parseUnits("500", 18);
+    const SMALL_MINT = ethers.parseUnits("500", 18);  // exactly at threshold
+    const LARGE_MINT = ethers.parseUnits("501", 18);  // above threshold
+
+    beforeEach(async function () {
+      // Set threshold
+      await token.connect(admin).setMintThreshold(THRESHOLD);
+
+      // Grant TIMELOCK_MINTER_ROLE to timelockMinter signer
+      const TIMELOCK_MINTER_ROLE = await token.TIMELOCK_MINTER_ROLE();
+      await token.connect(admin).grantRole(TIMELOCK_MINTER_ROLE, timelockMinter.address);
+
+      // Register timelockMinter-related recipients are already done (alice, bob in global beforeEach)
+    });
+
+    it("should default mintThreshold to 0 (disabled)", async function () {
+      // Deploy a fresh token to test default
+      const Token = await ethers.getContractFactory("HKSTPSecurityToken");
+      const fresh = await Token.deploy(
+        "Fresh", "FRH",
+        await registry.getAddress(),
+        await compliance.getAddress(),
+        ethers.ZeroAddress,
+        admin.address
+      );
+      expect(await fresh.mintThreshold()).to.equal(0n);
+    });
+
+    it("should emit MintThresholdSet event", async function () {
+      await expect(token.connect(admin).setMintThreshold(ethers.parseUnits("1000", 18)))
+        .to.emit(token, "MintThresholdSet")
+        .withArgs(THRESHOLD, ethers.parseUnits("1000", 18));
+    });
+
+    it("should allow AGENT_ROLE to mint at or below threshold", async function () {
+      await token.connect(agent).mint(alice.address, SMALL_MINT);
+      expect(await token.balanceOf(alice.address)).to.equal(SMALL_MINT);
+    });
+
+    it("should reject AGENT_ROLE minting above threshold", async function () {
+      await expect(
+        token.connect(agent).mint(alice.address, LARGE_MINT)
+      ).to.be.revertedWith("HKSTPSecurityToken: large mint requires TIMELOCK_MINTER_ROLE");
+    });
+
+    it("should allow TIMELOCK_MINTER_ROLE to mint above threshold", async function () {
+      await token.connect(timelockMinter).mint(alice.address, LARGE_MINT);
+      expect(await token.balanceOf(alice.address)).to.equal(LARGE_MINT);
+    });
+
+    it("should reject TIMELOCK_MINTER_ROLE minting at or below threshold (needs AGENT_ROLE)", async function () {
+      // timelockMinter does NOT have AGENT_ROLE, so small mints should fail
+      await expect(
+        token.connect(timelockMinter).mint(alice.address, SMALL_MINT)
+      ).to.be.revertedWith("HKSTPSecurityToken: caller is not AGENT_ROLE");
+    });
+
+    it("should allow any mint by AGENT_ROLE when threshold is 0 (disabled)", async function () {
+      await token.connect(admin).setMintThreshold(0n);
+      // Now agent can mint any amount
+      await token.connect(agent).mint(alice.address, ethers.parseUnits("100000", 18));
+      expect(await token.balanceOf(alice.address)).to.equal(ethers.parseUnits("100000", 18));
+    });
+
+    it("should reject setMintThreshold from non-admin", async function () {
+      await expect(
+        token.connect(alice).setMintThreshold(THRESHOLD)
+      ).to.be.reverted;
+    });
+
+    it("should enforce both supply cap AND threshold together", async function () {
+      const CAP = ethers.parseUnits("2000", 18);
+      await token.connect(admin).setMaxSupply(CAP);
+
+      // TIMELOCK_MINTER_ROLE mints 1500 (above threshold, under cap) — OK
+      await token.connect(timelockMinter).mint(alice.address, ethers.parseUnits("1500", 18));
+
+      // TIMELOCK_MINTER_ROLE tries to mint 600 more (above threshold, would exceed cap) — FAIL
+      await expect(
+        token.connect(timelockMinter).mint(bob.address, ethers.parseUnits("600", 18))
+      ).to.be.revertedWith("HKSTPSecurityToken: mint would exceed max supply");
+    });
+
+    it("should reject minting from address without any role", async function () {
+      await expect(
+        token.connect(charlie).mint(alice.address, SMALL_MINT)
+      ).to.be.revertedWith("HKSTPSecurityToken: caller is not AGENT_ROLE");
+    });
+  });
+
+  // =========================================================================
+  // Self-Dealing Prevention
+  // =========================================================================
+
+  describe("Self-Dealing Prevention", function () {
+    const LEGAL_HASH = ethers.id("ipfs://QmCourtOrderCID_Cap32_S182");
+    const OPERATOR_DATA = ethers.toUtf8Bytes("CASE-2026-002");
+
+    it("agent cannot mint to self", async function () {
+      // Even if agent were KYC-verified, the self-mint guard blocks it
+      await expect(
+        token.connect(agent).mint(agent.address, MINT_AMOUNT)
+      ).to.be.revertedWith("HKSTPSecurityToken: cannot mint to caller");
+    });
+
+    it("admin (who also has AGENT_ROLE) cannot mint to self", async function () {
+      // admin holds both DEFAULT_ADMIN_ROLE and AGENT_ROLE from deploy
+      await expect(
+        token.connect(admin).mint(admin.address, MINT_AMOUNT)
+      ).to.be.revertedWith("HKSTPSecurityToken: cannot mint to caller");
+    });
+
+    it("TIMELOCK_MINTER_ROLE holder cannot mint to self", async function () {
+      const THRESHOLD = ethers.parseUnits("500", 18);
+      await token.connect(admin).setMintThreshold(THRESHOLD);
+      const LARGE_MINT = ethers.parseUnits("1000", 18);
+      await expect(
+        token.connect(timelockMinter).mint(timelockMinter.address, LARGE_MINT)
+      ).to.be.revertedWith("HKSTPSecurityToken: cannot mint to caller");
+    });
+
+    it("agent can still mint to other verified addresses", async function () {
+      await token.connect(agent).mint(alice.address, MINT_AMOUNT);
+      expect(await token.balanceOf(alice.address)).to.equal(MINT_AMOUNT);
+    });
+
+    it("agent cannot force-transfer to self", async function () {
+      // Mint tokens to alice first
+      await token.connect(agent).mint(alice.address, MINT_AMOUNT);
+      await expect(
+        token.connect(agent).forcedTransfer(
+          alice.address, agent.address, MINT_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+        )
+      ).to.be.revertedWith("HKSTPSecurityToken: cannot force-transfer to caller");
+    });
+
+    it("agent can still force-transfer to other verified addresses", async function () {
+      await token.connect(agent).mint(alice.address, MINT_AMOUNT);
+      await token.connect(agent).forcedTransfer(
+        alice.address, bob.address, MINT_AMOUNT, LEGAL_HASH, OPERATOR_DATA
+      );
+      expect(await token.balanceOf(bob.address)).to.equal(MINT_AMOUNT);
     });
   });
 });

@@ -53,11 +53,27 @@ interface ICompliance {
  *   - Full audit-trail events.
  *
  * Access Control roles:
- *   DEFAULT_ADMIN_ROLE  — platform admin (HKSTP); manages agents and safe-list
- *   AGENT_ROLE          — licensed custodians; may mint, burn, freeze addresses
+ *   DEFAULT_ADMIN_ROLE  — platform admin (HKSTP); manages agents, safe-list, supply cap, threshold
+ *   AGENT_ROLE          — licensed custodians; may mint (≤ threshold), burn, freeze addresses
+ *   TIMELOCK_MINTER_ROLE — governance timelock; required for mints above mintThreshold
  */
 contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pausable {
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
+    bytes32 public constant TIMELOCK_MINTER_ROLE = keccak256("TIMELOCK_MINTER_ROLE");
+
+    // ── Supply-cap & tiered minting ─────────────────────────────
+    //
+    // maxSupply:      hard ceiling on totalSupply (0 = unlimited).
+    // mintThreshold:  mints above this amount require TIMELOCK_MINTER_ROLE
+    //                 instead of AGENT_ROLE, forcing governance approval
+    //                 through HKSTPGovernor → HKSTPTimelock (48 h delay).
+    //                 0 = all mints go through AGENT_ROLE only.
+
+    /// @notice Hard cap on total supply (0 = unlimited).
+    uint256 public maxSupply;
+
+    /// @notice Mints above this amount require TIMELOCK_MINTER_ROLE (0 = disabled).
+    uint256 public mintThreshold;
 
     // ── EIP-1167 proxy-safe name/symbol storage ─────────────────
     //
@@ -113,6 +129,8 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     event MaxShareholdersSet(uint256 maxShareholders);
     event IdentityHolderAdded(address indexed identityContract);
     event IdentityHolderRemoved(address indexed identityContract);
+    event MaxSupplySet(uint256 previousCap, uint256 newCap);
+    event MintThresholdSet(uint256 previousThreshold, uint256 newThreshold);
 
     /// @notice ERC-1644 Forced Transfer — emitted when the Custodian/Agent executes
     ///         a court-ordered or liquidator-directed transfer under Cap. 32 S182.
@@ -282,6 +300,36 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     }
 
     // -------------------------------------------------------------------------
+    // Supply cap & tiered minting (DEFAULT_ADMIN_ROLE)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice Set the hard cap on total supply (0 = unlimited).
+     *         Cannot be set below the current totalSupply.
+     * @param cap New max supply in token base units.
+     */
+    function setMaxSupply(uint256 cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            cap == 0 || cap >= totalSupply(),
+            "HKSTPSecurityToken: cap below current supply"
+        );
+        emit MaxSupplySet(maxSupply, cap);
+        maxSupply = cap;
+    }
+
+    /**
+     * @notice Set the mint-threshold.  Mints with `amount > mintThreshold`
+     *         require TIMELOCK_MINTER_ROLE (governance approval) instead of
+     *         the regular AGENT_ROLE.  Set to 0 to disable the threshold
+     *         (all mints go through AGENT_ROLE only).
+     * @param threshold Amount in token base units.
+     */
+    function setMintThreshold(uint256 threshold) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit MintThresholdSet(mintThreshold, threshold);
+        mintThreshold = threshold;
+    }
+
+    // -------------------------------------------------------------------------
     // Safe-list management (AGENT_ROLE)
     // -------------------------------------------------------------------------
 
@@ -312,15 +360,48 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     }
 
     // -------------------------------------------------------------------------
-    // Minting / Burning (AGENT_ROLE)
+    // Minting / Burning (AGENT_ROLE / TIMELOCK_MINTER_ROLE)
     // -------------------------------------------------------------------------
 
     /**
      * @notice Mint tokens to a verified investor.
+     *
+     *         Supply-cap guard:
+     *           If maxSupply > 0, totalSupply() + amount must not exceed maxSupply.
+     *
+     *         Tiered minting guard:
+     *           If mintThreshold > 0 and amount > mintThreshold, the caller must
+     *           hold TIMELOCK_MINTER_ROLE (governance-approved mint via Timelock)
+     *           instead of AGENT_ROLE.
+     *           Mints ≤ mintThreshold (or when threshold is 0) require AGENT_ROLE.
+     *
      * @param to     Recipient (must be registered and verified in Identity Registry).
+     *                Must not be the caller (self-dealing prevention).
      * @param amount Amount to mint.
      */
-    function mint(address to, uint256 amount) external onlyRole(AGENT_ROLE) whenNotPaused {
+    function mint(address to, uint256 amount) external whenNotPaused {
+        // ── Self-dealing prevention ─────────────────────────────
+        require(to != msg.sender, "HKSTPSecurityToken: cannot mint to caller");
+
+        // ── Tiered role check ───────────────────────────────────
+        if (mintThreshold > 0 && amount > mintThreshold) {
+            require(
+                hasRole(TIMELOCK_MINTER_ROLE, msg.sender),
+                "HKSTPSecurityToken: large mint requires TIMELOCK_MINTER_ROLE"
+            );
+        } else {
+            require(
+                hasRole(AGENT_ROLE, msg.sender),
+                "HKSTPSecurityToken: caller is not AGENT_ROLE"
+            );
+        }
+
+        // ── Supply cap check ────────────────────────────────────
+        require(
+            maxSupply == 0 || totalSupply() + amount <= maxSupply,
+            "HKSTPSecurityToken: mint would exceed max supply"
+        );
+
         require(
             IIdentityRegistry(identityRegistry).isVerified(to),
             "HKSTPSecurityToken: recipient not verified"
@@ -368,6 +449,7 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
      * @param from            Source address (lost wallet, insolvent entity).
      * @param to              Destination address (recovered wallet, liquidator).
      *                        Must be registered and verified in the Identity Registry.
+     *                        Must not be the caller (self-dealing prevention).
      * @param amount          Number of tokens to transfer.
      * @param legalOrderHash  bytes32 IPFS CID of the encrypted court order document.
      *                        Must not be zero — every forced transfer must have a
@@ -384,6 +466,7 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     ) external onlyRole(AGENT_ROLE) whenNotPaused {
         require(from != address(0), "HKSTPSecurityToken: from is zero address");
         require(to   != address(0), "HKSTPSecurityToken: to is zero address");
+        require(to   != msg.sender, "HKSTPSecurityToken: cannot force-transfer to caller");
         require(amount > 0,         "HKSTPSecurityToken: zero amount");
         require(legalOrderHash != bytes32(0), "HKSTPSecurityToken: missing legal order hash");
         require(

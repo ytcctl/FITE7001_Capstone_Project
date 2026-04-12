@@ -191,7 +191,13 @@ export const SECURITY_TOKEN_ABI = [
   'function grantRole(bytes32 role, address account) external',
   'function revokeRole(bytes32 role, address account) external',
   'function AGENT_ROLE() view returns (bytes32)',
+  'function TIMELOCK_MINTER_ROLE() view returns (bytes32)',
   'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  // Supply cap & tiered minting
+  'function maxSupply() view returns (uint256)',
+  'function mintThreshold() view returns (uint256)',
+  'function setMaxSupply(uint256 cap) external',
+  'function setMintThreshold(uint256 threshold) external',
   // Events
   'event Transfer(address indexed from, address indexed to, uint256 value)',
   'event TokensMinted(address indexed to, uint256 amount, address indexed agent)',
@@ -201,6 +207,8 @@ export const SECURITY_TOKEN_ABI = [
   'event MaxShareholdersSet(uint256 maxShareholders)',
   'event IdentityHolderAdded(address indexed identityContract)',
   'event IdentityHolderRemoved(address indexed identityContract)',
+  'event MaxSupplySet(uint256 previousCap, uint256 newCap)',
+  'event MintThresholdSet(uint256 previousThreshold, uint256 newThreshold)',
   // ERC-1644 Forced Transfer (Settlement Finality)
   'function forcedTransfer(address from, address to, uint256 amount, bytes32 legalOrderHash, bytes operatorData) external',
   'function isControllable() view returns (bool)',

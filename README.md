@@ -180,7 +180,8 @@ ERC-3643 (T-REX) inspired security token — **one token per HKSTP portfolio sta
 |---------|-------------|
 | Transfer control | Every transfer checks Identity Registry + Compliance modules |
 | Safe-list | Operational addresses (treasury, escrow) bypass per-transfer attestation |
-| Minting / Burning | Only addresses with `AGENT_ROLE` (licensed custodians) |
+| Minting / Burning | `AGENT_ROLE` for day-to-day mints; `TIMELOCK_MINTER_ROLE` required above `mintThreshold` |
+| Supply cap | `maxSupply` hard ceiling prevents unlimited inflation (0 = unlimited) |
 | Pause | Admin can emergency-pause all transfers |
 | Freeze | Agents can freeze individual addresses |
 
@@ -492,7 +493,7 @@ frontend/
 └── ...
 
 test/
-├── HKSTPSecurityToken.test.js    # Token deployment, mint, transfer, pause, freeze
+├── HKSTPSecurityToken.test.js    # Token deployment, mint, transfer, pause, freeze, supply cap, tiered minting, self-dealing prevention
 ├── HKSTPCompliance.test.js       # Attestation, replay, module checks
 ├── DvPSettlement.test.js         # Settlement lifecycle, atomic execution
 ├── Identity.test.js              # ONCHAINID deployment + claim management
@@ -590,7 +591,7 @@ npm run test:besu
 
 | File | Coverage |
 |------|---------|
-| `test/HKSTPSecurityToken.test.js` | Deployment, minting, transfers, safe-list, pause, freeze |
+| `test/HKSTPSecurityToken.test.js` | Deployment, minting, transfers, safe-list, pause, freeze, supply cap, tiered minting threshold, self-dealing prevention |
 | `test/HKSTPCompliance.test.js` | Attestation verify/consume, replay protection, module checks |
 | `test/DvPSettlement.test.js` | Settlement lifecycle, atomic execution, deadline, pause |
 | `test/Identity.test.js` | ONCHAINID deployment, claim issuance, identity lookup |
@@ -652,17 +653,19 @@ npm run deploy:besu
 1. Grant `TOKEN_ROLE` on `HKSTPCompliance` to `HKSTPSecurityToken`
 2. Grant `AGENT_ROLE` on `HKSTPSecurityToken` to licensed custodian wallets
 3. Safe-list treasury, escrow, and custody addresses on the token
-4. Grant `OPERATOR_ROLE` on `DvPSettlement` to the matching engine service account
-5. Register oracle members on `OracleCommittee` and set threshold
-6. Register investor identities via `IdentityFactory.deployIdentity()` + `HKSTPIdentityRegistry.registerIdentity()`
-7. Set KYC claims via `HKSTPIdentityRegistry.setClaim()`
-8. Create initial order book markets via `OrderBookFactory.createOrderBook()` (one per listed token)
-9. Safe-list each deployed OrderBook on its corresponding security token (`setSafeList(orderBookAddr, true)`)
-10. Register wallet tiers in `WalletRegistry` (hot, warm, cold)
-11. Configure `MultiSigWarm` signers
-12. Grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
-13. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
-14. Run `scripts/harden-admin.js` to finalize admin role configuration
+4. Set `maxSupply` on `HKSTPSecurityToken` (hard cap on total supply)
+5. Set `mintThreshold` on `HKSTPSecurityToken` (e.g. 1 % of supply) and grant `TIMELOCK_MINTER_ROLE` to `HKSTPTimelock`
+6. Grant `OPERATOR_ROLE` on `DvPSettlement` to the matching engine service account
+7. Register oracle members on `OracleCommittee` and set threshold
+8. Register investor identities via `IdentityFactory.deployIdentity()` + `HKSTPIdentityRegistry.registerIdentity()`
+9. Set KYC claims via `HKSTPIdentityRegistry.setClaim()`
+10. Create initial order book markets via `OrderBookFactory.createOrderBook()` (one per listed token)
+11. Safe-list each deployed OrderBook on its corresponding security token (`setSafeList(orderBookAddr, true)`)
+12. Register wallet tiers in `WalletRegistry` (hot, warm, cold)
+13. Configure `MultiSigWarm` signers
+14. Grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
+15. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
+16. Run `scripts/harden-admin.js` to finalize admin role configuration
 
 ---
 
@@ -683,6 +686,9 @@ npm run deploy:besu
 - Attestations are one-time-use (replay protection via nonce + used-hash mapping)
 - `AccessControl` used throughout — role-based, no single-owner risk
 - Follows checks-effects-interactions pattern in `executeSettlement()` and `_executeTrade()`
+- **Supply cap** — `maxSupply` prevents unlimited inflation; cannot be set below current `totalSupply()`
+- **Tiered minting** — `mintThreshold` forces large issuances through `TIMELOCK_MINTER_ROLE` (Governor → Timelock 48 h delay), while routine operational mints stay with `AGENT_ROLE`
+- **Self-dealing prevention** — `mint()` and `forcedTransfer()` reject `to == msg.sender`, preventing privileged operators from minting or force-transferring tokens to themselves
 - **98/2 custody ratio** enforced on-chain via `WalletRegistry` with automated sweep alerts
 - **Multi-sig warm wallet** (`MultiSigWarm`) requires 2-of-3 for rebalancing
 - Air-gapped cold storage with FIPS 140-2 Level 3+ HSMs
@@ -708,6 +714,8 @@ npm run deploy:besu
 | Forced transfer / rectification | `forcedTransfer()` (EIP-1644) with IPFS-anchored legal proof |
 | Shareholder cap | 50-shareholder limit enforced via identity-linked compliance module |
 | Governance transparency | `HKSTPGovernor` + `HKSTPTimelock` — KYC-gated voting, 48-hour execution delay |
+| Supply-cap & tiered minting | `maxSupply` hard cap + `mintThreshold` governance gate — prevents unlimited inflation; large issuances require Governor proposal + 48 h Timelock |
+| Self-dealing prevention | `mint()` and `forcedTransfer()` enforce `to != msg.sender` — operators cannot issue or redirect tokens to themselves |
 | Deposit / Withdrawal | FPS integration with closed-loop AML; future Project Ensemble / wCBDC support |
 
 ---
