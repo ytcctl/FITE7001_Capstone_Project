@@ -11,9 +11,10 @@ TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                     INVESTOR PORTAL  (React / Vite)                      │
-│  SSO+MFA │ KYC Upload │ Wallet │ Order Book │ Portfolio │ Governance     │
+│  SSO+MFA │ KYC Upload │ Wallet │ Trading │ Market Mgmt │ Governance     │
+│                          │ Portfolio │ Settlement │ Token Minting        │
 └──────────────────────────────────┬───────────────────────────────────────┘
-                                   │
+                                   │  KYC frontend guard
          ┌─────────────────────────▼────────────────────────┐
          │        COMPLIANCE / ORACLE SERVICE               │
          │  OracleCommittee — multi-sig EIP-712 attestation │
@@ -34,12 +35,19 @@ TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible
 │  │   module checks)    │  │                      │  └────────────────┘  │
 │  └─────────────────────┘  └──────────────────────┘                      │
 │                                                                          │
-│  ┌─────────────────────┐  ┌──────────────────────┐  ┌────────────────┐  │
-│  │  Custody Layer       │  │ Governance Layer     │  │ Identity Layer │  │
-│  │  WalletRegistry     │  │ HKSTPGovernor        │  │ IdentityFactory│  │
-│  │  MultiSigWarm       │  │ HKSTPTimelock        │  │ Identity (734) │  │
-│  └─────────────────────┘  └──────────────────────┘  │ ClaimIssuer    │  │
-│                                                      └────────────────┘  │
+│  ┌─────────────────────────────────────────────────┐ ┌────────────────┐ │
+│  │  Trading Layer                                   │ │ Identity Layer │ │
+│  │  OrderBookFactory → OrderBook (per token pair)   │ │ IdentityFactory│ │
+│  │  KYC gate: identityRegistry.isVerified(trader)   │ │ Identity (734) │ │
+│  │  Auto-matching engine + escrow settlement         │ │ ClaimIssuer    │ │
+│  └─────────────────────────────────────────────────┘ └────────────────┘ │
+│                                                                          │
+│  ┌─────────────────────┐  ┌──────────────────────┐                      │
+│  │  Custody Layer       │  │ Governance Layer     │                      │
+│  │  WalletRegistry     │  │ HKSTPGovernor        │                      │
+│  │  MultiSigWarm       │  │ HKSTPTimelock        │                      │
+│  └─────────────────────┘  └──────────────────────┘                      │
+│                                                                          │
 │  ┌─────────────────────┐  ┌──────────────────────┐                      │
 │  │  MockCashToken      │  │ SystemHealthCheck    │                      │
 │  │  (ERC-20 / THKD)    │  │ (deployment wiring)  │                      │
@@ -208,6 +216,31 @@ Off-chain matching engine  →  createSettlement()
 
 Settlement lifecycle: `Pending → Settled | Failed | Cancelled`
 
+#### `OrderBookFactory.sol`
+Factory contract that deploys and registers **one OrderBook per security-token / cash-token pair**. Each listed token on TokenHub gets its own order book for trading against the shared cash token (tokenized HKD).
+
+| Feature | Description |
+|---------|-------------|
+| `createOrderBook()` | Deploys a new `OrderBook` for a given security token, passing shared `cashToken`, `cashDecimals`, and `identityRegistry` |
+| Market registry | Stores `securityToken → OrderBook` mapping; exposes `activeMarkets()`, `allMarkets()` |
+| `identityRegistry` | Immutable reference passed to every OrderBook for KYC enforcement |
+| Lifecycle | `deactivateMarket()` / `reactivateMarket()` to pause individual markets |
+| Admin-only | `DEFAULT_ADMIN_ROLE` required to create / manage markets |
+
+#### `OrderBook.sol`
+On-chain **limit-order book** with automatic price-time priority matching for a single security-token ↔ cash-token pair.
+
+| Feature | Description |
+|---------|-------------|
+| Limit orders | Investors place buy/sell orders with price + quantity |
+| Auto-matching | New orders immediately match against best opposite-side orders |
+| Partial fills | Remaining quantity stays on the book after a partial match |
+| Escrow model | Buy orders lock cash tokens; sell orders lock security tokens into the contract |
+| KYC gate | `identityRegistry.isVerified(msg.sender)` checked on every `placeBuyOrder()` and `placeSellOrder()` — non-KYC wallets are rejected at order time |
+| Safe-listed | OrderBook contract is safe-listed on the security token so escrow→buyer transfers pass the token's `_update()` compliance hook |
+| Cancel | Traders can cancel their own open orders and reclaim escrowed funds |
+| Pausable | Admin can emergency-pause all trading activity |
+
 ### 3.2  Identity Layer (`identity/`)
 
 #### `identity/Identity.sol`
@@ -319,7 +352,9 @@ TokenHub will evolve toward tokenized deposits issued directly by banks, enablin
 
 ---
 
-## 5  Contract Interaction Diagram
+## 5  Contract Interaction Diagrams
+
+### 5.1  DvP Settlement Flow
 
 ```
 Investor (seller)                 DvPSettlement              Investor (buyer)
@@ -344,6 +379,54 @@ Investor (seller)                 DvPSettlement              Investor (buyer)
       │                                │      security token ─────►│
 ```
 
+### 5.2  OrderBook Trading Flow
+
+```
+Investor (buyer)                OrderBook (escrow)            Investor (seller)
+      │                                │                           │
+      │  1. approve(ob, cashAmt)       │   1. approve(ob, tokenAmt)│
+      │───────────────────────────►────│◄──────────────────────────│
+      │                                │                           │
+      │  2. placeBuyOrder(price, qty)  │   3. placeSellOrder(…)    │
+      │───────────────────────────►────│◄──────────────────────────│
+      │     ├─ isVerified(buyer)? ✓    │     ├─ isVerified(seller)?│
+      │     └─ lock cashToken escrow   │     └─ lock secToken      │
+      │                                │                           │
+      │         [Auto-matching engine runs inside OrderBook]       │
+      │                                │                           │
+      │     securityToken.transfer     │                           │
+      │     (orderBook → buyer)  ──────│──►  _update() compliance  │
+      │                                │     (OrderBook safe-listed│
+      │                                │      ∴ buyer isVerified)  │
+      │                                │                           │
+      │     cashToken.transfer         │                           │
+      │     (escrow → seller)  ────────│──────────────────────────►│
+      │                                │                           │
+      │  ◄── security tokens received  │     THKD received ──────►│
+```
+
+### 5.3  Three-Layer KYC Enforcement
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                       Layer 1: OrderBook                            │
+│  placeBuyOrder()  → identityRegistry.isVerified(msg.sender)       │
+│  placeSellOrder() → identityRegistry.isVerified(msg.sender)       │
+│  ⚡ Primary gate — blocks non-KYC at order time                    │
+├────────────────────────────────────────────────────────────────────┤
+│                  Layer 2: SecurityToken._update()                   │
+│  Every transfer() / transferFrom() triggers compliance hook        │
+│  OrderBook = safe-listed → skips own verification                  │
+│  Counterparty (buyer/seller) still checked via isVerified()        │
+│  Works regardless of tool (Portal, MetaMask, custom script)        │
+├────────────────────────────────────────────────────────────────────┤
+│                  Layer 3: Frontend (Trading.tsx)                    │
+│  identityRegistry.isVerified(account) checked on page load         │
+│  Red banner + disabled order form for non-KYC users                │
+│  Defense-in-depth — UX layer, not the enforcement layer            │
+└────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 6  Project Structure
@@ -354,6 +437,8 @@ contracts/
 ├── HKSTPIdentityRegistry.sol     # KYC/AML claim registry
 ├── HKSTPCompliance.sol           # Modular compliance + EIP-712 attestation
 ├── DvPSettlement.sol             # Atomic delivery-vs-payment
+├── OrderBookFactory.sol          # Deploys one OrderBook per token pair
+├── OrderBook.sol                 # On-chain limit-order book with KYC gate
 ├── OracleCommittee.sol           # Multi-oracle threshold attestation
 ├── TokenFactory.sol              # One-click token deployment per startup
 ├── TokenFactoryV2.sol            # Upgradeable proxy factory (ERC-1967)
@@ -377,9 +462,34 @@ scripts/
 ├── deploy.js                     # Full deployment script
 ├── deploy-and-update-frontend.js # Deploy + write ABI/addresses to frontend
 ├── deploy-health-check.js        # Deploy & run SystemHealthCheck
+├── deploy-orderbook-factory.js   # Deploy OrderBookFactory + initial HKSTP market
 ├── seed-investor.js              # Seed test investor identities
 ├── harden-admin.js               # Post-deploy admin hardening
 └── burn-excess.js                # Burn excess token supply
+
+frontend/
+├── src/
+│   ├── App.tsx                   # Route definitions
+│   ├── main.tsx                  # Entry point
+│   ├── components/
+│   │   └── Layout.tsx            # Navigation sidebar + admin route guard
+│   ├── config/
+│   │   └── contracts.ts          # Contract addresses + ABIs
+│   ├── context/
+│   │   └── Web3Context.tsx       # MetaMask provider + contract instances
+│   └── pages/
+│       ├── Dashboard.tsx         # Platform overview
+│       ├── Trading.tsx           # Multi-market order book trading (KYC-gated)
+│       ├── MarketManagement.tsx  # Admin: create/manage order book markets
+│       ├── Portfolio.tsx         # Token portfolio view
+│       ├── Settlement.tsx        # DvP settlement management
+│       ├── KYCManagement.tsx     # Identity & KYC claim management
+│       ├── TokenManagement.tsx   # Token lifecycle management
+│       ├── TokenMinting.tsx      # Mint/burn security tokens
+│       ├── ComplianceRules.tsx   # Compliance module configuration
+│       ├── Governance.tsx        # On-chain governance proposals
+│       └── WalletCustody.tsx     # Hot/warm/cold wallet management
+└── ...
 
 test/
 ├── HKSTPSecurityToken.test.js    # Token deployment, mint, transfer, pause, freeze
@@ -412,7 +522,7 @@ The fastest way to get a running instance with zero local setup:
    - Compiles Solidity contracts
    - Starts Hyperledger Besu in Docker
    - Starts the Engine API block producer
-   - Deploys all 13 contracts
+   - Deploys all 14+ contracts (including OrderBookFactory)
    - Seeds Investor1 (KYC + 10,000 HKSAT + 5,000,000 THKD)
    - Launches the Vite frontend on port 3000
 4. Codespaces auto-forwards port 3000 — click the URL to open the frontend
@@ -531,10 +641,11 @@ npm run deploy:besu
 6. **`TokenFactory` / `TokenFactoryV2`** — deploy multiple startup tokens
 7. **`MockCashToken`** — tokenized HKD (replace with Project Ensemble contract in production)
 8. **`DvPSettlement`** — atomic settlement engine
-9. **`WalletRegistry`** — custody tier registry + 98/2 enforcement
-10. **`MultiSigWarm`** — warm wallet multi-sig
-11. **`HKSTPGovernor` + `HKSTPTimelock`** — governance stack
-12. **`SystemHealthCheck`** — run post-deployment wiring verification
+9. **`OrderBookFactory`** — multi-market order book factory (linked to `IdentityRegistry` for KYC)
+10. **`WalletRegistry`** — custody tier registry + 98/2 enforcement
+11. **`MultiSigWarm`** — warm wallet multi-sig
+12. **`HKSTPGovernor` + `HKSTPTimelock`** — governance stack
+13. **`SystemHealthCheck`** — run post-deployment wiring verification
 
 ### Post-Deployment Steps
 
@@ -545,11 +656,13 @@ npm run deploy:besu
 5. Register oracle members on `OracleCommittee` and set threshold
 6. Register investor identities via `IdentityFactory.deployIdentity()` + `HKSTPIdentityRegistry.registerIdentity()`
 7. Set KYC claims via `HKSTPIdentityRegistry.setClaim()`
-8. Register wallet tiers in `WalletRegistry` (hot, warm, cold)
-9. Configure `MultiSigWarm` signers
-10. Grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
-11. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
-12. Run `scripts/harden-admin.js` to finalize admin role configuration
+8. Create initial order book markets via `OrderBookFactory.createOrderBook()` (one per listed token)
+9. Safe-list each deployed OrderBook on its corresponding security token (`setSafeList(orderBookAddr, true)`)
+10. Register wallet tiers in `WalletRegistry` (hot, warm, cold)
+11. Configure `MultiSigWarm` signers
+12. Grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
+13. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
+14. Run `scripts/harden-admin.js` to finalize admin role configuration
 
 ---
 
@@ -557,12 +670,19 @@ npm run deploy:besu
 
 - All transfers are gated by the Identity Registry (both parties must be KYC-verified)
 - Compliance module checks run on every non-safe-listed transfer
+- **Three-layer KYC enforcement on trading:**
+  1. **OrderBook contract** — `identityRegistry.isVerified(msg.sender)` blocks non-KYC wallets at order placement
+  2. **SecurityToken `_update()` hook** — per-party compliance checks on every token transfer (including escrow)
+  3. **Frontend KYC guard** — Trading UI checks verification status and disables order forms for non-KYC users
+- **OrderBook safe-listing** — each OrderBook is safe-listed on its security token so escrow transfers succeed, but the counterparty (buyer/seller) is still independently verified
+- **Cannot bypass via MetaMask** — all enforcement is at the smart contract layer; external tools (MetaMask, Etherscan, custom scripts) trigger the same `_update()` compliance hook
 - **OracleCommittee** requires threshold-based multi-oracle attestation — no single point of failure
 - DvP uses `ReentrancyGuard` to prevent re-entrancy attacks
-- Emergency pause available on token, DvP, and WalletRegistry contracts
+- OrderBook uses `ReentrancyGuard` to prevent re-entrancy during escrow + matching
+- Emergency pause available on token, DvP, OrderBook, and WalletRegistry contracts
 - Attestations are one-time-use (replay protection via nonce + used-hash mapping)
 - `AccessControl` used throughout — role-based, no single-owner risk
-- Follows checks-effects-interactions pattern in `executeSettlement()`
+- Follows checks-effects-interactions pattern in `executeSettlement()` and `_executeTrade()`
 - **98/2 custody ratio** enforced on-chain via `WalletRegistry` with automated sweep alerts
 - **Multi-sig warm wallet** (`MultiSigWarm`) requires 2-of-3 for rebalancing
 - Air-gapped cold storage with FIPS 140-2 Level 3+ HSMs
@@ -578,8 +698,10 @@ npm run deploy:besu
 | Investor suitability | `HKSTPIdentityRegistry` — 5 claim topics + ONCHAINID identity verification |
 | Transfer restrictions | `HKSTPCompliance` — jurisdiction, lock-up, concentration caps |
 | Multi-oracle attestation | `OracleCommittee` — threshold-based multi-sig for compliance approvals |
+| **Order book KYC gate** | `OrderBook` — `identityRegistry.isVerified()` enforced on every buy/sell order; non-KYC wallets cannot trade even via MetaMask |
+| **Multi-market trading** | `OrderBookFactory` — one order book per listed security token; admin-managed market lifecycle |
 | Settlement finality | `DvPSettlement` — atomic single-transaction, immutable audit trail |
-| Emergency intervention | `pause()` on token, DvP, and WalletRegistry (PAUSER_ROLE / DEFAULT_ADMIN_ROLE) |
+| Emergency intervention | `pause()` on token, DvP, OrderBook, and WalletRegistry (PAUSER_ROLE / DEFAULT_ADMIN_ROLE) |
 | Audit trail | Events on every state change across all contracts |
 | Custody safeguards | `WalletRegistry` (98/2 enforcement) + `MultiSigWarm` (2-of-3 warm wallet) |
 | Cold storage compliance | Air-gapped signing, FIPS 140-2 Level 3+ HSM, key ceremony quorum controls |
