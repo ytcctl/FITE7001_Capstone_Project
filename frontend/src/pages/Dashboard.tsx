@@ -5,7 +5,7 @@ import { TrendingUp, Coins, ShieldCheck, Users, AlertCircle, Activity, CheckCirc
 import { ethers } from 'ethers';
 
 const Dashboard: React.FC = () => {
-  const { account, contracts, chainId } = useWeb3();
+  const { account, contracts, chainId, roles } = useWeb3();
   const [tokenName, setTokenName] = useState('—');
   const [tokenSymbol, setTokenSymbol] = useState('—');
   const [totalSupply, setTotalSupply] = useState('0');
@@ -179,7 +179,8 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* System Health Check */}
+      {/* System Health Check — admin/agent only */}
+      {(roles.isAdmin || roles.isAgent) && (
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -253,6 +254,7 @@ const Dashboard: React.FC = () => {
           )
         )}
       </div>
+      )}
     </div>
   );
 };

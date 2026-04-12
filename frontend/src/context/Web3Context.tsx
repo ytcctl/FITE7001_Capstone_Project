@@ -177,22 +177,23 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * network switch.  Used on page-load auto-reconnect and chainChanged events
    * so the wrong-network banner stays visible until the user explicitly clicks
    * "Switch Network".
+   *
+   * @param newAccount  Optional account address from the accountsChanged event.
+   *                    When provided, forces the provider to use this address
+   *                    instead of whatever getSigner() returns (avoids stale cache).
    */
-  const reconnect = useCallback(async () => {
+  const reconnect = useCallback(async (newAccount?: string) => {
     if (!window.ethereum) return;
     try {
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = (await window.ethereum.request({
-        method: 'eth_accounts',
-      })) as string[];
+      const accounts = newAccount
+        ? [newAccount]
+        : ((await window.ethereum.request({ method: 'eth_accounts' })) as string[]);
       if (accounts.length === 0) return;
 
       const network = await browserProvider.getNetwork();
       const currentChainId = Number(network.chainId);
-      const s = await browserProvider.getSigner();
 
-      setProvider(browserProvider);
-      setSigner(s);
       setAccount(accounts[0]);
       setChainId(currentChainId);
       setError(null);
@@ -201,9 +202,16 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setWrongNetwork(true);
         setContracts(null);
         setRoles(DEFAULT_ROLES);
+        setProvider(browserProvider);
+        setSigner(null);
         return;
       }
 
+      // Get the signer for the specific account address
+      const s = await browserProvider.getSigner(accounts[0]);
+
+      setProvider(browserProvider);
+      setSigner(s);
       setWrongNetwork(false);
       const c = initContracts(s);
       detectRoles(accounts[0], c);
@@ -282,8 +290,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (accounts.length === 0) {
         disconnect();
       } else {
-        // Silent reconnect — never prompts a network switch
-        reconnect();
+        // Pass the new account directly to avoid stale provider cache
+        reconnect(accounts[0]);
       }
     };
 
