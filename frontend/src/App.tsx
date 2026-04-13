@@ -25,14 +25,9 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-/** Banner shown when MetaMask is on the wrong network */
+/** Banner shown when wallet is on the wrong network */
 const WrongNetworkBanner: React.FC = () => {
-  const { wrongNetwork, switchNetwork, chainId } = useWeb3();
-
-  // Debug — remove after confirming fix works
-  React.useEffect(() => {
-    console.log('[WrongNetworkBanner] wrongNetwork =', wrongNetwork, '| chainId =', chainId);
-  }, [wrongNetwork, chainId]);
+  const { wrongNetwork, switchNetwork, chainId, walletMode } = useWeb3();
 
   if (!wrongNetwork) return null;
   return (
@@ -42,12 +37,14 @@ const WrongNetworkBanner: React.FC = () => {
         Wrong network detected (Chain ID: {chainId ?? '?'}). Please switch to{' '}
         <strong>{NETWORK_CONFIG.chainName}</strong> (Chain ID: {NETWORK_CONFIG.chainId}).
       </span>
-      <button
-        onClick={switchNetwork}
-        className="ml-2 bg-white text-red-700 px-3 py-1 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors"
-      >
-        Switch Network
-      </button>
+      {walletMode === 'metamask' && (
+        <button
+          onClick={switchNetwork}
+          className="ml-2 bg-white text-red-700 px-3 py-1 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors"
+        >
+          Switch Network
+        </button>
+      )}
     </div>
   );
 };

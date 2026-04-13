@@ -47,9 +47,22 @@ export interface UserRoles {
   isOperator: boolean;
 }
 
+/** Connection mode: MetaMask (browser extension) or built-in (private key via RPC) */
+export type WalletMode = 'metamask' | 'builtin';
+
+/** Pre-configured test accounts for the Besu devnet */
+export const TEST_ACCOUNTS = [
+  { label: 'Admin / Deployer', address: '0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73', key: '0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63' },
+  { label: 'Operator',         address: '0x627306090abaB3A6e1400e9345bC60c78a8BEf57', key: '0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f' },
+  { label: 'Agent / Custodian', address: '0xf17f52151EbEF6C7334FAD080c5704D77216b732', key: '0xc88b703fb08cbea894b6aeff5a544fb92e78a18e19814cd85da83b71f772aa6c' },
+  { label: 'Seller',           address: '0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef', key: '0x388c684f0ba1ef5017716adb5d21a053ea8e90277d0868337519f97bede61418' },
+  { label: 'Buyer',            address: '0x821aEa9a577a9b44299B9c15c88cf3087F3b5544', key: '0x659cbb0e2411a44db63778987b1e22153c086a95eb6b18bdf89de078917abc63' },
+  { label: 'Investor1',        address: '0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3', key: '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a' },
+] as const;
+
 interface Web3State {
-  provider: ethers.BrowserProvider | null;
-  signer: ethers.JsonRpcSigner | null;
+  provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null;
+  signer: ethers.JsonRpcSigner | ethers.Wallet | null;
   account: string | null;
   chainId: number | null;
   contracts: Contracts | null;
@@ -58,8 +71,10 @@ interface Web3State {
   isConnecting: boolean;
   error: string | null;
   wrongNetwork: boolean;
+  walletMode: WalletMode | null;
   switchNetwork: () => Promise<void>;
   connect: () => Promise<void>;
+  connectWithKey: (privateKey: string) => Promise<void>;
   disconnect: () => void;
 }
 
@@ -76,8 +91,10 @@ const Web3Context = createContext<Web3State>({
   isConnecting: false,
   error: null,
   wrongNetwork: false,
+  walletMode: null,
   switchNetwork: async () => {},
   connect: async () => {},
+  connectWithKey: async () => {},
   disconnect: () => {},
 });
 
@@ -85,8 +102,8 @@ const Web3Context = createContext<Web3State>({
 // Provider
 // -----------------------------------------------------------------
 export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
-  const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
+  const [provider, setProvider] = useState<ethers.BrowserProvider | ethers.JsonRpcProvider | null>(null);
+  const [signer, setSigner] = useState<ethers.JsonRpcSigner | ethers.Wallet | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [contracts, setContracts] = useState<Contracts | null>(null);
@@ -95,6 +112,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wrongNetwork, setWrongNetwork] = useState(false);
+  const [walletMode, setWalletMode] = useState<WalletMode | null>(null);
 
   /** Detect on-chain roles for the given account */
   const detectRoles = useCallback(async (addr: string, c: Contracts) => {
@@ -124,7 +142,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   /** Build ethers contract instances bound to the signer */
-  const initContracts = useCallback((s: ethers.JsonRpcSigner) => {
+  const initContracts = useCallback((s: ethers.JsonRpcSigner | ethers.Wallet) => {
     const c: Contracts = {
       identityRegistry: new ethers.Contract(CONTRACT_ADDRESSES.identityRegistry, IDENTITY_REGISTRY_ABI, s),
       compliance: new ethers.Contract(CONTRACT_ADDRESSES.compliance, COMPLIANCE_ABI, s),
@@ -267,6 +285,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAccount(accounts[0]);
       setChainId(currentChainId);
       setWrongNetwork(false);
+      setWalletMode('metamask');
       const c = initContracts(s);
       detectRoles(accounts[0], c);
     } catch (e: unknown) {
@@ -277,6 +296,37 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [ensureNetwork, initContracts, detectRoles]);
 
+  /** Connect using a private key directly via JSON-RPC (no browser extension needed) */
+  const connectWithKey = useCallback(async (privateKey: string) => {
+    setIsConnecting(true);
+    setError(null);
+    try {
+      const rpcProvider = new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl);
+      const network = await rpcProvider.getNetwork();
+      const currentChainId = Number(network.chainId);
+
+      const wallet = new ethers.Wallet(privateKey, rpcProvider);
+      const addr = wallet.address;
+
+      setProvider(rpcProvider);
+      setSigner(wallet);
+      setAccount(addr);
+      setChainId(currentChainId);
+      setWalletMode('builtin');
+      setWrongNetwork(currentChainId !== NETWORK_CONFIG.chainId);
+
+      if (currentChainId === NETWORK_CONFIG.chainId) {
+        const c = initContracts(wallet);
+        detectRoles(addr, c);
+      }
+    } catch (e: unknown) {
+      const err = e as Error;
+      setError(err.message || 'Failed to connect with private key');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [initContracts, detectRoles]);
+
   /** Disconnect wallet */
   const disconnect = useCallback(() => {
     setProvider(null);
@@ -285,6 +335,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setChainId(null);
     setContracts(null);
     setRoles(DEFAULT_ROLES);
+    setWalletMode(null);
   }, []);
 
   /** Listen for MetaMask account / chain changes */
@@ -345,7 +396,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <Web3Context.Provider
-      value={{ provider, signer, account, chainId, contracts, roles, rolesLoading, isConnecting, error, wrongNetwork, switchNetwork, connect, disconnect }}
+      value={{ provider, signer, account, chainId, contracts, roles, rolesLoading, isConnecting, error, wrongNetwork, walletMode, switchNetwork, connect, connectWithKey, disconnect }}
     >
       {children}
     </Web3Context.Provider>

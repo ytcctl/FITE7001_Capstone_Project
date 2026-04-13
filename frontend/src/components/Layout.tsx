@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -17,8 +17,10 @@ import {
   Vault,
   BarChart3,
   Store,
+  Key,
+  ChevronDown,
 } from 'lucide-react';
-import { useWeb3 } from '../context/Web3Context';
+import { useWeb3, TEST_ACCOUNTS } from '../context/Web3Context';
 
 interface NavItem {
   to: string;
@@ -42,11 +44,34 @@ const navItems: NavItem[] = [
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { account, chainId, roles, rolesLoading, isConnecting, wrongNetwork, connect, disconnect } = useWeb3();
+  const { account, chainId, roles, rolesLoading, isConnecting, wrongNetwork, walletMode, connect, connectWithKey, disconnect } = useWeb3();
   const location = useLocation();
+  const [showWalletMenu, setShowWalletMenu] = useState(false);
+  const [showCustomKey, setShowCustomKey] = useState(false);
+  const [customKey, setCustomKey] = useState('');
+  const [keyError, setKeyError] = useState('');
 
   const isAdminOrAgent = roles.isAdmin || roles.isAgent;
   const shortAddr = account ? `${account.slice(0, 6)}…${account.slice(-4)}` : '';
+
+  const handleTestAccount = async (key: string) => {
+    setShowWalletMenu(false);
+    setShowCustomKey(false);
+    await connectWithKey(key);
+  };
+
+  const handleCustomKey = async () => {
+    const trimmed = customKey.trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(trimmed)) {
+      setKeyError('Invalid private key format (expected 0x + 64 hex chars)');
+      return;
+    }
+    setKeyError('');
+    setShowWalletMenu(false);
+    setShowCustomKey(false);
+    setCustomKey('');
+    await connectWithKey(trimmed);
+  };
 
   // Push everything down when the wrong-network banner is visible
   const bannerOffset = wrongNetwork ? 'pt-12' : '';
@@ -99,7 +124,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="p-4 border-t border-white/10 space-y-2">
           {account && (
             <div className="px-4 py-2 text-xs text-gray-400 truncate">
-              <span className="block text-gray-500 mb-0.5">Connected</span>
+              <span className="block text-gray-500 mb-0.5">
+                Connected{walletMode === 'builtin' ? ' (Built-in)' : walletMode === 'metamask' ? ' (MetaMask)' : ''}
+              </span>
               {shortAddr} · Chain {chainId}
               <span className={`ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                 isAdminOrAgent
@@ -119,14 +146,80 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               Disconnect
             </button>
           ) : (
-            <button
-              onClick={connect}
-              disabled={isConnecting}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/10 rounded-xl transition-colors"
-            >
-              <Wallet size={20} />
-              {isConnecting ? 'Connecting…' : 'Connect Wallet'}
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowWalletMenu(!showWalletMenu)}
+                disabled={isConnecting}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/10 rounded-xl transition-colors"
+              >
+                <Wallet size={20} />
+                {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+                <ChevronDown size={14} className={`ml-auto transition-transform ${showWalletMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showWalletMenu && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100]">
+                  {/* MetaMask option */}
+                  {typeof window !== 'undefined' && !!(window as unknown as { ethereum?: unknown }).ethereum && (
+                    <button
+                      onClick={() => { setShowWalletMenu(false); connect(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 transition-colors border-b border-white/5"
+                    >
+                      <Wallet size={16} className="text-orange-400" />
+                      MetaMask
+                    </button>
+                  )}
+
+                  {/* Test accounts */}
+                  <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                    Built-in Test Accounts
+                  </div>
+                  {TEST_ACCOUNTS.map((ta) => (
+                    <button
+                      key={ta.address}
+                      onClick={() => handleTestAccount(ta.key)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                    >
+                      <Key size={14} className="text-green-400 shrink-0" />
+                      <div className="text-left min-w-0">
+                        <div className="truncate">{ta.label}</div>
+                        <div className="text-[10px] text-gray-500 truncate">{ta.address}</div>
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Custom key */}
+                  <div className="border-t border-white/5">
+                    <button
+                      onClick={() => setShowCustomKey(!showCustomKey)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 hover:bg-white/5 transition-colors"
+                    >
+                      <Key size={14} className="text-purple-400" />
+                      Custom Private Key
+                      <ChevronDown size={12} className={`ml-auto transition-transform ${showCustomKey ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showCustomKey && (
+                      <div className="px-4 pb-3 space-y-2">
+                        <input
+                          type="password"
+                          value={customKey}
+                          onChange={(e) => { setCustomKey(e.target.value); setKeyError(''); }}
+                          placeholder="0x..."
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                        />
+                        {keyError && <p className="text-[10px] text-red-400">{keyError}</p>}
+                        <button
+                          onClick={handleCustomKey}
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-lg transition-colors font-medium"
+                        >
+                          Connect
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </aside>
