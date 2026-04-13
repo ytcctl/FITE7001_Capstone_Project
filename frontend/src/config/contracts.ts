@@ -5,11 +5,28 @@
 // Update the values below to match your Besu deployment.
 // -----------------------------------------------------------------
 
+/** Derive the Besu RPC URL at runtime.
+ *  - Local dev:   http://127.0.0.1:8545
+ *  - Codespaces:  replace the port in the forwarded hostname
+ *    e.g. https://…-3000.app.github.dev → https://…-8545.app.github.dev  */
+function getBesuRpcUrl(): string {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:8545';
+  const { hostname, protocol } = window.location;
+  // GitHub Codespaces forwarded URLs contain ".app.github.dev"
+  if (hostname.endsWith('.app.github.dev')) {
+    // hostname looks like: musical-space-zebra-v9jv65v9442pjr4-3000.app.github.dev
+    // Replace the port segment (last number before .app.github.dev)
+    const replaced = hostname.replace(/-\d+\.app\.github\.dev$/, '-8545.app.github.dev');
+    return `${protocol}//${replaced}`;
+  }
+  return 'http://127.0.0.1:8545';
+}
+
 /** Network configuration for the Besu devnet */
 export const NETWORK_CONFIG = {
   chainId: 7001,
   chainName: 'Besu Devnet',
-  rpcUrl: 'http://127.0.0.1:8545',
+  rpcUrl: getBesuRpcUrl(),
   blockExplorer: '',
 };
 
