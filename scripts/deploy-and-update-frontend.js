@@ -1,12 +1,14 @@
 /**
  * @title deploy-and-update-frontend.js
- * @notice Deploys all contracts to Besu, then auto-updates
+ * @notice Deploys all contracts (Hardhat Network or Besu), then auto-updates
  *         frontend/src/config/contracts.ts with the real addresses.
  *
- * Includes an embedded block producer so the script is self-contained —
- * no need to run a separate block-producer.js process.
+ * Works with both:
+ *   - Hardhat Network (auto-mine, no block producer needed)
+ *   - Besu + Engine API (embedded block producer starts automatically)
  *
  * Usage:
+ *   npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
  *   npx hardhat run scripts/deploy-and-update-frontend.js --network besu
  */
 
@@ -15,7 +17,7 @@ const fs = require("fs");
 const path = require("path");
 
 // ---------------------------------------------------------------------------
-// Embedded Engine-API block producer (runs in background during deployment)
+// Embedded Engine-API block producer (only used with Besu)
 // ---------------------------------------------------------------------------
 const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8551";
 const ETH_URL = process.env.ETH_URL || "http://127.0.0.1:8545";
@@ -103,13 +105,44 @@ function startBlockProducer() {
   return { stop: () => { running = false; return promise; } };
 }
 
+/** Detect whether Besu Engine API is available */
+async function hasEngineAPI() {
+  try {
+    const res = await fetch(ENGINE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", method: "engine_exchangeCapabilities",
+        params: [["engine_forkchoiceUpdatedV3"]], id: 1,
+      }),
+      signal: AbortSignal.timeout(2000),
+    });
+    const json = await res.json();
+    return !json.error;
+  } catch {
+    return false;
+  }
+}
+
+// No-op block producer for Hardhat Network (auto-mines)
+function noopBlockProducer() {
+  return { stop: async () => {} };
+}
+
 // ---------------------------------------------------------------------------
 // Deploy
 // ---------------------------------------------------------------------------
 async function main() {
-  // Start embedded block producer so transactions get mined
-  console.log("Starting embedded block producer...\n");
-  const blockProducer = startBlockProducer();
+  // Start embedded block producer only if Besu Engine API is available
+  const useEngine = await hasEngineAPI();
+  let blockProducer;
+  if (useEngine) {
+    console.log("Mode: Besu + Engine API (block producer started)\n");
+    blockProducer = startBlockProducer();
+  } else {
+    console.log("Mode: Hardhat Network (auto-mine)\n");
+    blockProducer = noopBlockProducer();
+  }
 
   const signers = await ethers.getSigners();
   const deployer  = signers[0];

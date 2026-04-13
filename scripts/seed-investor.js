@@ -3,8 +3,10 @@
  * @notice Registers Investor1, issues KYC claims, and mints tokens
  *         on the CURRENT deployment. Run after deploy-and-update-frontend.js.
  *
+ * Works with both Hardhat Network (auto-mine) and Besu (Engine API).
+ *
  * Usage:
- *   npx hardhat run scripts/seed-investor.js --network besu
+ *   npx hardhat run scripts/seed-investor.js --network localhost
  */
 
 const { ethers } = require("hardhat");
@@ -89,11 +91,37 @@ function startBlockProducer() {
 }
 
 // ---------------------------------------------------------------------------
+// Detect whether Engine API is available (Besu) or not (Hardhat)
+// ---------------------------------------------------------------------------
+async function hasEngineAPI() {
+  try {
+    const res = await fetch(ENGINE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "engine_exchangeCapabilities", params: [[]], id: 1 }),
+    });
+    const json = await res.json();
+    return !json.error;
+  } catch {
+    return false;
+  }
+}
+
+function noopBlockProducer() {
+  return { stop: async () => {} };
+}
+
+// ---------------------------------------------------------------------------
 // Seed
 // ---------------------------------------------------------------------------
 async function main() {
-  console.log("Starting embedded block producer...\n");
-  const blockProducer = startBlockProducer();
+  const useEngine = await hasEngineAPI();
+  if (useEngine) {
+    console.log("Starting embedded block producer (Besu detected)...\n");
+  } else {
+    console.log("Hardhat auto-mine detected — block producer skipped.\n");
+  }
+  const blockProducer = useEngine ? startBlockProducer() : noopBlockProducer();
 
   const [deployer] = await ethers.getSigners();
 

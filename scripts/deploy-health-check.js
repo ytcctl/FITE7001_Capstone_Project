@@ -1,12 +1,12 @@
 /**
  * @title deploy-health-check.js
- * @notice Deploy SystemHealthCheck to Besu.
+ * @notice Deploy SystemHealthCheck.
  *
- * Includes an embedded Engine-API block producer so the deployment
- * is self-contained (Besu PoS does not auto-mine blocks).
+ * Works with both Hardhat Network (auto-mine) and Besu (Engine API).
+ * On Hardhat, the block producer is a no-op.
  *
  * Usage:
- *   npx hardhat run scripts/deploy-health-check.js --network besu
+ *   npx hardhat run scripts/deploy-health-check.js --network localhost
  */
 const { ethers } = require("hardhat");
 
@@ -95,13 +95,36 @@ function startBlockProducer() {
 }
 
 // ---------------------------------------------------------------------------
+// Detect whether Engine API is available (Besu) or not (Hardhat)
+// ---------------------------------------------------------------------------
+async function hasEngineAPI() {
+  try {
+    const res = await fetch(ENGINE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "engine_exchangeCapabilities", params: [[]], id: 1 }),
+    });
+    const json = await res.json();
+    return !json.error;
+  } catch {
+    return false;
+  }
+}
+
+function noopBlockProducer() {
+  return { stop: async () => {} };
+}
+
+// ---------------------------------------------------------------------------
 // Deploy
 // ---------------------------------------------------------------------------
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying SystemHealthCheck with account:", deployer.address);
 
-  const blockProducer = startBlockProducer();
+  const useEngine = await hasEngineAPI();
+  const blockProducer = useEngine ? startBlockProducer() : noopBlockProducer();
+  if (!useEngine) console.log("  (Hardhat auto-mine detected — block producer skipped)");
 
   try {
     const Factory = await ethers.getContractFactory("SystemHealthCheck");
