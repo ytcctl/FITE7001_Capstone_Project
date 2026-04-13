@@ -53,11 +53,10 @@ export type WalletMode = 'metamask' | 'builtin';
 /** Pre-configured test accounts for the Besu devnet */
 export const TEST_ACCOUNTS = [
   { label: 'Admin / Deployer', address: '0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73', key: '0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63' },
-  { label: 'Operator',         address: '0x627306090abaB3A6e1400e9345bC60c78a8BEf57', key: '0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f' },
-  { label: 'Agent / Custodian', address: '0xf17f52151EbEF6C7334FAD080c5704D77216b732', key: '0xc88b703fb08cbea894b6aeff5a544fb92e78a18e19814cd85da83b71f772aa6c' },
-  { label: 'Seller',           address: '0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef', key: '0x388c684f0ba1ef5017716adb5d21a053ea8e90277d0868337519f97bede61418' },
-  { label: 'Buyer',            address: '0x821aEa9a577a9b44299B9c15c88cf3087F3b5544', key: '0x659cbb0e2411a44db63778987b1e22153c086a95eb6b18bdf89de078917abc63' },
-  { label: 'Investor1',        address: '0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3', key: '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a' },
+  { label: 'Operator',         address: '0x627306090abaB3A6e1400e9345bC60c78a8BEf57', key: '0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3' },
+  { label: 'Agent / Custodian', address: '0xf17f52151EbEF6C7334FAD080c5704D77216b732', key: '0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f' },
+  { label: 'Seller',           address: '0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef', key: '0x0dbbe8e4ae425a6d2687f1a7e3ba17bc98c673636790f1b8ad91193c05875ef1' },
+  { label: 'Buyer',            address: '0x821aEa9a577a9b44299B9c15c88cf3087F3b5544', key: '0xc88b703fb08cbea894b6aeff5a544fb92e78a18e19814cd85da83b71f772aa6c' },
 ] as const;
 
 // -----------------------------------------------------------------
@@ -170,10 +169,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
         c.dvpSettlement.hasRole(operatorRole, addr) as Promise<boolean>,
       ]);
 
-      console.log('[Web3] Roles detected for', addr, { isAdmin, isAgent, isOperator });
       setRoles({ isAdmin, isAgent, isOperator });
-    } catch (err) {
-      console.error('[Web3] Role detection failed:', err);
+    } catch {
       // If role detection fails (e.g. wrong network), default to no roles
       setRoles(DEFAULT_ROLES);
     } finally {
@@ -186,7 +183,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
    *  placeholder so that the rest of the app (especially role detection)
    *  is not blocked. */
   const initContracts = useCallback((s: ethers.JsonRpcSigner | ethers.Wallet) => {
-    const addr = (key: string) => CONTRACT_ADDRESSES[key] || ethers.ZeroAddress;
+    const addr = (key: string) => (CONTRACT_ADDRESSES as Record<string, string>)[key] || ethers.ZeroAddress;
     const c: Contracts = {
       identityRegistry: new ethers.Contract(addr('identityRegistry'), IDENTITY_REGISTRY_ABI, s),
       compliance: new ethers.Contract(addr('compliance'), COMPLIANCE_ABI, s),
@@ -289,7 +286,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [initContracts, detectRoles]);
 
   /** Connect wallet — interactive, called by the "Connect Wallet" button.
-   *  This is the ONLY path that calls ensureNetwork(). */
+   *  Uses wallet_requestPermissions to ALWAYS show the MetaMask account picker,
+   *  even if the site has been previously authorized. */
   const connect = useCallback(async () => {
     if (!window.ethereum) {
       setError('MetaMask not detected. Please install MetaMask.');
@@ -298,11 +296,23 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsConnecting(true);
     setError(null);
     try {
-      // Prompt wallet connection first (so MetaMask unlocks)
+      // Force MetaMask to show the account-selection popup every time
+      await window.ethereum.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      });
+
+      // Now read the selected account(s)
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const accounts = (await window.ethereum.request({
-        method: 'eth_requestAccounts',
+        method: 'eth_accounts',
       })) as string[];
+
+      if (accounts.length === 0) {
+        setError('No account selected');
+        return;
+      }
+
       const network = await browserProvider.getNetwork();
       const currentChainId = Number(network.chainId);
 

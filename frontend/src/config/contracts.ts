@@ -17,11 +17,11 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0xD218078f319c4569Cb1BEfA40a728F15Cef0313E',
-  compliance: '0x5bC13f7Eeae521CDD95Cd000B92E586541cF68CE',
-  securityToken: '0x594e68f223a390500467346151C9C7E6f9C1faeA',
-  cashToken: '0x5319CEBc7d941947Cb89294d0f48e759Ee1F9070',
-  dvpSettlement: '0x7Bc9320F8798f3AD82168dDD7493BF5f2c0D9FD5',
+  identityRegistry: '0x58007B36aFFd661F8D3DC265D409C80f557Eb5e7',
+  compliance: '0x2C88a29ACbcD2472d1E1698FF8c07b3085B464e2',
+  securityToken: '0x046Bfa92B000F015ced65882Bad62Db43993b29B',
+  cashToken: '0x96338A290AA80e9A492254de78cEFbeb57B0Dc54',
+  dvpSettlement: '0xAA881df1D0b4Ab28757059e244d81Ec305a19771',
   tokenFactory: '0x0F095aeA9540468B19829d02cC811Ebe5173D615',
   claimIssuer: '0x51D4903ef5F871273e5B4172898B18809CFd7881',
   identityFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',

@@ -28,15 +28,25 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const deployer  = signers[0];
+  const operator  = signers.length > 1 ? signers[1] : deployer;
+  const agent     = signers.length > 2 ? signers[2] : deployer;  // agent / custodian
+  const seller    = signers.length > 3 ? signers[3] : deployer;
+  const buyer     = signers.length > 4 ? signers[4] : deployer;
+
   console.log("Deploying with account:", deployer.address);
+  console.log("Operator :", operator.address);
+  console.log("Agent    :", agent.address);
+  console.log("Seller   :", seller.address);
+  console.log("Buyer    :", buyer.address);
   console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
 
   // Configuration — fall back to deployer address for testing
   const complianceOracle = process.env.COMPLIANCE_ORACLE || deployer.address;
   const treasuryAddress  = process.env.TREASURY_ADDRESS  || deployer.address;
   const escrowAddress    = process.env.ESCROW_ADDRESS    || deployer.address;
-  const custodianAddress = process.env.CUSTODIAN_ADDRESS || deployer.address;
+  const custodianAddress = agent.address;
 
   // -------------------------------------------------------------------------
   // 1. Deploy HKSTPIdentityRegistry
@@ -113,17 +123,18 @@ async function main() {
   await (await compliance.grantRole(TOKEN_ROLE, tokenAddress)).wait();
   console.log("     TOKEN_ROLE granted to HKSTPSecurityToken on HKSTPCompliance");
 
-  // Grant OPERATOR_ROLE on DvP to the matching engine (using deployer as placeholder)
+  // Grant OPERATOR_ROLE on DvP to the operator account
   const OPERATOR_ROLE = await dvp.OPERATOR_ROLE();
-  await (await dvp.grantRole(OPERATOR_ROLE, deployer.address)).wait();
-  console.log("     OPERATOR_ROLE granted to deployer on DvPSettlement (replace with matching engine)");
+  await (await dvp.grantRole(OPERATOR_ROLE, operator.address)).wait();
+  console.log("     OPERATOR_ROLE granted to operator on DvPSettlement:", operator.address);
 
-  // Grant AGENT_ROLE on token to custodian
-  const AGENT_ROLE = await token.AGENT_ROLE();
-  if (custodianAddress !== deployer.address) {
-    await (await token.grantRole(AGENT_ROLE, custodianAddress)).wait();
-    console.log("     AGENT_ROLE granted to custodian:", custodianAddress);
-  }
+  // Grant AGENT_ROLE on BOTH IdentityRegistry and SecurityToken to the agent/custodian
+  const AGENT_ROLE_TOKEN    = await token.AGENT_ROLE();
+  const AGENT_ROLE_REGISTRY = await registry.AGENT_ROLE();
+  await (await token.grantRole(AGENT_ROLE_TOKEN, agent.address)).wait();
+  console.log("     AGENT_ROLE granted to agent on HKSTPSecurityToken:", agent.address);
+  await (await registry.grantRole(AGENT_ROLE_REGISTRY, agent.address)).wait();
+  console.log("     AGENT_ROLE granted to agent on HKSTPIdentityRegistry:", agent.address);
 
   // Safe-list operational addresses (treasury, escrow, custodian)
   const operationalAddresses = [
