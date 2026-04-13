@@ -60,6 +60,44 @@ export const TEST_ACCOUNTS = [
   { label: 'Investor1',        address: '0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3', key: '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a' },
 ] as const;
 
+// -----------------------------------------------------------------
+// Saved accounts (localStorage)
+// -----------------------------------------------------------------
+export interface SavedAccount {
+  label: string;
+  address: string;
+  key: string;
+}
+
+const SAVED_ACCOUNTS_KEY = 'tokenhub_saved_accounts';
+
+export function getSavedAccounts(): SavedAccount[] {
+  try {
+    const raw = localStorage.getItem(SAVED_ACCOUNTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveAccount(account: SavedAccount): void {
+  const existing = getSavedAccounts();
+  // Deduplicate by address (case-insensitive)
+  const filtered = existing.filter(
+    (a) => a.address.toLowerCase() !== account.address.toLowerCase(),
+  );
+  filtered.push(account);
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
+}
+
+export function removeSavedAccount(address: string): void {
+  const existing = getSavedAccounts();
+  const filtered = existing.filter(
+    (a) => a.address.toLowerCase() !== address.toLowerCase(),
+  );
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
+}
+
 interface Web3State {
   provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null;
   signer: ethers.JsonRpcSigner | ethers.Wallet | null;
@@ -74,7 +112,7 @@ interface Web3State {
   walletMode: WalletMode | null;
   switchNetwork: () => Promise<void>;
   connect: () => Promise<void>;
-  connectWithKey: (privateKey: string) => Promise<void>;
+  connectWithKey: (privateKey: string, label?: string) => Promise<void>;
   disconnect: () => void;
 }
 
@@ -94,7 +132,7 @@ const Web3Context = createContext<Web3State>({
   walletMode: null,
   switchNetwork: async () => {},
   connect: async () => {},
-  connectWithKey: async () => {},
+  connectWithKey: async (_key: string, _label?: string) => {},
   disconnect: () => {},
 });
 
@@ -299,7 +337,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [ensureNetwork, initContracts, detectRoles]);
 
   /** Connect using a private key directly via JSON-RPC (no browser extension needed) */
-  const connectWithKey = useCallback(async (privateKey: string) => {
+  const connectWithKey = useCallback(async (privateKey: string, label?: string) => {
     setIsConnecting(true);
     setError(null);
     try {
@@ -311,6 +349,14 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const wallet = new ethers.Wallet(privateKey, rpcProvider);
       const addr = wallet.address;
+
+      // Save to localStorage if a label is provided and not a built-in test account
+      if (label) {
+        const isBuiltIn = TEST_ACCOUNTS.some((ta) => ta.address.toLowerCase() === addr.toLowerCase());
+        if (!isBuiltIn) {
+          saveAccount({ label, address: addr, key: privateKey });
+        }
+      }
 
       setProvider(rpcProvider);
       setSigner(wallet);

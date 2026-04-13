@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -19,8 +19,11 @@ import {
   Store,
   Key,
   ChevronDown,
+  X,
+  UserPlus,
 } from 'lucide-react';
-import { useWeb3, TEST_ACCOUNTS } from '../context/Web3Context';
+import { useWeb3, TEST_ACCOUNTS, getSavedAccounts, removeSavedAccount } from '../context/Web3Context';
+import type { SavedAccount } from '../context/Web3Context';
 
 interface NavItem {
   to: string;
@@ -49,7 +52,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [showWalletMenu, setShowWalletMenu] = useState(false);
   const [showCustomKey, setShowCustomKey] = useState(false);
   const [customKey, setCustomKey] = useState('');
+  const [customLabel, setCustomLabel] = useState('');
   const [keyError, setKeyError] = useState('');
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+
+  // Load saved accounts from localStorage when menu opens
+  useEffect(() => {
+    if (showWalletMenu) setSavedAccounts(getSavedAccounts());
+  }, [showWalletMenu]);
 
   const isAdminOrAgent = roles.isAdmin || roles.isAgent;
   const shortAddr = account ? `${account.slice(0, 6)}…${account.slice(-4)}` : '';
@@ -60,17 +70,31 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     await connectWithKey(key);
   };
 
+  const handleSavedAccount = async (sa: SavedAccount) => {
+    setShowWalletMenu(false);
+    setShowCustomKey(false);
+    await connectWithKey(sa.key);
+  };
+
+  const handleRemoveSaved = (e: React.MouseEvent, address: string) => {
+    e.stopPropagation();
+    removeSavedAccount(address);
+    setSavedAccounts(getSavedAccounts());
+  };
+
   const handleCustomKey = async () => {
     const trimmed = customKey.trim();
     if (!/^0x[0-9a-fA-F]{64}$/.test(trimmed)) {
       setKeyError('Invalid private key format (expected 0x + 64 hex chars)');
       return;
     }
+    const label = customLabel.trim() || `Account ${savedAccounts.length + 1}`;
     setKeyError('');
     setShowWalletMenu(false);
     setShowCustomKey(false);
     setCustomKey('');
-    await connectWithKey(trimmed);
+    setCustomLabel('');
+    await connectWithKey(trimmed, label);
   };
 
   // Push everything down when the wrong-network banner is visible
@@ -188,6 +212,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </button>
                   ))}
 
+                  {/* Saved accounts */}
+                  {savedAccounts.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-t border-white/5">
+                        Saved Accounts
+                      </div>
+                      {savedAccounts.map((sa) => (
+                        <button
+                          key={sa.address}
+                          onClick={() => handleSavedAccount(sa)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 transition-colors group"
+                        >
+                          <UserPlus size={14} className="text-cyan-400 shrink-0" />
+                          <div className="text-left min-w-0 flex-1">
+                            <div className="truncate">{sa.label}</div>
+                            <div className="text-[10px] text-gray-500 truncate">{sa.address}</div>
+                          </div>
+                          <span
+                            role="button"
+                            onClick={(e) => handleRemoveSaved(e, sa.address)}
+                            className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all p-1"
+                            title="Remove saved account"
+                          >
+                            <X size={12} />
+                          </span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
                   {/* Custom key */}
                   <div className="border-t border-white/5">
                     <button
@@ -201,6 +255,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     {showCustomKey && (
                       <div className="px-4 pb-3 space-y-2">
                         <input
+                          type="text"
+                          value={customLabel}
+                          onChange={(e) => setCustomLabel(e.target.value)}
+                          placeholder="Label (e.g. Investor2)"
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                        />
+                        <input
                           type="password"
                           value={customKey}
                           onChange={(e) => { setCustomKey(e.target.value); setKeyError(''); }}
@@ -212,7 +273,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           onClick={handleCustomKey}
                           className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-lg transition-colors font-medium"
                         >
-                          Connect
+                          Connect & Save
                         </button>
                       </div>
                     )}
