@@ -618,19 +618,61 @@ npm run deploy:local
 
 ### Hyperledger Besu Network
 
+#### Prerequisites
+
+| Requirement | Version |
+|---|---|
+| Node.js | ≥ 18 |
+| Docker | Running (for the Besu container) |
+| `.env.besu` | See below |
+
+Create a `.env.besu` file in the project root (git-ignored):
+
+```env
+BESU_RPC_URL=http://127.0.0.1:8545
+BESU_CHAIN_ID=7001
+BESU_PRIVATE_KEYS=<deployer>,<operator>,<agent>,<seller>,<buyer>
+COMPLIANCE_ORACLE=<oracle-address>
+TREASURY_ADDRESS=<treasury-address>
+ESCROW_ADDRESS=<escrow-address>
+CUSTODIAN_ADDRESS=<custodian-address>
+```
+
+#### One-Command Deploy (Recommended)
+
+The unified launcher spawns the Engine-API block producer as a child process, deploys all 5 core contracts, configures roles, then cleans up automatically:
+
 ```bash
-# Start Besu node
+# 1. Start the Besu container (if not already running)
 npm run besu:start
+# or: .\besu\start-besu.ps1 -Detach
 
-# Deploy contracts
-export BESU_RPC_URL="http://<besu-node>:8545"
-export BESU_PRIVATE_KEYS="<deployer-private-key>"
-export COMPLIANCE_ORACLE="<oracle-address>"
-export TREASURY_ADDRESS="<treasury-address>"
-export ESCROW_ADDRESS="<escrow-address>"
-export CUSTODIAN_ADDRESS="<custodian-address>"
+# 2. Compile contracts
+npm run compile
 
+# 3. Deploy everything in one go
 npm run deploy:besu
+```
+
+`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
+1. Checks Besu RPC is reachable
+2. Spawns `besu/block-producer.js` as a child process (Engine API V3 block forger)
+3. Waits for block production to start
+4. Runs `npx hardhat run scripts/deploy.js --network besu`
+5. Stops the block producer and exits
+
+> **Why a unified script?** The post-merge Besu devnet has no real beacon chain — blocks must be actively produced via the Engine API. Running the block producer and deploy in separate terminals is fragile on Windows. The launcher coordinates both in a single process.
+
+#### Manual Deploy (Advanced)
+
+If you prefer to run the block producer separately:
+
+```bash
+# Terminal 1 — start the block producer
+node besu/block-producer.js --interval 1000
+
+# Terminal 2 — deploy contracts
+npx hardhat run scripts/deploy.js --network besu
 ```
 
 ### Deployment Order
@@ -670,7 +712,81 @@ npm run deploy:besu
 
 ---
 
-## 10  Security Considerations
+## 10  Frontend Deployment
+
+The Investor Portal is a **React 18 + Vite + Tailwind CSS** single-page application located in `frontend/`.
+
+### Prerequisites
+
+| Requirement | Version |
+|---|---|
+| Node.js | ≥ 18 |
+| Besu container | Running (`npm run besu:start`) |
+| Contracts deployed | Via `npm run deploy:besu` (see §9) |
+| MetaMask | Configured for Chain ID **7001** |
+
+### Step 1 — Update Contract Addresses
+
+After each fresh Besu deployment, update `frontend/src/config/contracts.ts` with the new addresses printed in the deployment summary:
+
+```typescript
+// frontend/src/config/contracts.ts
+export const CONTRACT_ADDRESSES = {
+  identityRegistry: '0x...', // from deploy output
+  compliance:       '0x...',
+  securityToken:    '0x...',
+  cashToken:        '0x...',
+  dvpSettlement:    '0x...',
+  // ... other contracts
+};
+```
+
+### Step 2 — Install Dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### Step 3 — Start Dev Server
+
+```bash
+npm run dev
+# → opens http://localhost:3000
+```
+
+### Step 4 — Connect MetaMask
+
+1. Add a **Custom Network** in MetaMask:
+   - **Network Name:** Besu Devnet
+   - **RPC URL:** `http://127.0.0.1:8545`
+   - **Chain ID:** `7001`
+   - **Currency Symbol:** ETH
+2. **Import** a dev account private key from `.env.besu` (e.g. the deployer key)
+3. Connect to the dApp when prompted
+
+### Step 5 — Production Build (Optional)
+
+```bash
+cd frontend
+npm run build     # outputs to frontend/dist/
+npm run preview   # preview production build locally
+```
+
+The `dist/` folder can be served by any static hosting provider (Nginx, Vercel, Netlify, GitHub Pages, etc.).
+
+### Frontend Port Reference
+
+| Port | Service |
+|------|---------|
+| 3000 | Frontend (Vite dev server) |
+| 8545 | Besu JSON-RPC |
+| 8546 | Besu WebSocket |
+| 8551 | Besu Engine API (block producer) |
+
+---
+
+## 11  Security Considerations
 
 - All transfers are gated by the Identity Registry (both parties must be KYC-verified)
 - Compliance module checks run on every non-safe-listed transfer
@@ -698,7 +814,7 @@ npm run deploy:besu
 
 ---
 
-## 11  SFC Regulatory Alignment
+## 12  SFC Regulatory Alignment
 
 | Requirement | Implementation |
 |-------------|----------------|
@@ -721,7 +837,7 @@ npm run deploy:besu
 
 ---
 
-## 12  Citation List
+## 13  Citation List
 
 1. Project Plan - Tokenizing HKSTP Startups v0.2.pdf
 2. [SFC Circular on Tokenisation (2 Nov 2023)](https://apps.sfc.hk/edistributionWeb/api/circular/list-content/circular/doc?lang=EN&refNo=23EC53)

@@ -21,6 +21,14 @@
 const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8551";
 const ETH_URL = process.env.ETH_URL || "http://127.0.0.1:8545";
 
+// Catch unhandled errors so the process doesn't silently die
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("UNHANDLED REJECTION:", reason);
+});
+
 // Parse --interval flag
 let INTERVAL = 1000;
 const idx = process.argv.indexOf("--interval");
@@ -165,7 +173,7 @@ async function main() {
       }
     } catch (err) {
       // Don't crash — just log and retry
-      console.error(`  ✗ ${err.message}`);
+      console.error("  ✗ Loop error:", err);
     }
 
     await new Promise((r) => setTimeout(r, INTERVAL));

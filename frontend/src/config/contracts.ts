@@ -5,48 +5,33 @@
 // Update the values below to match your Besu deployment.
 // -----------------------------------------------------------------
 
-/** Derive the Besu RPC URL at runtime.
- *  - Local dev:       http://127.0.0.1:8545
- *  - Codespaces/remote: use /rpc proxy (Vite proxies to localhost:8545 server-side)
- *    This avoids CORS and authentication issues with forwarded ports. */
-function getBesuRpcUrl(): string {
-  if (typeof window === 'undefined') return 'http://127.0.0.1:8545';
-  const { hostname } = window.location;
-  // In Codespaces (or any non-localhost environment), use the Vite proxy
-  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-    return `${window.location.origin}/rpc`;
-  }
-  return 'http://127.0.0.1:8545';
-}
-
 /** Network configuration for the Besu devnet */
 export const NETWORK_CONFIG = {
   chainId: 7001,
   chainName: 'Besu Devnet',
-  rpcUrl: getBesuRpcUrl(),
+  rpcUrl: 'http://127.0.0.1:8545',
   blockExplorer: '',
 };
 
 // -----------------------------------------------------------------
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
-export const CONTRACT_ADDRESSES: Record<string, string> = {
-  identityRegistry: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
-  compliance: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
-  securityToken: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
-  cashToken: '0xed78Cb21Ce10A086a7973fB44e96d34F31D45cF1',
-  dvpSettlement: '0x218d5fe2E168656eBDE49e7a4A3C97E699D0be78',
-  tokenFactory: '0x3F0BE59Bc74c7368Aa049a0B064ce9Dc32890669',
-  claimIssuer: '0x290b0cFa0AC2d8959acf8009706273ffBB9F2572',
-  identityFactory: '0x6486A01e45648B1aDCc51D375Af3a7c0a5e9002a',
-  timelock: '0x1EA7432837C5e0e26209aa45aab6aA27913E51c0',
-  governor: '0x8002B7ae0032e39ec64ECe493AB727A8060eAb67',
-  walletRegistry: '0x0f908B9E910492958c6EaA269002AAf6Ae8F11bF',
-  multiSigWarm: '0x91810eaDF2d75b4422b39d80Bc81f0AB09B44356',
-  // Deployed separately — update after running the corresponding deploy scripts
-  systemHealthCheck: '',
-  orderBook: '',
-  orderBookFactory: '',
+export const CONTRACT_ADDRESSES = {
+  identityRegistry: '0xD218078f319c4569Cb1BEfA40a728F15Cef0313E',
+  compliance: '0x5bC13f7Eeae521CDD95Cd000B92E586541cF68CE',
+  securityToken: '0x594e68f223a390500467346151C9C7E6f9C1faeA',
+  cashToken: '0x5319CEBc7d941947Cb89294d0f48e759Ee1F9070',
+  dvpSettlement: '0x7Bc9320F8798f3AD82168dDD7493BF5f2c0D9FD5',
+  tokenFactory: '0x0F095aeA9540468B19829d02cC811Ebe5173D615',
+  claimIssuer: '0x51D4903ef5F871273e5B4172898B18809CFd7881',
+  identityFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
+  timelock: '0xe52155361a36C7d445F2c6784B14Bf7A3C306e15',
+  governor: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
+  walletRegistry: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
+  multiSigWarm: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
+  systemHealthCheck: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
+  orderBook: '',  // UPDATE after running deploy-orderbook.js
+  orderBookFactory: '0x36A8bE2C24f812ed7a95f14ffEBDB5F778F61699',
 };
 
 // -----------------------------------------------------------------
