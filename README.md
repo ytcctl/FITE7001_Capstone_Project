@@ -496,7 +496,7 @@ scripts/
 
 besu/
 ├── block-producer.js             # Engine API V3 block forger for post-merge Besu
-├── genesis.json                  # Besu genesis config (chain ID 7001, Cancun EVM)
+├── genesis.json                  # Besu genesis config (Cancun EVM, runtime chain ID 31337)
 ├── start-besu.ps1                # Start Besu Docker container (Windows PowerShell)
 ├── start-besu.sh                 # Start Besu Docker container (Linux / Codespaces)
 ├── ibft/                         # IBFT2 validator key material
@@ -574,7 +574,7 @@ The fastest way to get a running instance with zero local setup:
 | 8546 | Besu WebSocket |
 | 8551 | Besu Engine API |
 
-> **MetaMask in Codespaces:** Point MetaMask to the Codespaces-forwarded port 8545 URL (e.g. `https://<codespace>-8545.app.github.dev`), chain ID **7001**.
+> **MetaMask in Codespaces:** Point MetaMask to the Codespaces-forwarded port 8545 URL (e.g. `https://<codespace>-8545.app.github.dev`), chain ID **31337**.
 
 ### Option B — Local Setup
 
@@ -606,7 +606,7 @@ npx hardhat compile
 | `npm run test:besu` | `hardhat test test/integration/besu-e2e.test.js --network besu` | Besu end-to-end integration tests |
 | `npm run coverage` | `hardhat coverage` | Solidity code coverage report |
 | `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy to local Hardhat node |
-| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified Besu deploy** (block producer + contracts) |
+| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified deploy** (auto-spawns Hardhat node + contracts) |
 | `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
 | `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container |
 | `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container |
@@ -662,14 +662,52 @@ npm run test:besu
 
 ## 9  Deployment
 
-### Local Hardhat Network
+### Local Hardhat Network (Recommended for Development)
+
+Hardhat Network is the recommended development blockchain — it auto-mines transactions instantly, pre-funds dev accounts with 1,000,000 ETH each, and requires zero external dependencies (no Docker).
+
+#### Quick Start (All-in-One)
 
 ```bash
-npx hardhat node &
-npm run deploy:local
+npm run compile
+npm run deploy:besu    # Launches Hardhat node + deploys all contracts
 ```
 
-### Hyperledger Besu Network
+`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
+1. Checks if a node is already running on port 8545
+2. If not, auto-spawns `npx hardhat node` as a managed child process
+3. Deploys all 5 core contracts via `npx hardhat run scripts/deploy.js --network localhost`
+4. Configures roles (TOKEN_ROLE, OPERATOR_ROLE, AGENT_ROLE) and safe-lists
+5. Leaves the Hardhat node running for frontend interaction
+
+#### Manual Start (Two Terminals)
+
+```bash
+# Terminal 1 — start the Hardhat node (stays running)
+npx hardhat node
+
+# Terminal 2 — deploy core contracts
+npx hardhat run scripts/deploy.js --network localhost
+
+# Terminal 2 — deploy OrderBook
+npx hardhat run scripts/deploy-orderbook.js --network localhost
+```
+
+#### Dev Accounts (pre-funded with 1,000,000 ETH each)
+
+| Role | Address | Private Key |
+|------|---------|-------------|
+| Deployer / Admin | `0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73` | `0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63` |
+| Operator | `0x627306090abaB3A6e1400e9345bC60c78a8BEf57` | `0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3` |
+| Agent / Custodian | `0xf17f52151EbEF6C7334FAD080c5704D77216b732` | `0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f` |
+| Seller | `0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef` | `0x0dbbe8e4ae425a6d2687f1a7e3ba17bc98c6736950282febeaea2cf4c0f57ecb` |
+| Buyer | `0x821aEa9a577a9b44299B9c15c88cf3087F3b5544` | `0xc88b703fb08cbea894b6aeff5a544fb92e78a18e19814cd85da83b71f772aa6c` |
+
+> **Note:** These are well-known dev keys — **never** use them on a public network.
+
+### Hyperledger Besu Network (Optional — Production-like)
+
+Besu is available as an alternative for production-like testing with the Engine API block producer.
 
 #### Prerequisites
 
@@ -683,7 +721,7 @@ Create a `.env.besu` file in the project root (git-ignored):
 
 ```env
 BESU_RPC_URL=http://127.0.0.1:8545
-BESU_CHAIN_ID=7001
+BESU_CHAIN_ID=31337
 BESU_PRIVATE_KEYS=<deployer>,<operator>,<agent>,<seller>,<buyer>
 COMPLIANCE_ORACLE=<oracle-address>
 TREASURY_ADDRESS=<treasury-address>
@@ -708,13 +746,13 @@ npm run deploy:besu
 ```
 
 `npm run deploy:besu` runs `scripts/deploy-besu.js` which:
-1. Checks Besu RPC is reachable
-2. Spawns `besu/block-producer.js` as a child process (Engine API V3 block forger)
-3. Waits for block production to start
-4. Runs `npx hardhat run scripts/deploy.js --network besu`
-5. Stops the block producer and exits
+1. Checks if a node is running on port 8545 (Hardhat or Besu)
+2. If not, auto-spawns `npx hardhat node` as a managed child process
+3. If Besu Engine API is detected on port 8551, spawns the block producer
+4. Runs `npx hardhat run scripts/deploy.js --network localhost`
+5. Stops the block producer (if any) and leaves the node running
 
-> **Why a unified script?** The post-merge Besu devnet has no real beacon chain — blocks must be actively produced via the Engine API. Running the block producer and deploy in separate terminals is fragile on Windows. The launcher coordinates both in a single process.
+> **Why a unified script?** It auto-detects whether to use Hardhat Network (auto-mine) or Besu (Engine API block production), handles spawning the node if needed, and coordinates everything in a single process.
 
 #### Manual Deploy (Advanced)
 
@@ -785,13 +823,13 @@ The Investor Portal is a **React 18 + Vite + Tailwind CSS** single-page applicat
 | Requirement | Version |
 |---|---|
 | Node.js | ≥ 18 |
-| Besu container | Running (`npm run besu:start`) |
+| Blockchain node | Running (`npx hardhat node` or Besu container) |
 | Contracts deployed | Via `npm run deploy:besu` (see §9) |
-| MetaMask | Configured for Chain ID **7001** |
+| MetaMask | Configured for Chain ID **31337** |
 
 ### Step 1 — Update Contract Addresses
 
-After each fresh Besu deployment, update `frontend/src/config/contracts.ts` with the new addresses printed in the deployment summary:
+After each fresh deployment, update `frontend/src/config/contracts.ts` with the new addresses printed in the deployment summary:
 
 ```typescript
 // frontend/src/config/contracts.ts
@@ -822,11 +860,11 @@ npm run dev
 ### Step 4 — Connect MetaMask
 
 1. Add a **Custom Network** in MetaMask:
-   - **Network Name:** Besu Devnet
+   - **Network Name:** TokenHub Devnet
    - **RPC URL:** `http://127.0.0.1:8545`
-   - **Chain ID:** `7001`
+   - **Chain ID:** `31337`
    - **Currency Symbol:** ETH
-2. **Import** a dev account private key from `.env.besu` (e.g. the deployer key)
+2. **Import** a dev account private key (e.g. the deployer key from the table in §9)
 3. Connect to the dApp when prompted
 
 ### Step 5 — Production Build (Optional)
@@ -844,9 +882,9 @@ The `dist/` folder can be served by any static hosting provider (Nginx, Vercel, 
 | Port | Service |
 |------|---------|
 | 3000 | Frontend (Vite dev server) |
-| 8545 | Besu JSON-RPC |
-| 8546 | Besu WebSocket |
-| 8551 | Besu Engine API (block producer) |
+| 8545 | Hardhat / Besu JSON-RPC |
+| 8546 | Besu WebSocket (Besu only) |
+| 8551 | Besu Engine API (Besu only) |
 
 ---
 

@@ -500,7 +500,7 @@ contracts/
 #### Prerequisites
 - Node.js ≥ 18 (required by Hardhat ^2.22.4)
 - npm ≥ 9
-- Docker (for Hyperledger Besu local network)
+- Docker (optional — only needed for Hyperledger Besu)
 
 ### Install dependencies
 
@@ -525,7 +525,7 @@ npx hardhat compile
 | `npm run test:besu` | `hardhat test … --network besu` | Besu end-to-end integration tests |
 | `npm run coverage` | `hardhat coverage` | Solidity code coverage report |
 | `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy to local Hardhat node |
-| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified Besu deploy** (block producer + contracts) |
+| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified deploy** (auto-spawns Hardhat node + contracts) |
 | `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
 | `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container |
 | `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container |
@@ -581,14 +581,40 @@ npm run test:besu
 
 ## 9  Deployment
 
-### Local Hardhat Network
+### Local Hardhat Network (Recommended for Development)
+
+Hardhat Network is the recommended development blockchain — it auto-mines transactions instantly, pre-funds dev accounts with 1,000,000 ETH each, and requires zero external dependencies (no Docker).
+
+#### Quick Start (All-in-One)
 
 ```bash
-npx hardhat node &
-npm run deploy:local
+npm run compile
+npm run deploy:besu    # Launches Hardhat node + deploys all contracts
 ```
 
-### Hyperledger Besu Network
+`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
+1. Checks if a node is running on port 8545 (Hardhat or Besu)
+2. If not, auto-spawns `npx hardhat node` as a managed child process
+3. If Besu Engine API is detected on port 8551, spawns the block producer
+4. Runs `npx hardhat run scripts/deploy.js --network localhost`
+5. Stops the block producer (if any) and leaves the node running
+
+#### Manual Start (Two Terminals)
+
+```bash
+# Terminal 1 — start the Hardhat node (stays running)
+npx hardhat node
+
+# Terminal 2 — deploy core contracts
+npx hardhat run scripts/deploy.js --network localhost
+
+# Terminal 2 — deploy OrderBook
+npx hardhat run scripts/deploy-orderbook.js --network localhost
+```
+
+### Hyperledger Besu Network (Optional — Production-like)
+
+Besu is available as an alternative for production-like testing with the Engine API block producer.
 
 #### Prerequisites
 
@@ -602,7 +628,7 @@ Create a `.env.besu` file in the project root (git-ignored):
 
 ```env
 BESU_RPC_URL=http://127.0.0.1:8545
-BESU_CHAIN_ID=7001
+BESU_CHAIN_ID=31337
 BESU_PRIVATE_KEYS=<deployer>,<operator>,<agent>,<seller>,<buyer>
 COMPLIANCE_ORACLE=<oracle-address>
 TREASURY_ADDRESS=<treasury-address>
@@ -627,13 +653,13 @@ npm run deploy:besu
 ```
 
 `npm run deploy:besu` runs `scripts/deploy-besu.js` which:
-1. Checks Besu RPC is reachable
-2. Spawns `besu/block-producer.js` as a child process (Engine API V3 block forger)
-3. Waits for block production to start
-4. Runs `npx hardhat run scripts/deploy.js --network besu`
-5. Stops the block producer and exits
+1. Checks if a node is running on port 8545 (Hardhat or Besu)
+2. If not, auto-spawns `npx hardhat node` as a managed child process
+3. If Besu Engine API is detected on port 8551, spawns the block producer
+4. Runs `npx hardhat run scripts/deploy.js --network localhost`
+5. Stops the block producer (if any) and leaves the node running
 
-> **Why a unified script?** The post-merge Besu devnet has no real beacon chain — blocks must be actively produced via the Engine API. Running the block producer and deploy in separate terminals is fragile on Windows. The launcher coordinates both in a single process.
+> **Why a unified script?** It auto-detects whether to use Hardhat Network (auto-mine) or Besu (Engine API block production), handles spawning the node if needed, and coordinates everything in a single process.
 
 #### Deploy OrderBook (After Core Contracts)
 

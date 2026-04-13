@@ -1,28 +1,31 @@
 /**
  * @title deploy-besu.js
- * @notice All-in-one Besu deployment launcher.
+ * @notice All-in-one deployment launcher.
  *
- * 1. Spawns the Engine-API block producer as a child process.
- * 2. Waits until the block producer is producing blocks.
- * 3. Runs `npx hardhat run scripts/deploy.js --network besu`.
- * 4. Kills the block producer and exits.
+ * Workflow:
+ *   1. Checks if a node is already running on port 8545.
+ *   2. If not, spawns `npx hardhat node` as a managed child process.
+ *   3. If Besu Engine API is found on port 8551, spawns the block producer.
+ *   4. Runs `npx hardhat run scripts/deploy.js --network localhost`.
+ *   5. Leaves the Hardhat node running (or cleans up block producer).
  *
  * Usage (from project root):
  *   node scripts/deploy-besu.js
  */
 
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const path = require("path");
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const BP_SCRIPT = path.join(PROJECT_ROOT, "besu", "block-producer.js");
 const ETH_URL = process.env.ETH_URL || "http://127.0.0.1:8545";
+const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8551";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-async function rpc(method, params = []) {
-  const res = await fetch(ETH_URL, {
+async function rpc(url, method, params = []) {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
@@ -31,8 +34,26 @@ async function rpc(method, params = []) {
 }
 
 async function currentBlock() {
-  const hex = await rpc("eth_blockNumber");
+  const hex = await rpc(ETH_URL, "eth_blockNumber");
   return parseInt(hex, 16);
+}
+
+async function hasEngineAPI() {
+  try {
+    const res = await fetch(ENGINE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", method: "engine_exchangeCapabilities",
+        params: [["engine_forkchoiceUpdatedV3"]], id: 1,
+      }),
+      signal: AbortSignal.timeout(2000),
+    });
+    const json = await res.json();
+    return !json.error;
+  } catch {
+    return false;
+  }
 }
 
 function sleep(ms) {
@@ -44,78 +65,109 @@ function sleep(ms) {
 // ---------------------------------------------------------------------------
 (async () => {
   console.log("═══════════════════════════════════════════════════════");
-  console.log("  TokenHub — Besu Deployment Launcher");
+  console.log("  TokenHub — Deployment Launcher");
   console.log("═══════════════════════════════════════════════════════\n");
 
-  // ── 1. Check Besu is reachable ──────────────────────────────────────────
+  let nodeProcess = null; // managed Hardhat node (if we spawned it)
+
+  // ── 1. Check if a node is already running on port 8545 ──────────────────
   let startBlock;
+  let nodeAlreadyRunning = false;
   try {
     startBlock = await currentBlock();
-    console.log(`✓ Besu RPC reachable — current block #${startBlock}`);
-  } catch (err) {
-    console.error("✗ Cannot reach Besu RPC at", ETH_URL);
-    console.error("  Make sure the Besu container is running:");
-    console.error("    .\\besu\\start-besu.ps1 -Detach\n");
-    process.exit(1);
-  }
-
-  // ── 2. Spawn block producer ─────────────────────────────────────────────
-  console.log("\nSpawning block producer...");
-  const bp = spawn("node", [BP_SCRIPT, "--interval", "800"], {
-    cwd: PROJECT_ROOT,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
-  });
-
-  // Relay block-producer stdout/stderr with a prefix
-  bp.stdout.on("data", (d) => {
-    for (const line of d.toString().split("\n").filter(Boolean)) {
-      console.log(`  [bp] ${line}`);
-    }
-  });
-  bp.stderr.on("data", (d) => {
-    for (const line of d.toString().split("\n").filter(Boolean)) {
-      console.error(`  [bp:err] ${line}`);
-    }
-  });
-
-  bp.on("exit", (code) => {
-    if (code !== null && code !== 0) {
-      console.error(`\n✗ Block producer exited unexpectedly (code ${code})`);
-    }
-  });
-
-  // ── 3. Wait for at least one new block ──────────────────────────────────
-  console.log("Waiting for block production...");
-  let ready = false;
-  for (let i = 0; i < 30; i++) {
-    await sleep(1000);
-    try {
-      const now = await currentBlock();
-      if (now > startBlock) {
-        console.log(`✓ Block production confirmed — block #${now}\n`);
-        ready = true;
-        break;
+    nodeAlreadyRunning = true;
+    console.log(`✓ RPC reachable — current block #${startBlock}`);
+  } catch {
+    // No node running — spawn Hardhat node
+    console.log("No node running on port 8545 — starting Hardhat Network...");
+    nodeProcess = spawn("npx", ["hardhat", "node"], {
+      cwd: PROJECT_ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
+      detached: false,
+    });
+    nodeProcess.stdout.on("data", (d) => {
+      const text = d.toString();
+      if (text.includes("Started HTTP")) {
+        console.log("✓ Hardhat Network started on http://127.0.0.1:8545");
       }
-    } catch { /* retry */ }
+    });
+    nodeProcess.stderr.on("data", (d) => {
+      const text = d.toString().trim();
+      if (text) console.error(`  [node:err] ${text}`);
+    });
+
+    // Wait for the node to be ready
+    for (let i = 0; i < 30; i++) {
+      await sleep(1000);
+      try {
+        startBlock = await currentBlock();
+        console.log(`✓ Hardhat Network ready — block #${startBlock}`);
+        break;
+      } catch { /* retry */ }
+    }
+    if (startBlock === undefined) {
+      console.error("✗ Failed to start Hardhat node. Aborting.");
+      if (nodeProcess) nodeProcess.kill();
+      process.exit(1);
+    }
   }
 
-  if (!ready) {
-    // Even if no *new* block was produced (0 pending txs), the producer is
-    // running and will produce blocks as soon as txs arrive. Proceed anyway.
-    console.log("⚠ No new block yet (no pending txs) — proceeding anyway.\n");
+  // ── 2. Detect back-end (Besu Engine API vs Hardhat auto-mine) ───────────
+  const isBesu = await hasEngineAPI();
+  let bp = null;
+
+  if (isBesu) {
+    console.log("  Mode: Besu + Engine API (block producer required)");
+    console.log("\nSpawning block producer...");
+    bp = spawn("node", [BP_SCRIPT, "--interval", "800"], {
+      cwd: PROJECT_ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+    bp.stdout.on("data", (d) => {
+      for (const line of d.toString().split("\n").filter(Boolean))
+        console.log(`  [bp] ${line}`);
+    });
+    bp.stderr.on("data", (d) => {
+      for (const line of d.toString().split("\n").filter(Boolean))
+        console.error(`  [bp:err] ${line}`);
+    });
+    bp.on("exit", (code) => {
+      if (code !== null && code !== 0)
+        console.error(`\n✗ Block producer exited unexpectedly (code ${code})`);
+    });
+
+    console.log("Waiting for block production...");
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      await sleep(1000);
+      try {
+        const now = await currentBlock();
+        if (now > startBlock) { ready = true; break; }
+      } catch { /* retry */ }
+    }
+    if (!ready)
+      console.log("⚠ No new block yet (no pending txs) — proceeding anyway.\n");
+    else
+      console.log(`✓ Block production confirmed\n`);
+  } else {
+    console.log("  Mode: Hardhat Network (auto-mine)\n");
   }
 
-  // ── 4. Run Hardhat deploy ───────────────────────────────────────────────
+  // ── 3. Run Hardhat deploy ───────────────────────────────────────────────
   console.log("Running Hardhat deployment...\n");
   const deploy = spawn(
     "npx",
-    ["hardhat", "run", "scripts/deploy.js", "--network", "besu"],
+    ["hardhat", "run", "scripts/deploy.js", "--network", "localhost"],
     {
       cwd: PROJECT_ROOT,
-      stdio: "inherit",            // connect directly to our stdout/stderr
-      env: { ...process.env },
-      shell: true,                 // required on Windows to resolve npx.cmd
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        BESU_CHAIN_ID: process.env.BESU_CHAIN_ID || "31337",
+      },
+      shell: true,
     }
   );
 
@@ -123,17 +175,23 @@ function sleep(ms) {
     deploy.on("exit", resolve);
   });
 
-  // ── 5. Clean up ─────────────────────────────────────────────────────────
-  console.log("\nStopping block producer...");
-  bp.kill("SIGTERM");
-  // Give it a moment to exit gracefully
-  await sleep(500);
-  if (!bp.killed) bp.kill("SIGKILL");
+  // ── 4. Clean up block producer (if any) ─────────────────────────────────
+  if (bp) {
+    console.log("\nStopping block producer...");
+    bp.kill("SIGTERM");
+    await sleep(500);
+    if (!bp.killed) bp.kill("SIGKILL");
+  }
 
   if (deployCode === 0) {
     console.log("\n✓ Deployment completed successfully!");
+    if (nodeProcess) {
+      console.log("\n  Hardhat node is still running on http://127.0.0.1:8545");
+      console.log("  Press Ctrl+C in the node terminal to stop it.\n");
+    }
   } else {
     console.error(`\n✗ Deployment failed (exit code ${deployCode})`);
+    if (nodeProcess) nodeProcess.kill();
   }
 
   process.exit(deployCode || 0);

@@ -1,17 +1,18 @@
 /**
  * @title deploy-orderbook.js
- * @notice Deploy OrderBook to Besu.
+ * @notice Deploy OrderBook to the local devnet.
  *
- * Includes an embedded Engine-API block producer so the deployment
- * is self-contained (Besu PoS does not auto-mine blocks).
+ * Works with both Hardhat Network (auto-mine) and Besu + Engine API.
+ * When Engine API is available on port 8551, an embedded block producer
+ * is started automatically.
  *
  * Usage:
- *   npx hardhat run scripts/deploy-orderbook.js --network besu
+ *   npx hardhat run scripts/deploy-orderbook.js --network localhost
  */
 const { ethers } = require("hardhat");
 
 // ---------------------------------------------------------------------------
-// Embedded Engine-API block producer
+// Embedded Engine-API block producer (only used with Besu)
 // ---------------------------------------------------------------------------
 const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8551";
 const ETH_URL    = process.env.ETH_URL    || "http://127.0.0.1:8545";
@@ -95,11 +96,32 @@ function startBlockProducer() {
 }
 
 // ---------------------------------------------------------------------------
-// Deployed contract addresses (must match contracts.ts)
+// Deployed contract addresses — pass via env or update here after deploy.js
 // ---------------------------------------------------------------------------
-const SECURITY_TOKEN    = "0x8eC60639166f38Fb1455f77F956761Bc9c14FD6b";
-const CASH_TOKEN        = "0x68Ede5Cf8d66f127FF24db24c0D1E739f38C5F8f";
-const IDENTITY_REGISTRY = "0x3168F97b255A7a11e134cf33F2Ee0c78637c9c0C";
+const SECURITY_TOKEN    = process.env.SECURITY_TOKEN    || "0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e";
+const CASH_TOKEN        = process.env.CASH_TOKEN        || "0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517";
+const IDENTITY_REGISTRY = process.env.IDENTITY_REGISTRY || "0x42699A7612A82f1d9C36148af9C77354759b210b";
+
+// ---------------------------------------------------------------------------
+// Engine API detection
+// ---------------------------------------------------------------------------
+async function hasEngineAPI() {
+  try {
+    const res = await fetch(ENGINE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", method: "engine_exchangeCapabilities",
+        params: [["engine_forkchoiceUpdatedV3"]], id: 1,
+      }),
+      signal: AbortSignal.timeout(2000),
+    });
+    const json = await res.json();
+    return !json.error;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Deploy
@@ -111,7 +133,14 @@ async function main() {
   console.log("  Cash Token:        ", CASH_TOKEN);
   console.log("  Identity Registry: ", IDENTITY_REGISTRY);
 
-  const blockProducer = startBlockProducer();
+  // Start block producer only if Engine API is available (Besu)
+  let blockProducer = null;
+  if (await hasEngineAPI()) {
+    console.log("  Mode: Besu + Engine API (block producer started)");
+    blockProducer = startBlockProducer();
+  } else {
+    console.log("  Mode: Hardhat Network (auto-mine)");
+  }
 
   try {
     const Factory = await ethers.getContractFactory("OrderBook");
@@ -131,7 +160,7 @@ async function main() {
     console.log("\nUpdate frontend/src/config/contracts.ts:");
     console.log(`  orderBook: '${addr}',`);
   } finally {
-    await blockProducer.stop();
+    if (blockProducer) await blockProducer.stop();
   }
 }
 

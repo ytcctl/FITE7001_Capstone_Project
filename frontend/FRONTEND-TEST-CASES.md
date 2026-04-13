@@ -4,7 +4,7 @@
 
 | Item | Details |
 |------|---------|
-| Blockchain | Besu Devnet (Chain ID 7001) running locally or via Codespaces |
+| Blockchain | Besu Devnet (Chain ID 31337) running locally or via Codespaces |
 | Contracts | All contracts deployed via `npx hardhat run scripts/deploy.js --network besu` |
 | Wallets | Admin wallet (deployer), Agent wallet, 2+ Investor wallets |
 | Browser | MetaMask installed and configured for Besu Devnet |
@@ -17,7 +17,7 @@
 
 | ID | Test Case | Steps | Expected Result |
 |----|-----------|-------|-----------------|
-| W-P-01 | Connect via MetaMask | Click wallet menu → "MetaMask" | Wallet connects, address displayed, role badge shown, chain ID = 7001 |
+| W-P-01 | Connect via MetaMask | Click wallet menu → "MetaMask" | Wallet connects, address displayed, role badge shown, chain ID = 31337 |
 | W-P-02 | Connect via test account | Click wallet menu → select pre-loaded test account | Wallet connects with test account address, correct role detected |
 | W-P-03 | Connect via custom private key | Enter valid `0x` + 64 hex chars → "Connect" | Wallet connects, address derived correctly, account saved to localStorage |
 | W-P-04 | Disconnect wallet | Click wallet → "Disconnect" | Address cleared, UI reverts to "Connect Wallet" state, routes unprotected |
@@ -25,7 +25,7 @@
 | W-P-06 | Auto-reconnect on page reload | Connect wallet → reload page | Wallet automatically reconnects, same account restored |
 | W-P-07 | Save custom account with label | Enter private key + label "Test Investor" → connect | Account appears in saved accounts list with label |
 | W-P-08 | Remove saved account | Click ✕ button on saved account entry | Account removed from saved list and localStorage |
-| W-P-09 | Network switch prompt | Connect on wrong network → click "Switch Network" | MetaMask prompts to add/switch to Besu Devnet (chain 7001) |
+| W-P-09 | Network switch prompt | Connect on wrong network → click "Switch Network" | MetaMask prompts to add/switch to Besu Devnet (chain 31337) |
 | W-P-10 | Role detection — admin | Connect with deployer key | `roles.isAdmin = true`, admin routes accessible |
 | W-P-11 | Role detection — agent | Connect with agent key | `roles.isAgent = true`, admin routes accessible |
 | W-P-12 | Role detection — investor | Connect with regular wallet | `roles.isAdmin = false, isAgent = false`, admin routes hidden |

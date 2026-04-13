@@ -116,7 +116,7 @@ async function main() {
   console.log("║  Validators:", NUM_VALIDATORS, "  (BFT tolerance: 1 faulty node)    ║");
   console.log("║  Consensus:  IBFT 2.0                            ║");
   console.log("║  Block time: 2 seconds                           ║");
-  console.log("║  Chain ID:   7001                                ║");
+  console.log("║  Chain ID:   31337                               ║");
   console.log("╠══════════════════════════════════════════════════╣");
   console.log("║  Start:                                          ║");
   console.log("║    docker compose -f besu/ibft/docker-compose.yml up -d  ║");
@@ -127,7 +127,7 @@ async function main() {
   // Write a summary file for reference
   const summary = {
     generated: new Date().toISOString(),
-    chainId: 7001,
+    chainId: 31337,
     consensus: "IBFT 2.0",
     blockPeriod: "2s",
     bftTolerance: "1 faulty node (f=1, n=3f+1=4)",

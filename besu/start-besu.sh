@@ -49,7 +49,7 @@ mkdir -p "$DATA_PATH"
 # Remove existing container
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
-echo "Starting Hyperledger Besu (Cancun, chain ID 7001)..."
+echo "Starting Hyperledger Besu (Cancun, chain ID 31337)..."
 echo "  RPC    : http://127.0.0.1:8545"
 echo "  WS     : ws://127.0.0.1:8546"
 echo "  Engine : http://127.0.0.1:8551"
@@ -62,7 +62,7 @@ docker run $DETACH_FLAG \
   -p 8551:8551 \
   -v "$GENESIS_PATH:/opt/besu/genesis.json" \
   -v "$DATA_PATH:/opt/besu/data" \
-  hyperledger/besu:latest \
+  hyperledger/besu:24.12.2 \
   --genesis-file=/opt/besu/genesis.json \
   --data-path=/opt/besu/data \
   --rpc-http-enabled \

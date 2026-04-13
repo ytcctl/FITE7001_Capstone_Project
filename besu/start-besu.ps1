@@ -52,7 +52,7 @@ docker rm -f $containerName 2>$null
 $genesisDocker = $genesisPath -replace '\\','/'
 $dataDocker    = $dataPath    -replace '\\','/'
 
-Write-Host "Starting Hyperledger Besu (Cancun, chain ID 7001)..." -ForegroundColor Cyan
+Write-Host "Starting Hyperledger Besu (Cancun, chain ID 31337)..." -ForegroundColor Cyan
 Write-Host "  RPC    : http://127.0.0.1:$rpcPort" -ForegroundColor Green
 Write-Host "  WS     : ws://127.0.0.1:$wsPort" -ForegroundColor Green
 Write-Host "  Engine : http://127.0.0.1:$enginePort" -ForegroundColor Green
@@ -67,10 +67,9 @@ $dockerArgs += @(
     "--name", $containerName,
     "-p", "${rpcPort}:8545",
     "-p", "${wsPort}:8546",
-    "-p", "${enginePort}:8551",
     "-v", "${genesisDocker}:/opt/besu/genesis.json",
     "-v", "${dataDocker}:/opt/besu/data",
-    "hyperledger/besu:latest",
+    "hyperledger/besu:24.12.2",
     "--genesis-file=/opt/besu/genesis.json",
     "--data-path=/opt/besu/data",
     "--rpc-http-enabled",
@@ -81,8 +80,6 @@ $dockerArgs += @(
     "--rpc-ws-api=ETH,NET,WEB3",
     "--rpc-ws-host=0.0.0.0",
     "--host-allowlist=*",
-    "--engine-jwt-disabled",
-    "--engine-rpc-enabled",
     "--min-gas-price=0",
     "--logging=INFO"
 )

@@ -1,14 +1,18 @@
 // -----------------------------------------------------------------
 // Contract ABIs & Addresses  —  TokenHub HKSTP Security Token Suite
 // -----------------------------------------------------------------
-// Addresses are populated after running `npx hardhat run scripts/deploy.js --network besu`.
-// Update the values below to match your Besu deployment.
+// Addresses are populated after running:
+//   npx hardhat node              (terminal 1 — keep running)
+//   npx hardhat run scripts/deploy.js --network localhost   (terminal 2)
+//   npx hardhat run scripts/deploy-orderbook.js --network localhost
+// Or use the all-in-one launcher:
+//   node scripts/deploy-besu.js
 // -----------------------------------------------------------------
 
-/** Network configuration for the Besu devnet */
+/** Network configuration for the local devnet (Hardhat / Besu) */
 export const NETWORK_CONFIG = {
-  chainId: 7001,
-  chainName: 'Besu Devnet',
+  chainId: 31337,
+  chainName: 'Hardhat Devnet',
   rpcUrl: 'http://127.0.0.1:8545',
   blockExplorer: '',
 };
@@ -17,21 +21,12 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x3168F97b255A7a11e134cf33F2Ee0c78637c9c0C',
-  compliance: '0x44DA6D482387c5dd88490F8A0cf9e9A066aC3E6a',
-  securityToken: '0x8eC60639166f38Fb1455f77F956761Bc9c14FD6b',
-  cashToken: '0x68Ede5Cf8d66f127FF24db24c0D1E739f38C5F8f',
-  dvpSettlement: '0xfE402F69c447C819e535627Fd633F30f3D82F763',
-  tokenFactory: '0x0F095aeA9540468B19829d02cC811Ebe5173D615',
-  claimIssuer: '0x51D4903ef5F871273e5B4172898B18809CFd7881',
-  identityFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
-  timelock: '0xe52155361a36C7d445F2c6784B14Bf7A3C306e15',
-  governor: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
-  walletRegistry: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
-  multiSigWarm: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
-  systemHealthCheck: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
-  orderBook: '0x595d8e5811e953573eF16290b943a2eea4f9629C',
-  orderBookFactory: '0x36A8bE2C24f812ed7a95f14ffEBDB5F778F61699',
+  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
+  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
+  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
+  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
+  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
+  orderBook: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
 };
 
 // -----------------------------------------------------------------

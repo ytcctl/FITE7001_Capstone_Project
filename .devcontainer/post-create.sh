@@ -24,7 +24,7 @@ npx hardhat compile
 
 # ── 3. Start Besu via Docker ────────────────────────────────────
 echo ""
-echo "▶ Starting Hyperledger Besu (Cancun, chain ID 7001)..."
+echo "▶ Starting Hyperledger Besu (Cancun, chain ID 31337)..."
 bash besu/start-besu.sh -d
 
 # Wait for Besu RPC to be reachable
@@ -53,7 +53,7 @@ echo "▶ Deploying all contracts to Besu..."
 # Supply all 5 dev-account private keys so Hardhat can use all signers
 # (deployer, operator, agent/custodian, seller, buyer)
 export BESU_PRIVATE_KEYS="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63,0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3,0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f,0x0dbbe8e4ae425a6d2687f1a7e3ba17bc98c673636790f1b8ad91193c05875ef1,0xc88b703fb08cbea894b6aeff5a544fb92e78a18e19814cd85da83b71f772aa6c"
-export BESU_CHAIN_ID=7001
+export BESU_CHAIN_ID=31337
 npx hardhat run scripts/deploy-and-update-frontend.js --network besu
 
 # ── 6. Deploy SystemHealthCheck ──────────────────────────────────
@@ -80,7 +80,7 @@ echo "  ✅ Setup complete!"
 echo ""
 echo "  Frontend : http://localhost:3000  (forwarded by Codespaces)"
 echo "  Besu RPC : http://localhost:8545"
-echo "  Chain ID : 7001"
+echo "  Chain ID : 31337"
 echo ""
 echo "  Admin PK  : 0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
 echo "  Admin Addr: 0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73"
