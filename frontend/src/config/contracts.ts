@@ -6,18 +6,15 @@
 // -----------------------------------------------------------------
 
 /** Derive the Besu RPC URL at runtime.
- *  - Local dev:   http://127.0.0.1:8545
- *  - Codespaces:  replace the port in the forwarded hostname
- *    e.g. https://…-3000.app.github.dev → https://…-8545.app.github.dev  */
+ *  - Local dev:       http://127.0.0.1:8545
+ *  - Codespaces/remote: use /rpc proxy (Vite proxies to localhost:8545 server-side)
+ *    This avoids CORS and authentication issues with forwarded ports. */
 function getBesuRpcUrl(): string {
   if (typeof window === 'undefined') return 'http://127.0.0.1:8545';
-  const { hostname, protocol } = window.location;
-  // GitHub Codespaces forwarded URLs contain ".app.github.dev"
-  if (hostname.endsWith('.app.github.dev')) {
-    // hostname looks like: musical-space-zebra-v9jv65v9442pjr4-3000.app.github.dev
-    // Replace the port segment (last number before .app.github.dev)
-    const replaced = hostname.replace(/-\d+\.app\.github\.dev$/, '-8545.app.github.dev');
-    return `${protocol}//${replaced}`;
+  const { hostname } = window.location;
+  // In Codespaces (or any non-localhost environment), use the Vite proxy
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `${window.location.origin}/rpc`;
   }
   return 'http://127.0.0.1:8545';
 }
@@ -46,6 +43,9 @@ export const CONTRACT_ADDRESSES = {
   governor: '0xDE87AF9156a223404885002669D3bE239313Ae33',
   walletRegistry: '0x686AfD6e502A81D2e77f2e038A23C0dEf4949A20',
   multiSigWarm: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
+  systemHealthCheck: '0xE03Ef2490316bfF9808d936eEe70f23896F07548',
+  orderBookFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
+  orderBook: '0x2e9c5D910763e00CCDbF6CEEC98417e08f6629E3',
 };
 
 // -----------------------------------------------------------------

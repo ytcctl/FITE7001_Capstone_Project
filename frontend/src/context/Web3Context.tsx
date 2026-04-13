@@ -132,8 +132,10 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
         c.dvpSettlement.hasRole(operatorRole, addr) as Promise<boolean>,
       ]);
 
+      console.log('[Web3] Roles detected for', addr, { isAdmin, isAgent, isOperator });
       setRoles({ isAdmin, isAgent, isOperator });
-    } catch {
+    } catch (err) {
+      console.error('[Web3] Role detection failed:', err);
       // If role detection fails (e.g. wrong network), default to no roles
       setRoles(DEFAULT_ROLES);
     } finally {
@@ -301,9 +303,11 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsConnecting(true);
     setError(null);
     try {
+      console.log('[Web3] Connecting via built-in wallet, RPC:', NETWORK_CONFIG.rpcUrl);
       const rpcProvider = new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl);
       const network = await rpcProvider.getNetwork();
       const currentChainId = Number(network.chainId);
+      console.log('[Web3] Connected to chain', currentChainId);
 
       const wallet = new ethers.Wallet(privateKey, rpcProvider);
       const addr = wallet.address;
