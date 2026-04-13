@@ -22,7 +22,9 @@
     "vscode": {
       "extensions": [
         "NomicFoundation.hardhat-solidity",
-        "dbaeumer.vscode-eslint"
+        "dbaeumer.vscode-eslint",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
       ]
     }
   }
