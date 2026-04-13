@@ -91,6 +91,3 @@ if [ -n "$DETACH_FLAG" ]; then
   echo "Restart: docker start $CONTAINER_NAME"
   echo "Reset:   ./besu/start-besu.sh -d --reset"
 fi
-  echo "Logs:   docker logs -f $CONTAINER_NAME"
-  echo "Stop:   docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME"
-fi
