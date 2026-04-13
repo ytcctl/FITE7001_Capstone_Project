@@ -181,24 +181,28 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  /** Build ethers contract instances bound to the signer */
+  /** Build ethers contract instances bound to the signer.
+   *  Contracts whose addresses are missing/empty use ZeroAddress as a
+   *  placeholder so that the rest of the app (especially role detection)
+   *  is not blocked. */
   const initContracts = useCallback((s: ethers.JsonRpcSigner | ethers.Wallet) => {
+    const addr = (key: string) => CONTRACT_ADDRESSES[key] || ethers.ZeroAddress;
     const c: Contracts = {
-      identityRegistry: new ethers.Contract(CONTRACT_ADDRESSES.identityRegistry, IDENTITY_REGISTRY_ABI, s),
-      compliance: new ethers.Contract(CONTRACT_ADDRESSES.compliance, COMPLIANCE_ABI, s),
-      securityToken: new ethers.Contract(CONTRACT_ADDRESSES.securityToken, SECURITY_TOKEN_ABI, s),
-      cashToken: new ethers.Contract(CONTRACT_ADDRESSES.cashToken, CASH_TOKEN_ABI, s),
-      dvpSettlement: new ethers.Contract(CONTRACT_ADDRESSES.dvpSettlement, DVP_SETTLEMENT_ABI, s),
-      tokenFactory: new ethers.Contract(CONTRACT_ADDRESSES.tokenFactory, TOKEN_FACTORY_ABI, s),
-      claimIssuer: new ethers.Contract(CONTRACT_ADDRESSES.claimIssuer, CLAIM_ISSUER_ABI, s),
-      identityFactory: new ethers.Contract(CONTRACT_ADDRESSES.identityFactory, IDENTITY_FACTORY_ABI, s),
-      governor: new ethers.Contract(CONTRACT_ADDRESSES.governor, GOVERNOR_ABI, s),
-      timelock: new ethers.Contract(CONTRACT_ADDRESSES.timelock, TIMELOCK_ABI, s),
-      walletRegistry: new ethers.Contract(CONTRACT_ADDRESSES.walletRegistry, WALLET_REGISTRY_ABI, s),
-      multiSigWarm: new ethers.Contract(CONTRACT_ADDRESSES.multiSigWarm, MULTI_SIG_WARM_ABI, s),
-      systemHealthCheck: new ethers.Contract(CONTRACT_ADDRESSES.systemHealthCheck, SYSTEM_HEALTH_CHECK_ABI, s),
-      orderBook: new ethers.Contract(CONTRACT_ADDRESSES.orderBook, ORDER_BOOK_ABI, s),
-      orderBookFactory: new ethers.Contract(CONTRACT_ADDRESSES.orderBookFactory, ORDER_BOOK_FACTORY_ABI, s),
+      identityRegistry: new ethers.Contract(addr('identityRegistry'), IDENTITY_REGISTRY_ABI, s),
+      compliance: new ethers.Contract(addr('compliance'), COMPLIANCE_ABI, s),
+      securityToken: new ethers.Contract(addr('securityToken'), SECURITY_TOKEN_ABI, s),
+      cashToken: new ethers.Contract(addr('cashToken'), CASH_TOKEN_ABI, s),
+      dvpSettlement: new ethers.Contract(addr('dvpSettlement'), DVP_SETTLEMENT_ABI, s),
+      tokenFactory: new ethers.Contract(addr('tokenFactory'), TOKEN_FACTORY_ABI, s),
+      claimIssuer: new ethers.Contract(addr('claimIssuer'), CLAIM_ISSUER_ABI, s),
+      identityFactory: new ethers.Contract(addr('identityFactory'), IDENTITY_FACTORY_ABI, s),
+      governor: new ethers.Contract(addr('governor'), GOVERNOR_ABI, s),
+      timelock: new ethers.Contract(addr('timelock'), TIMELOCK_ABI, s),
+      walletRegistry: new ethers.Contract(addr('walletRegistry'), WALLET_REGISTRY_ABI, s),
+      multiSigWarm: new ethers.Contract(addr('multiSigWarm'), MULTI_SIG_WARM_ABI, s),
+      systemHealthCheck: new ethers.Contract(addr('systemHealthCheck'), SYSTEM_HEALTH_CHECK_ABI, s),
+      orderBook: new ethers.Contract(addr('orderBook'), ORDER_BOOK_ABI, s),
+      orderBookFactory: new ethers.Contract(addr('orderBookFactory'), ORDER_BOOK_FACTORY_ABI, s),
     };
     setContracts(c);
     return c;

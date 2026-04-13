@@ -30,7 +30,7 @@ export const NETWORK_CONFIG = {
 // -----------------------------------------------------------------
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
-export const CONTRACT_ADDRESSES = {
+export const CONTRACT_ADDRESSES: Record<string, string> = {
   identityRegistry: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
   compliance: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
   securityToken: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
@@ -43,6 +43,10 @@ export const CONTRACT_ADDRESSES = {
   governor: '0x8002B7ae0032e39ec64ECe493AB727A8060eAb67',
   walletRegistry: '0x0f908B9E910492958c6EaA269002AAf6Ae8F11bF',
   multiSigWarm: '0x91810eaDF2d75b4422b39d80Bc81f0AB09B44356',
+  // Deployed separately — update after running the corresponding deploy scripts
+  systemHealthCheck: '',
+  orderBook: '',
+  orderBookFactory: '',
 };
 
 // -----------------------------------------------------------------
