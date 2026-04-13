@@ -97,8 +97,9 @@ function startBlockProducer() {
 // ---------------------------------------------------------------------------
 // Deployed contract addresses (must match contracts.ts)
 // ---------------------------------------------------------------------------
-const SECURITY_TOKEN = "0x6aA8b700cD034Ab4B897B59447f268b33B8cF699";
-const CASH_TOKEN     = "0xc83003B2AD5C3EF3e93Cc3Ef0a48E84dc8DBD718";
+const SECURITY_TOKEN    = "0x8eC60639166f38Fb1455f77F956761Bc9c14FD6b";
+const CASH_TOKEN        = "0x68Ede5Cf8d66f127FF24db24c0D1E739f38C5F8f";
+const IDENTITY_REGISTRY = "0x3168F97b255A7a11e134cf33F2Ee0c78637c9c0C";
 
 // ---------------------------------------------------------------------------
 // Deploy
@@ -106,19 +107,21 @@ const CASH_TOKEN     = "0xc83003B2AD5C3EF3e93Cc3Ef0a48E84dc8DBD718";
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying OrderBook with account:", deployer.address);
-  console.log("  Security Token:", SECURITY_TOKEN);
-  console.log("  Cash Token:    ", CASH_TOKEN);
+  console.log("  Security Token:    ", SECURITY_TOKEN);
+  console.log("  Cash Token:        ", CASH_TOKEN);
+  console.log("  Identity Registry: ", IDENTITY_REGISTRY);
 
   const blockProducer = startBlockProducer();
 
   try {
     const Factory = await ethers.getContractFactory("OrderBook");
-    // constructor(securityToken, cashToken, secDecimals, cashDecimals, admin)
+    // constructor(securityToken, cashToken, secDecimals, cashDecimals, identityRegistry, admin)
     const contract = await Factory.deploy(
       SECURITY_TOKEN,
       CASH_TOKEN,
       18,   // HKSTPSecurityToken decimals
       6,    // MockCashToken decimals
+      IDENTITY_REGISTRY,
       deployer.address
     );
     await contract.waitForDeployment();

@@ -240,7 +240,30 @@ On-chain **limit-order book** with automatic price-time priority matching for a 
 | KYC gate | `identityRegistry.isVerified(msg.sender)` checked on every `placeBuyOrder()` and `placeSellOrder()` — non-KYC wallets are rejected at order time |
 | Safe-listed | OrderBook contract is safe-listed on the security token so escrow→buyer transfers pass the token's `_update()` compliance hook |
 | Cancel | Traders can cancel their own open orders and reclaim escrowed funds |
+| Order book queries | `getBuyOrderIds()`, `getSellOrderIds()`, `getOrdersBatch()`, `getTradesBatch()` |
+| Market stats | `bestBid()`, `bestAsk()`, `spread()`, `orderCount()`, `tradeCount()` |
 | Pausable | Admin can emergency-pause all trading activity |
+
+```
+OrderBook KYC Enforcement Flow:
+
+  Investor → placeBuyOrder(price, qty)
+                │
+                ├─ identityRegistry.isVerified(msg.sender)?
+                │    NO  → revert "buyer not KYC verified"
+                │    YES → lock cashToken escrow
+                │              │
+                │              ├─ match against best sell orders
+                │              │    securityToken.transfer(orderBook → buyer)
+                │              │    cashToken.transfer(escrow → seller)
+                │              └─ remaining qty stays on book
+                │
+  Investor → placeSellOrder(price, qty)
+                │
+                ├─ identityRegistry.isVerified(msg.sender)?
+                │    NO  → revert "seller not KYC verified"
+                │    YES → lock securityToken escrow → match...
+```
 
 ### 3.2  Identity Layer (`identity/`)
 
@@ -461,24 +484,38 @@ contracts/
     └── MockCashToken.sol         # ERC-20 tokenized HKD mock
 
 scripts/
-├── deploy.js                     # Full deployment script
-├── deploy-and-update-frontend.js # Deploy + write ABI/addresses to frontend
+├── deploy.js                     # Core deployment logic (5 core contracts + roles)
+├── deploy-besu.js                # Unified launcher: block-producer + deploy.js in one command
+├── deploy-and-update-frontend.js # Deploy + write ABI/addresses to frontend (Codespaces)
 ├── deploy-health-check.js        # Deploy & run SystemHealthCheck
+├── deploy-orderbook.js           # Deploy standalone OrderBook (embedded block producer)
 ├── deploy-orderbook-factory.js   # Deploy OrderBookFactory + initial HKSTP market
 ├── seed-investor.js              # Seed test investor identities
 ├── harden-admin.js               # Post-deploy admin hardening
 └── burn-excess.js                # Burn excess token supply
 
+besu/
+├── block-producer.js             # Engine API V3 block forger for post-merge Besu
+├── genesis.json                  # Besu genesis config (chain ID 7001, Cancun EVM)
+├── start-besu.ps1                # Start Besu Docker container (Windows PowerShell)
+├── start-besu.sh                 # Start Besu Docker container (Linux / Codespaces)
+├── ibft/                         # IBFT2 validator key material
+└── data/                         # Besu runtime data (git-ignored)
+
+.devcontainer/
+├── devcontainer.json             # GitHub Codespaces / VS Code Dev Container config
+└── post-create.sh                # Auto-setup: install, compile, deploy, start frontend
+
 frontend/
 ├── src/
-│   ├── App.tsx                   # Route definitions
+│   ├── App.tsx                   # Route definitions + wrong-network banner
 │   ├── main.tsx                  # Entry point
 │   ├── components/
-│   │   └── Layout.tsx            # Navigation sidebar + admin route guard
+│   │   └── Layout.tsx            # Navigation sidebar + Connect Wallet dropdown
 │   ├── config/
 │   │   └── contracts.ts          # Contract addresses + ABIs
 │   ├── context/
-│   │   └── Web3Context.tsx       # MetaMask provider + contract instances
+│   │   └── Web3Context.tsx       # MetaMask / private-key provider + contract instances
 │   └── pages/
 │       ├── Dashboard.tsx         # Platform overview
 │       ├── Trading.tsx           # Multi-market order book trading (KYC-gated, last price + 24h change)
@@ -559,6 +596,22 @@ npm run compile
 # or
 npx hardhat compile
 ```
+
+### npm Scripts Reference
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `npm run compile` | `hardhat compile` | Compile all Solidity contracts |
+| `npm test` | `hardhat test` | Run all Hardhat test suites |
+| `npm run test:besu` | `hardhat test test/integration/besu-e2e.test.js --network besu` | Besu end-to-end integration tests |
+| `npm run coverage` | `hardhat coverage` | Solidity code coverage report |
+| `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy to local Hardhat node |
+| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified Besu deploy** (block producer + contracts) |
+| `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
+| `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container |
+| `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container |
+| `npm run besu:logs` | `docker logs -f tokenhub-besu` | Tail Besu container logs |
+| `npm run clean` | `hardhat clean` | Remove artifacts & cache |
 
 ---
 
@@ -675,6 +728,16 @@ node besu/block-producer.js --interval 1000
 npx hardhat run scripts/deploy.js --network besu
 ```
 
+#### Deploy OrderBook (After Core Contracts)
+
+```bash
+# Deploy standalone OrderBook with embedded block producer
+npx hardhat run scripts/deploy-orderbook.js --network besu
+
+# Deploy OrderBookFactory + initial market
+npx hardhat run scripts/deploy-orderbook-factory.js --network besu
+```
+
 ### Deployment Order
 
 1. **`IdentityFactory`** — ONCHAINID minimal proxy factory
@@ -690,6 +753,7 @@ npx hardhat run scripts/deploy.js --network besu
 11. **`MultiSigWarm`** — warm wallet multi-sig
 12. **`HKSTPGovernor` + `HKSTPTimelock`** — governance stack
 13. **`SystemHealthCheck`** — run post-deployment wiring verification
+14. **`OrderBook`** — standalone order book (via `deploy-orderbook.js`, includes embedded block producer)
 
 ### Post-Deployment Steps
 

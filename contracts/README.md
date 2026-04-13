@@ -488,7 +488,16 @@ contracts/
 
 ## 7  Setup & Installation
 
-### Prerequisites
+### Option A — GitHub Codespaces (One-Click)
+
+1. Go to [github.com/ytcctl/FITE7001_Capstone_Project](https://github.com/ytcctl/FITE7001_Capstone_Project)
+2. Click **Code → Codespaces → Create codespace on main**
+3. Wait ~3 minutes — the `postCreateCommand` automatically installs, compiles, deploys, and starts the frontend
+4. See the [project README](../README.md) for full Codespaces details
+
+### Option B — Local Setup
+
+#### Prerequisites
 - Node.js ≥ 18 (required by Hardhat ^2.22.4)
 - npm ≥ 9
 - Docker (for Hyperledger Besu local network)
@@ -506,6 +515,22 @@ npm run compile
 # or
 npx hardhat compile
 ```
+
+### npm Scripts Reference
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `npm run compile` | `hardhat compile` | Compile all Solidity contracts |
+| `npm test` | `hardhat test` | Run all Hardhat test suites |
+| `npm run test:besu` | `hardhat test … --network besu` | Besu end-to-end integration tests |
+| `npm run coverage` | `hardhat coverage` | Solidity code coverage report |
+| `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy to local Hardhat node |
+| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified Besu deploy** (block producer + contracts) |
+| `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
+| `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container |
+| `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container |
+| `npm run besu:logs` | `docker logs -f tokenhub-besu` | Tail Besu container logs |
+| `npm run clean` | `hardhat clean` | Remove artifacts & cache |
 
 ---
 
@@ -565,19 +590,71 @@ npm run deploy:local
 
 ### Hyperledger Besu Network
 
+#### Prerequisites
+
+| Requirement | Version |
+|---|---|
+| Node.js | ≥ 18 |
+| Docker | Running (for the Besu container) |
+| `.env.besu` | See below |
+
+Create a `.env.besu` file in the project root (git-ignored):
+
+```env
+BESU_RPC_URL=http://127.0.0.1:8545
+BESU_CHAIN_ID=7001
+BESU_PRIVATE_KEYS=<deployer>,<operator>,<agent>,<seller>,<buyer>
+COMPLIANCE_ORACLE=<oracle-address>
+TREASURY_ADDRESS=<treasury-address>
+ESCROW_ADDRESS=<escrow-address>
+CUSTODIAN_ADDRESS=<custodian-address>
+```
+
+#### One-Command Deploy (Recommended)
+
+The unified launcher spawns the Engine-API block producer as a child process, deploys all 5 core contracts, configures roles, then cleans up automatically:
+
 ```bash
-# Start Besu node
+# 1. Start the Besu container (if not already running)
 npm run besu:start
+# or: .\besu\start-besu.ps1 -Detach
 
-# Deploy contracts
-export BESU_RPC_URL="http://<besu-node>:8545"
-export BESU_PRIVATE_KEYS="<deployer-private-key>"
-export COMPLIANCE_ORACLE="<oracle-address>"
-export TREASURY_ADDRESS="<treasury-address>"
-export ESCROW_ADDRESS="<escrow-address>"
-export CUSTODIAN_ADDRESS="<custodian-address>"
+# 2. Compile contracts
+npm run compile
 
+# 3. Deploy everything in one go
 npm run deploy:besu
+```
+
+`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
+1. Checks Besu RPC is reachable
+2. Spawns `besu/block-producer.js` as a child process (Engine API V3 block forger)
+3. Waits for block production to start
+4. Runs `npx hardhat run scripts/deploy.js --network besu`
+5. Stops the block producer and exits
+
+> **Why a unified script?** The post-merge Besu devnet has no real beacon chain — blocks must be actively produced via the Engine API. Running the block producer and deploy in separate terminals is fragile on Windows. The launcher coordinates both in a single process.
+
+#### Deploy OrderBook (After Core Contracts)
+
+```bash
+# Deploy standalone OrderBook with embedded block producer
+npx hardhat run scripts/deploy-orderbook.js --network besu
+
+# Deploy OrderBookFactory + initial market
+npx hardhat run scripts/deploy-orderbook-factory.js --network besu
+```
+
+#### Manual Deploy (Advanced)
+
+If you prefer to run the block producer separately:
+
+```bash
+# Terminal 1 — start the block producer
+node besu/block-producer.js --interval 1000
+
+# Terminal 2 — deploy contracts
+npx hardhat run scripts/deploy.js --network besu
 ```
 
 ### Deployment Order
@@ -595,6 +672,7 @@ npm run deploy:besu
 11. **`MultiSigWarm`** — warm wallet multi-sig
 12. **`HKSTPGovernor` + `HKSTPTimelock`** — governance stack
 13. **`SystemHealthCheck`** — run post-deployment wiring verification
+14. **`OrderBook`** — standalone order book (via `deploy-orderbook.js`, includes embedded block producer)
 
 ### Post-Deployment Steps
 
@@ -613,6 +691,7 @@ npm run deploy:besu
 13. Configure `MultiSigWarm` signers
 14. Grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
 15. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
+16. Run `scripts/harden-admin.js` to finalize admin role configuration
 16. Run `scripts/harden-admin.js` to finalize admin role configuration
 
 ---

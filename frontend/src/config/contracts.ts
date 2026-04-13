@@ -17,11 +17,11 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x58007B36aFFd661F8D3DC265D409C80f557Eb5e7',
-  compliance: '0x2C88a29ACbcD2472d1E1698FF8c07b3085B464e2',
-  securityToken: '0x046Bfa92B000F015ced65882Bad62Db43993b29B',
-  cashToken: '0x96338A290AA80e9A492254de78cEFbeb57B0Dc54',
-  dvpSettlement: '0xAA881df1D0b4Ab28757059e244d81Ec305a19771',
+  identityRegistry: '0x3168F97b255A7a11e134cf33F2Ee0c78637c9c0C',
+  compliance: '0x44DA6D482387c5dd88490F8A0cf9e9A066aC3E6a',
+  securityToken: '0x8eC60639166f38Fb1455f77F956761Bc9c14FD6b',
+  cashToken: '0x68Ede5Cf8d66f127FF24db24c0D1E739f38C5F8f',
+  dvpSettlement: '0xfE402F69c447C819e535627Fd633F30f3D82F763',
   tokenFactory: '0x0F095aeA9540468B19829d02cC811Ebe5173D615',
   claimIssuer: '0x51D4903ef5F871273e5B4172898B18809CFd7881',
   identityFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
@@ -30,7 +30,7 @@ export const CONTRACT_ADDRESSES = {
   walletRegistry: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
   multiSigWarm: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
   systemHealthCheck: '0x3415B7D5677909742C56dDADd140808Cc31Fe22c',
-  orderBook: '',  // UPDATE after running deploy-orderbook.js
+  orderBook: '0x595d8e5811e953573eF16290b943a2eea4f9629C',
   orderBookFactory: '0x36A8bE2C24f812ed7a95f14ffEBDB5F778F61699',
 };
 
