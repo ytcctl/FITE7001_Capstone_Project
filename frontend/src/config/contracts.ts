@@ -31,21 +31,18 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
-  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
-  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
-  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
-  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
-  tokenFactory: '0x05d91B9031A655d08E654177336d08543ac4B711',
-  claimIssuer: '0xfeae27388A65eE984F452f86efFEd42AaBD438FD',
-  identityFactory: '0xe135783649BfA7c9c4c6F8E528C7f56166efC8a6',
-  timelock: '0xC9Bc439c8723c5c6fdbBE14E5fF3a1224f8A0f7C',
-  governor: '0xDE87AF9156a223404885002669D3bE239313Ae33',
-  walletRegistry: '0x686AfD6e502A81D2e77f2e038A23C0dEf4949A20',
-  multiSigWarm: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
-  systemHealthCheck: '0xE03Ef2490316bfF9808d936eEe70f23896F07548',
-  orderBookFactory: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
-  orderBook: '0x2e9c5D910763e00CCDbF6CEEC98417e08f6629E3',
+  identityRegistry: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
+  compliance: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
+  securityToken: '0x47b33c2D3e928FDf2c0A82FcD7042Ae0cFd5862A',
+  cashToken: '0xed78Cb21Ce10A086a7973fB44e96d34F31D45cF1',
+  dvpSettlement: '0x218d5fe2E168656eBDE49e7a4A3C97E699D0be78',
+  tokenFactory: '0x3F0BE59Bc74c7368Aa049a0B064ce9Dc32890669',
+  claimIssuer: '0x290b0cFa0AC2d8959acf8009706273ffBB9F2572',
+  identityFactory: '0x6486A01e45648B1aDCc51D375Af3a7c0a5e9002a',
+  timelock: '0x1EA7432837C5e0e26209aa45aab6aA27913E51c0',
+  governor: '0x8002B7ae0032e39ec64ECe493AB727A8060eAb67',
+  walletRegistry: '0x0f908B9E910492958c6EaA269002AAf6Ae8F11bF',
+  multiSigWarm: '0x91810eaDF2d75b4422b39d80Bc81f0AB09B44356',
 };
 
 // -----------------------------------------------------------------
