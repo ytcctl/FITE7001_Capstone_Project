@@ -169,7 +169,7 @@ async function main() {
   const custodianAddress = agent.address;
 
   // 1. IdentityRegistry
-  console.log("1/12  Deploying HKSTPIdentityRegistry...");
+  console.log("1/14  Deploying HKSTPIdentityRegistry...");
   const IdentityRegistry = await ethers.getContractFactory(
     "HKSTPIdentityRegistry"
   );
@@ -179,7 +179,7 @@ async function main() {
   console.log("     HKSTPIdentityRegistry:", registryAddress);
 
   // 2. Compliance
-  console.log("2/12  Deploying HKSTPCompliance...");
+  console.log("2/14  Deploying HKSTPCompliance...");
   const Compliance = await ethers.getContractFactory("HKSTPCompliance");
   const compliance = await Compliance.deploy(deployer.address, complianceOracle);
   await compliance.waitForDeployment();
@@ -187,7 +187,7 @@ async function main() {
   console.log("     HKSTPCompliance:", complianceAddress);
 
   // 3. SecurityToken
-  console.log("3/12  Deploying HKSTPSecurityToken...");
+  console.log("3/14  Deploying HKSTPSecurityToken...");
   const Token = await ethers.getContractFactory("HKSTPSecurityToken");
   const token = await Token.deploy(
     "HKSTP Alpha Startup Token",
@@ -202,7 +202,7 @@ async function main() {
   console.log("     HKSTPSecurityToken:", tokenAddress);
 
   // 4. MockCashToken
-  console.log("4/12  Deploying MockCashToken (tokenized HKD)...");
+  console.log("4/14  Deploying MockCashToken (tokenized HKD)...");
   const MockCash = await ethers.getContractFactory("MockCashToken");
   const cashToken = await MockCash.deploy("Tokenized HKD", "THKD", 6, deployer.address);
   await cashToken.waitForDeployment();
@@ -210,7 +210,7 @@ async function main() {
   console.log("     MockCashToken (THKD):", cashTokenAddress);
 
   // 5. DvPSettlement
-  console.log("5/12  Deploying DvPSettlement...");
+  console.log("5/14  Deploying DvPSettlement...");
   const DvP = await ethers.getContractFactory("DvPSettlement");
   const dvp = await DvP.deploy(deployer.address);
   await dvp.waitForDeployment();
@@ -218,7 +218,7 @@ async function main() {
   console.log("     DvPSettlement:", dvpAddress);
 
   // 6. TokenFactory
-  console.log("6/12  Deploying TokenFactory...");
+  console.log("6/14  Deploying TokenFactory...");
   const TokenFactory = await ethers.getContractFactory("TokenFactory");
   const tokenFactory = await TokenFactory.deploy(
     deployer.address,    // admin
@@ -230,7 +230,7 @@ async function main() {
   console.log("     TokenFactory:", tokenFactoryAddress);
 
   // 7. ClaimIssuer (Trusted Claim Issuer for ONCHAINID)
-  console.log("7/12  Deploying ClaimIssuer...");
+  console.log("7/14  Deploying ClaimIssuer...");
   const ClaimIssuerFactory = await ethers.getContractFactory("ClaimIssuer");
   const claimIssuer = await ClaimIssuerFactory.deploy(deployer.address, deployer.address);
   await claimIssuer.waitForDeployment();
@@ -238,7 +238,7 @@ async function main() {
   console.log("     ClaimIssuer:", claimIssuerAddress);
 
   // 8. IdentityFactory (deploys per-investor ONCHAINID contracts)
-  console.log("8/12  Deploying IdentityFactory...");
+  console.log("8/14  Deploying IdentityFactory...");
   const IdentityFactoryContract = await ethers.getContractFactory("IdentityFactory");
   const identityFactory = await IdentityFactoryContract.deploy(deployer.address);
   await identityFactory.waitForDeployment();
@@ -246,7 +246,7 @@ async function main() {
   console.log("     IdentityFactory:", identityFactoryAddress);
 
   // 9. Timelock (governance execution delay)
-  console.log("9/12  Deploying HKSTPTimelock...");
+  console.log("9/14  Deploying HKSTPTimelock...");
   const TIMELOCK_MIN_DELAY = 172800; // 48 hours (production)
   const Timelock = await ethers.getContractFactory("HKSTPTimelock");
   const timelock = await Timelock.deploy(
@@ -260,7 +260,7 @@ async function main() {
   console.log("     HKSTPTimelock:", timelockAddress);
 
   // 10. Governor (on-chain governance with snapshot voting)
-  console.log("10/12 Deploying HKSTPGovernor...");
+  console.log("10/14 Deploying HKSTPGovernor...");
   const VOTING_DELAY  = 14400;  // ~2 days at 12s/block
   const VOTING_PERIOD = 50400;  // ~7 days at 12s/block
   const QUORUM_PCT    = 10;     // 10% of total supply
@@ -281,7 +281,7 @@ async function main() {
   console.log("     HKSTPGovernor:", governorAddress);
 
   // 11. WalletRegistry (98/2 custody rule enforcement)
-  console.log("11/12 Deploying WalletRegistry...");
+  console.log("11/14 Deploying WalletRegistry...");
   const WalletRegistry = await ethers.getContractFactory("WalletRegistry");
   const walletRegistry = await WalletRegistry.deploy(deployer.address);
   await walletRegistry.waitForDeployment();
@@ -289,7 +289,7 @@ async function main() {
   console.log("     WalletRegistry:", walletRegistryAddress);
 
   // 12. MultiSigWarm (2-of-3 multi-sig for warm wallet)
-  console.log("12/12 Deploying MultiSigWarm...");
+  console.log("12/14 Deploying MultiSigWarm...");
   // Use deployer + first two deterministic Besu accounts as initial signers
   // In production, replace with actual custody officer keys
   const warmSigner1 = deployer.address;
@@ -300,6 +300,34 @@ async function main() {
   await multiSigWarm.waitForDeployment();
   const multiSigWarmAddress = await multiSigWarm.getAddress();
   console.log("     MultiSigWarm:", multiSigWarmAddress);
+
+  // 13. OrderBook (on-chain order book for HKSAT/THKD)
+  console.log("13/14 Deploying OrderBook...");
+  const OrderBookFactory = await ethers.getContractFactory("OrderBook");
+  const orderBook = await OrderBookFactory.deploy(
+    tokenAddress,        // securityToken
+    cashTokenAddress,    // cashToken
+    18,                  // HKSTPSecurityToken decimals
+    6,                   // MockCashToken (THKD) decimals
+    registryAddress,     // identityRegistry (KYC gate)
+    deployer.address     // admin
+  );
+  await orderBook.waitForDeployment();
+  const orderBookAddress = await orderBook.getAddress();
+  console.log("     OrderBook:", orderBookAddress);
+
+  // 14. SystemHealthCheck (optional — deploy if contract exists)
+  let systemHealthCheckAddress = ethers.ZeroAddress;
+  try {
+    console.log("14/14 Deploying SystemHealthCheck...");
+    const SHC = await ethers.getContractFactory("SystemHealthCheck");
+    const shc = await SHC.deploy();
+    await shc.waitForDeployment();
+    systemHealthCheckAddress = await shc.getAddress();
+    console.log("     SystemHealthCheck:", systemHealthCheckAddress);
+  } catch (e) {
+    console.log("     ⚠ SystemHealthCheck skipped (contract not found or error)");
+  }
 
   // Post-deployment configuration
   console.log("\nConfiguring roles and safe-list...");
@@ -398,6 +426,89 @@ async function main() {
   await (await token.setSafeList(multiSigWarmAddress, true)).wait();
   console.log("     MultiSigWarm safe-listed on SecurityToken");
 
+  // OrderBook safe-listing (so escrow transfers succeed)
+  await (await token.setSafeList(orderBookAddress, true)).wait();
+  console.log("     OrderBook safe-listed on SecurityToken");
+
+  // -----------------------------------------------------------------------
+  // SEED INVESTOR1 (KYC + identity + tokens)
+  // -----------------------------------------------------------------------
+  const INVESTOR1 = "0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3";
+  console.log("\n══════════════════════════════════════════════════");
+  console.log("  Seeding Investor1:", INVESTOR1);
+  console.log("══════════════════════════════════════════════════");
+
+  // Grant AGENT_ROLE on IdentityRegistry to deployer (needed for registerIdentity)
+  const AGENT_ROLE_REG_DEPLOYER = await registry.AGENT_ROLE();
+  const deployerHasAgent = await registry.hasRole(AGENT_ROLE_REG_DEPLOYER, deployer.address);
+  if (!deployerHasAgent) {
+    await (await registry.grantRole(AGENT_ROLE_REG_DEPLOYER, deployer.address)).wait();
+    console.log("     AGENT_ROLE granted to deployer on IdentityRegistry");
+  }
+
+  // Register Investor1 identity
+  const inv1Registered = await registry.contains(INVESTOR1);
+  if (inv1Registered) {
+    const existingId = await registry.identity(INVESTOR1);
+    await (await registry.deleteIdentity(INVESTOR1)).wait();
+    await (await registry.registerIdentity(INVESTOR1, existingId, "HK")).wait();
+    console.log("     Investor1 re-registered (country: HK)");
+  } else {
+    const factoryId = await identityFactory.getIdentity(INVESTOR1);
+    if (factoryId !== ethers.ZeroAddress) {
+      await (await registry.registerIdentity(INVESTOR1, factoryId, "HK")).wait();
+      console.log("     Investor1 registered with factory identity (country: HK)");
+    } else {
+      await (await registry.registerIdentity(INVESTOR1, ethers.ZeroAddress, "HK")).wait();
+      console.log("     Investor1 registered (country: HK, auto-deploy identity)");
+    }
+  }
+
+  // Set boolean KYC claims (topics 1-5)
+  console.log("     Setting KYC claims (topics 1-5)...");
+  for (const topic of [1, 2, 3, 4, 5]) {
+    await (await registry.setClaim(INVESTOR1, topic, true)).wait();
+  }
+  console.log("     ✓ All 5 boolean claims set");
+
+  // Issue cryptographic ERC-735 claims via ClaimIssuer
+  console.log("     Issuing ERC-735 claims via ClaimIssuer...");
+  const inv1IdentityAddr = await registry.identity(INVESTOR1);
+  if (inv1IdentityAddr !== ethers.ZeroAddress) {
+    for (const topic of [1, 2, 3, 4, 5]) {
+      const claimData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "uint256", "uint256"],
+        [INVESTOR1, topic, 0]  // 0 = no expiry
+      );
+      const claimHash = await claimIssuer.getClaimHash(inv1IdentityAddr, topic, claimData);
+      const signature = await deployer.signMessage(ethers.getBytes(claimHash));
+      try {
+        await (await registry.issueClaim(INVESTOR1, topic, claimIssuerAddress, signature, claimData)).wait();
+      } catch (e) {
+        // already exists — fine
+      }
+    }
+    console.log("     ✓ ERC-735 claims issued");
+  }
+
+  // Verify investor
+  const isVerified = await registry.isVerified(INVESTOR1);
+  console.log(`     Investor1 isVerified: ${isVerified}`);
+
+  // Mint HKSAT tokens
+  const HKSAT_AMOUNT = ethers.parseUnits("10000", 18);
+  await (await token.mint(INVESTOR1, HKSAT_AMOUNT)).wait();
+  const hksatBal = await token.balanceOf(INVESTOR1);
+  console.log(`     ✓ HKSAT minted: ${ethers.formatUnits(hksatBal, 18)}`);
+
+  // Mint THKD tokens
+  const THKD_AMOUNT = ethers.parseUnits("5000000", 6);
+  await (await cashToken.mint(INVESTOR1, THKD_AMOUNT)).wait();
+  const thkdBal = await cashToken.balanceOf(INVESTOR1);
+  console.log(`     ✓ THKD minted: ${ethers.formatUnits(thkdBal, 6)}`);
+
+  console.log("     ✅ Investor1 seeded successfully");
+
   // -----------------------------------------------------------------------
   // AUTO-UPDATE frontend/src/config/contracts.ts
   // -----------------------------------------------------------------------
@@ -430,6 +541,7 @@ async function main() {
   governor: '${governorAddress}',
   walletRegistry: '${walletRegistryAddress}',
   multiSigWarm: '${multiSigWarmAddress}',
+  orderBook: '${orderBookAddress}',
 };`;
 
     if (oldBlock.test(content)) {
@@ -498,6 +610,9 @@ async function main() {
     `║ MultiSigWarm          : ${multiSigWarmAddress}  ║`
   );
   console.log(
+    `║ OrderBook             : ${orderBookAddress}  ║`
+  );
+  console.log(
     "╠══════════════════════════════════════════════════════════════╣"
   );
   console.log(
@@ -514,6 +629,15 @@ async function main() {
   );
   console.log(
     `║ Timelock delay: ${TIMELOCK_MIN_DELAY}s (48h) | Identity-locked voting  ║`
+  );
+  console.log(
+    "╠══════════════════════════════════════════════════════════════╣"
+  );
+  console.log(
+    `║ Investor1: ${INVESTOR1}              ║`
+  );
+  console.log(
+    `║   HKSAT: 10,000     THKD: 5,000,000     KYC: ✓              ║`
   );
   console.log(
     "╚══════════════════════════════════════════════════════════════╝"

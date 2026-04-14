@@ -44,25 +44,15 @@ done
 
 # ── 4. Deploy all contracts ──────────────────────────────────────
 echo ""
-echo "▶ Deploying all contracts (12 contracts + roles + frontend auto-update)..."
+echo "▶ Deploying all contracts (14 contracts + roles + seed investor + frontend auto-update)..."
 npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 
-# ── 5. Deploy OrderBook ─────────────────────────────────────────
+# ── 5. (Optional) Deploy SystemHealthCheck standalone ────────────
 echo ""
-echo "▶ Deploying OrderBook..."
-npx hardhat run scripts/deploy-orderbook.js --network localhost
+echo "▶ Verifying SystemHealthCheck..."
+npx hardhat run scripts/deploy-health-check.js --network localhost || echo "  ⚠ SystemHealthCheck deploy skipped (already deployed or optional)"
 
-# ── 6. Deploy SystemHealthCheck ──────────────────────────────────
-echo ""
-echo "▶ Deploying SystemHealthCheck..."
-npx hardhat run scripts/deploy-health-check.js --network localhost || echo "  ⚠ SystemHealthCheck deploy skipped (optional)"
-
-# ── 7. Seed investor ────────────────────────────────────────────
-echo ""
-echo "▶ Seeding Investor1 (KYC + tokens)..."
-npx hardhat run scripts/seed-investor.js --network localhost || echo "  ⚠ Seed investor skipped (optional)"
-
-# ── 8. Start frontend (background) ──────────────────────────────
+# ── 6. Start frontend (background) ──────────────────────────────
 echo ""
 echo "▶ Starting Vite dev server..."
 cd frontend

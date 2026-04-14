@@ -556,32 +556,31 @@ The fastest way to get a running instance with zero local setup:
 
 1. Go to [github.com/ytcctl/FITE7001_Capstone_Project](https://github.com/ytcctl/FITE7001_Capstone_Project)
 2. Click **Code → Codespaces → Create codespace on main**
-3. Wait ~3 minutes — the `postCreateCommand` automatically:
-   - Installs all Node dependencies
+3. Wait ~3 minutes — the `postCreateCommand` (`.devcontainer/post-create.sh`) automatically:
+   - Installs all Node dependencies (`npm ci` for root + frontend)
    - Compiles Solidity contracts
-   - Starts Hyperledger Besu in Docker
-   - Starts the Engine API block producer
-   - Deploys all 14+ contracts (including OrderBookFactory)
-   - Seeds Investor1 (KYC + 10,000 HKSAT + 5,000,000 THKD)
+   - Starts **Hardhat Network** in background (chain ID 31337, auto-mine)
+   - Deploys all 12+ contracts via `deploy-and-update-frontend.js`
+   - Deploys OrderBook
+   - Seeds Investor1 (KYC + tokens) *(optional, may be skipped)*
+   - Auto-updates `frontend/src/config/contracts.ts` with deployed addresses
    - Launches the Vite frontend on port 3000
 4. Codespaces auto-forwards port 3000 — click the URL to open the frontend
-5. Import the admin key in MetaMask and connect to the forwarded RPC URL
+5. Use the **built-in test accounts** in the Connect Wallet dropdown (no MetaMask needed), or import a dev key in MetaMask
 
 | Port | Service |
 |------|---------|
 | 3000 | Frontend (Vite) — auto-opens in browser |
-| 8545 | Besu JSON-RPC |
-| 8546 | Besu WebSocket |
-| 8551 | Besu Engine API |
+| 8545 | Hardhat JSON-RPC |
 
-> **MetaMask in Codespaces:** Point MetaMask to the Codespaces-forwarded port 8545 URL (e.g. `https://<codespace>-8545.app.github.dev`), chain ID **31337**.
+> **MetaMask in Codespaces:** Point MetaMask to the Codespaces-forwarded port 8545 URL (e.g. `https://<codespace>-8545.app.github.dev`), chain ID **31337**. Alternatively, use the built-in wallet (paste a dev private key directly in the Connect Wallet dropdown).
 
 ### Option B — Local Setup
 
 #### Prerequisites
 - Node.js ≥ 18 (required by Hardhat ^2.22.4)
 - npm ≥ 9
-- Docker (for Hyperledger Besu local network)
+- Docker *(optional — only needed if using Hyperledger Besu instead of Hardhat Network)*
 
 ### Install dependencies
 
@@ -603,15 +602,17 @@ npx hardhat compile
 |--------|---------|-------------|
 | `npm run compile` | `hardhat compile` | Compile all Solidity contracts |
 | `npm test` | `hardhat test` | Run all Hardhat test suites |
-| `npm run test:besu` | `hardhat test test/integration/besu-e2e.test.js --network besu` | Besu end-to-end integration tests |
+| `npm run test:besu` | `hardhat test test/integration/besu-e2e.test.js --network besu` | Besu end-to-end integration tests *(optional)* |
 | `npm run coverage` | `hardhat coverage` | Solidity code coverage report |
-| `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy to local Hardhat node |
-| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified deploy** (auto-spawns Hardhat node + contracts) |
-| `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
-| `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container |
-| `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container |
-| `npm run besu:logs` | `docker logs -f tokenhub-besu` | Tail Besu container logs |
+| `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy core contracts to Hardhat node |
+| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified deploy** — auto-spawns Hardhat node + deploys all contracts |
+| `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu *(requires running Besu + block producer)* |
+| `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container *(optional)* |
+| `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container *(optional)* |
+| `npm run besu:logs` | `docker logs -f tokenhub-besu` | Tail Besu container logs *(optional)* |
 | `npm run clean` | `hardhat clean` | Remove artifacts & cache |
+
+> **Recommended for development:** Use `npx hardhat node` + `--network localhost` (Hardhat Network). Besu scripts are available for production-like testing but require Docker.
 
 ---
 
@@ -824,8 +825,8 @@ The Investor Portal is a **React 18 + Vite + Tailwind CSS** single-page applicat
 |---|---|
 | Node.js | ≥ 18 |
 | Blockchain node | Running (`npx hardhat node` or Besu container) |
-| Contracts deployed | Via `npm run deploy:besu` (see §9) |
-| MetaMask | Configured for Chain ID **31337** |
+| Contracts deployed | Via `npm run deploy:besu` or `npx hardhat run scripts/deploy-and-update-frontend.js --network localhost` (see §9) |
+| MetaMask | *(Optional)* — configured for Chain ID **31337**; you can also use the built-in wallet |
 
 ### Step 1 — Update Contract Addresses
 
@@ -857,7 +858,24 @@ npm run dev
 # → opens http://localhost:3000
 ```
 
-### Step 4 — Connect MetaMask
+### Step 4 — Connect Wallet
+
+#### Option A — Built-in Test Accounts (Recommended, No MetaMask)
+
+1. Click **Connect Wallet** in the sidebar
+2. Select a test account from the dropdown:
+
+| Account | Role | Address |
+|---------|------|---------|
+| Deployer / Admin | `DEFAULT_ADMIN_ROLE` | `0xFE3B…Bd73` |
+| Operator | `OPERATOR_ROLE` | `0x6273…Ef57` |
+| Agent / Custodian | `AGENT_ROLE` | `0xf17f…b732` |
+| Seller | Investor | `0xC5fd…8Fef` |
+| Buyer | Investor | `0x821a…5544` |
+
+3. You're connected — no browser extension required
+
+#### Option B — MetaMask
 
 1. Add a **Custom Network** in MetaMask:
    - **Network Name:** TokenHub Devnet
@@ -866,6 +884,8 @@ npm run dev
    - **Currency Symbol:** ETH
 2. **Import** a dev account private key (e.g. the deployer key from the table in §9)
 3. Connect to the dApp when prompted
+
+> ⚠️ **Nonce errors after restarting Hardhat node:** MetaMask → Settings → Advanced → **Clear activity tab data**
 
 ### Step 5 — Production Build (Optional)
 
@@ -883,8 +903,8 @@ The `dist/` folder can be served by any static hosting provider (Nginx, Vercel, 
 |------|---------|
 | 3000 | Frontend (Vite dev server) |
 | 8545 | Hardhat / Besu JSON-RPC |
-| 8546 | Besu WebSocket (Besu only) |
-| 8551 | Besu Engine API (Besu only) |
+| 8546 | Besu WebSocket *(Besu only — not needed with Hardhat)* |
+| 8551 | Besu Engine API *(Besu only — not needed with Hardhat)* |
 
 ---
 
