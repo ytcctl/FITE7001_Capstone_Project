@@ -171,12 +171,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Bottom */}
         <div className="p-4 border-t border-white/10 space-y-2">
           {account && (
-            <div className="px-4 py-2 text-xs text-gray-400 truncate">
+            <div className="px-4 py-2 text-xs text-gray-400">
               <span className="block text-gray-500 mb-0.5">
                 Connected{walletMode === 'builtin' ? ' (Built-in)' : walletMode === 'metamask' ? ' (MetaMask)' : ''}
               </span>
-              {shortAddr} · Chain {chainId}
-              <span className={`ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+              <span className="block truncate">{shortAddr} · Chain {chainId}</span>
+              <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
                 roles.isAdmin
                   ? 'bg-yellow-500/20 text-yellow-400'
                   : roles.isAgent
