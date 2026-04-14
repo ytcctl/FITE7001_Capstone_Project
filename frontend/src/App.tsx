@@ -17,12 +17,20 @@ import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
 import { AlertTriangle } from 'lucide-react';
 
-/** Route guard — redirects non-admin users to the dashboard */
+/** Route guard — allows Admin OR Agent (KYC, Minting, Oracle) */
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { roles, rolesLoading, account } = useWeb3();
-  // While loading roles or not connected, show nothing (avoids flash)
   if (!account || rolesLoading) return null;
   if (!roles.isAdmin && !roles.isAgent) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
+/** Strict route guard — Admin only (Compliance, Token Mgmt, Markets, Custody).
+ *  Agent has no on-chain role on these contracts, so UI access is blocked. */
+const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { roles, rolesLoading, account } = useWeb3();
+  if (!account || rolesLoading) return null;
+  if (!roles.isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -57,17 +65,20 @@ const App: React.FC = () => {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          {/* Admin + Agent routes (Agent has AGENT_ROLE on these contracts) */}
           <Route path="/kyc" element={<AdminRoute><KYCManagement /></AdminRoute>} />
           <Route path="/mint" element={<AdminRoute><TokenMinting /></AdminRoute>} />
+          <Route path="/oracle" element={<AdminRoute><OracleCommittee /></AdminRoute>} />
+          {/* Admin-only routes (Agent has NO on-chain role on these contracts) */}
+          <Route path="/compliance" element={<AdminOnlyRoute><ComplianceRules /></AdminOnlyRoute>} />
+          <Route path="/tokens" element={<AdminOnlyRoute><TokenManagement /></AdminOnlyRoute>} />
+          <Route path="/custody" element={<AdminOnlyRoute><WalletCustody /></AdminOnlyRoute>} />
+          <Route path="/markets" element={<AdminOnlyRoute><MarketManagement /></AdminOnlyRoute>} />
+          {/* Public routes */}
           <Route path="/settlement" element={<Settlement />} />
-          <Route path="/compliance" element={<AdminRoute><ComplianceRules /></AdminRoute>} />
-          <Route path="/tokens" element={<AdminRoute><TokenManagement /></AdminRoute>} />
-          <Route path="/custody" element={<AdminRoute><WalletCustody /></AdminRoute>} />
           <Route path="/governance" element={<Governance />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/trading" element={<Trading />} />
-          <Route path="/markets" element={<AdminRoute><MarketManagement /></AdminRoute>} />
-          <Route path="/oracle" element={<AdminRoute><OracleCommittee /></AdminRoute>} />
         </Routes>
       </Layout>
     </>

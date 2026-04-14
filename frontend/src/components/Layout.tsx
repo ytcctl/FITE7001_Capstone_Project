@@ -30,18 +30,21 @@ interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Visible to Admin + Agent (Agent has AGENT_ROLE on the contract) */
+  adminOrAgent?: boolean;
+  /** Visible to Admin only (Agent has no on-chain role) */
   adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/kyc', label: 'KYC Management', icon: ShieldCheck, adminOnly: true },
-  { to: '/mint', label: 'Token Minting', icon: Coins, adminOnly: true },
+  { to: '/kyc', label: 'KYC Management', icon: ShieldCheck, adminOrAgent: true },
+  { to: '/mint', label: 'Token Minting', icon: Coins, adminOrAgent: true },
   { to: '/settlement', label: 'DvP Settlement', icon: ArrowRightLeft },
   { to: '/trading', label: 'Trading', icon: BarChart3 },
   { to: '/markets', label: 'Market Management', icon: Store, adminOnly: true },
   { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
-  { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, adminOnly: true },
+  { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, adminOrAgent: true },
   { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
   { to: '/custody', label: 'Wallet Custody', icon: Vault, adminOnly: true },
   { to: '/governance', label: 'Governance', icon: Vote },
@@ -132,7 +135,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to;
-            const isHidden = item.adminOnly && !isAdminOrAgent && !rolesLoading;
+            // adminOnly = admin-only pages (no agent); adminOrAgent = admin + agent pages
+            const isRestricted = item.adminOnly || item.adminOrAgent;
+            const isHidden =
+              !rolesLoading &&
+              ((item.adminOnly && !roles.isAdmin) ||
+               (item.adminOrAgent && !isAdminOrAgent));
 
             if (isHidden) return null;
 
@@ -148,7 +156,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <Icon size={20} className={isActive ? 'text-purple-400' : 'text-gray-500'} />
                 {item.label}
-                {item.adminOnly && (
+                {isRestricted && (
                   <Lock size={12} className="ml-auto text-yellow-500/60" />
                 )}
               </NavLink>
@@ -165,11 +173,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </span>
               {shortAddr} · Chain {chainId}
               <span className={`ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                isAdminOrAgent
+                roles.isAdmin
                   ? 'bg-yellow-500/20 text-yellow-400'
-                  : 'bg-blue-500/20 text-blue-400'
+                  : roles.isAgent
+                    ? 'bg-orange-500/20 text-orange-400'
+                    : 'bg-blue-500/20 text-blue-400'
               }`}>
-                {rolesLoading ? '…' : isAdminOrAgent ? 'ADMIN' : 'INVESTOR'}
+                {rolesLoading ? '…' : roles.isAdmin ? 'ADMIN' : roles.isAgent ? 'AGENT' : 'INVESTOR'}
               </span>
             </div>
           )}

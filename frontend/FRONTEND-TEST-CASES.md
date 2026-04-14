@@ -27,7 +27,7 @@
 | W-P-08 | Remove saved account | Click ✕ button on saved account entry | Account removed from saved list and localStorage | Low | | |
 | W-P-09 | Network switch prompt | Connect on wrong network → click "Switch Network" | MetaMask prompts to add/switch to Besu Devnet (chain 31337) | High | | |
 | W-P-10 | Role detection — admin | Connect with deployer key | `roles.isAdmin = true`, admin routes accessible | Critical | | |
-| W-P-11 | Role detection — agent | Connect with agent key | `roles.isAgent = true`, admin routes accessible | Critical | | |
+| W-P-11 | Role detection — agent | Connect with agent key | `roles.isAgent = true`, badge shows "AGENT" (orange), KYC/Mint/Oracle routes accessible, Compliance/Tokens/Markets/Custody hidden | Critical | | |
 | W-P-12 | Role detection — investor | Connect with regular wallet | `roles.isAdmin = false, isAgent = false`, admin routes hidden | Critical | | |
 
 ### 1.2 Negative Tests
@@ -42,10 +42,14 @@
 | W-N-06 | Wrong network connected | Connect MetaMask on Ethereum mainnet (chain 1) | Yellow banner: "Wrong Network" with switch button, routes accessible but data may be unavailable | Critical | | |
 | W-N-07 | Connect with empty private key | Leave key field empty → submit | Error message or button disabled | Low | | |
 | W-N-08 | RPC node unreachable | Stop Besu node → attempt to connect | Graceful error, role detection defaults to no roles | High | | |
-| W-N-09 | Admin route access without role | Connect as investor → navigate to `/kyc` directly via URL | Redirected to Dashboard, admin page not rendered | Critical | | |
-| W-N-10 | Admin route access to `/mint` | Connect as investor → navigate to `/mint` via URL | Redirected to Dashboard | Critical | | |
-| W-N-11 | Admin route access to `/compliance` | Connect as investor → navigate to `/compliance` via URL | Redirected to Dashboard | Critical | | |
-| W-N-12 | Admin route access to `/custody` | Connect as investor → navigate to `/custody` via URL | Redirected to Dashboard | Critical | | |
+| W-N-09 | Investor route access to `/kyc` | Connect as investor → navigate to `/kyc` directly via URL | Redirected to Dashboard, admin page not rendered | Critical | | |
+| W-N-10 | Investor route access to `/mint` | Connect as investor → navigate to `/mint` via URL | Redirected to Dashboard | Critical | | |
+| W-N-11 | Investor route access to `/compliance` | Connect as investor → navigate to `/compliance` via URL | Redirected to Dashboard | Critical | | |
+| W-N-12 | Investor route access to `/custody` | Connect as investor → navigate to `/custody` via URL | Redirected to Dashboard | Critical | | |
+| W-N-13 | Agent route access to `/compliance` | Connect as agent → navigate to `/compliance` via URL | Redirected to Dashboard (Agent has no on-chain role on Compliance) | Critical | | |
+| W-N-14 | Agent route access to `/tokens` | Connect as agent → navigate to `/tokens` via URL | Redirected to Dashboard (Agent has no on-chain role on TokenFactory) | Critical | | |
+| W-N-15 | Agent route access to `/markets` | Connect as agent → navigate to `/markets` via URL | Redirected to Dashboard (Agent has no on-chain role on OrderBookFactory) | Critical | | |
+| W-N-16 | Agent route access to `/custody` | Connect as agent → navigate to `/custody` via URL | Redirected to Dashboard (Agent has no on-chain role on WalletRegistry) | Critical | | |
 
 ---
 
@@ -130,8 +134,9 @@
 | T-N-02 | Empty token name | Leave name empty → Create | Error: "Token name and symbol cannot be empty." or button disabled | Medium | | |
 | T-N-03 | Empty token symbol | Leave symbol empty → Create | Error or button disabled | Medium | | |
 | T-N-04 | Symbol > 10 characters | Enter "VERYLONGSYMBOL" (14 chars) | Input limited to 10 chars | Low | | |
-| T-N-05 | Non-admin create token | Connect as investor → try to create token | Route guard blocks access | Critical | | |
-| T-N-06 | Transaction failure | Create token with contract error → check UI | Error message displayed, form state preserved | Medium | | |
+| T-N-05 | Non-admin create token (investor) | Connect as investor → try to create token | Route guard blocks access | Critical | | |
+| T-N-06 | Non-admin create token (agent) | Connect as agent → try to create token | Route guard blocks access (Agent has no TokenFactory role) | Critical | | |
+| T-N-07 | Transaction failure | Create token with contract error → check UI | Error message displayed, form state preserved | Medium | | |
 
 ---
 
@@ -268,9 +273,10 @@
 | C-N-03 | Invalid investor address for cap | Enter "abc" → Set Cap | Tx fails, error about address format | Medium | | |
 | C-N-04 | Negative cap amount | Enter -1000 → Set Cap | Validation error or contract rejection | Medium | | |
 | C-N-05 | Lock-up date in past | Select past date → Set Lock-Up | Tx may succeed but lock-up is already expired (no practical effect) | Low | | |
-| C-N-06 | Non-admin access | Connect as investor → navigate to `/compliance` | Route guard redirects to Dashboard | Critical | | |
-| C-N-07 | Set cap for unregistered address | Enter address not in identity registry → Set Cap | Tx may revert depending on compliance logic | Medium | | |
-| C-N-08 | Empty cap amount | Leave amount empty → Set Cap | Validation error or button disabled | Low | | |
+| C-N-06 | Non-admin access (investor) | Connect as investor → navigate to `/compliance` | Route guard redirects to Dashboard | Critical | | |
+| C-N-07 | Non-admin access (agent) | Connect as agent → navigate to `/compliance` | Route guard redirects to Dashboard (Agent has no Compliance role) | Critical | | |
+| C-N-08 | Set cap for unregistered address | Enter address not in identity registry → Set Cap | Tx may revert depending on compliance logic | Medium | | |
+| C-N-09 | Empty cap amount | Leave amount empty → Set Cap | Validation error or button disabled | Low | | |
 
 ---
 
@@ -363,9 +369,10 @@
 | MM-N-03 | No token selected | Don't select token → click Create | Error: "Select a token" | Medium | | |
 | MM-N-04 | Empty name | Clear auto-filled name → Create | Error: "Name and symbol required" | Medium | | |
 | MM-N-05 | Empty symbol | Clear auto-filled symbol → Create | Error: "Name and symbol required" | Medium | | |
-| MM-N-06 | Non-admin access | Connect as investor → navigate to `/markets` | Route guard redirects to Dashboard | Critical | | |
-| MM-N-07 | No tokens available | No factory tokens exist | Dropdown empty, creation not possible | Low | | |
-| MM-N-08 | Invalid decimals | Enter 99 for decimals | Contract may reject (0-18 valid range) | Low | | |
+| MM-N-06 | Non-admin access (investor) | Connect as investor → navigate to `/markets` | Route guard redirects to Dashboard | Critical | | |
+| MM-N-07 | Non-admin access (agent) | Connect as agent → navigate to `/markets` | Route guard redirects to Dashboard (Agent has no OrderBookFactory role) | Critical | | |
+| MM-N-08 | No tokens available | No factory tokens exist | Dropdown empty, creation not possible | Low | | |
+| MM-N-09 | Invalid decimals | Enter 99 for decimals | Contract may reject (0-18 valid range) | Low | | |
 
 ---
 
@@ -397,11 +404,12 @@
 | WC-N-01 | Compliance violation | Hot wallet holds > 2% of AUM | "OVER CAP" red warning displayed | Critical | | |
 | WC-N-02 | Register invalid address | Enter "bad-address" → Register | Error displayed, wallet not registered | Medium | | |
 | WC-N-03 | Register duplicate wallet | Register same address twice | Tx reverts, error about duplicate | High | | |
-| WC-N-04 | Non-admin access | Connect as investor → navigate to `/custody` | Route guard redirects to Dashboard | Critical | | |
-| WC-N-05 | Empty label | Leave label empty → Register | Default label assigned (e.g., "Account 1") | Low | | |
-| WC-N-06 | No wallets registered | Open page with empty registry | Empty table, zero balances, 0% for all tiers | Medium | | |
-| WC-N-07 | Sweep check when compliant | Hot wallet < 2% → Trigger Sweep | Button may be hidden when compliant | Low | | |
-| WC-N-08 | Invalid tier selection | Manipulate form to submit invalid tier | Contract rejects, error displayed | Medium | | |
+| WC-N-04 | Non-admin access (investor) | Connect as investor → navigate to `/custody` | Route guard redirects to Dashboard | Critical | | |
+| WC-N-05 | Non-admin access (agent) | Connect as agent → navigate to `/custody` | Route guard redirects to Dashboard (Agent has no WalletRegistry role) | Critical | | |
+| WC-N-06 | Empty label | Leave label empty → Register | Default label assigned (e.g., "Account 1") | Low | | |
+| WC-N-07 | No wallets registered | Open page with empty registry | Empty table, zero balances, 0% for all tiers | Medium | | |
+| WC-N-08 | Sweep check when compliant | Hot wallet < 2% → Trigger Sweep | Button may be hidden when compliant | Low | | |
+| WC-N-09 | Invalid tier selection | Manipulate form to submit invalid tier | Contract rejects, error displayed | Medium | | |
 
 ---
 
@@ -465,9 +473,10 @@
 | V2-N-03 | Upgrade to zero address | Enter `0x0000…0000` → Upgrade | Tx reverts, error: "zero impl" | Critical | | |
 | V2-N-04 | Upgrade to same implementation | Enter current impl address → Upgrade | Tx reverts, error: "same impl" | High | | |
 | V2-N-05 | Upgrade without UPGRADER_ROLE | Connect non-admin → try upgrade | Tx reverts (no role), error displayed | Critical | | |
-| V2-N-06 | Non-admin create V2 token | Connect as investor → try create | Route guard blocks access to page | Critical | | |
-| V2-N-07 | Symbol > 10 chars | Enter "VERYLONGSYM" (11 chars) | Input limited to 10 characters | Low | | |
-| V2-N-08 | Transaction rejected by user | Start create → reject in MetaMask | Error displayed, form preserved | Medium | | |
+| V2-N-06 | Non-admin create V2 token (investor) | Connect as investor → try create | Route guard blocks access to page | Critical | | |
+| V2-N-07 | Non-admin create V2 token (agent) | Connect as agent → try create | Route guard blocks access (Agent has no TokenFactoryV2 role) | Critical | | |
+| V2-N-08 | Symbol > 10 chars | Enter "VERYLONGSYM" (11 chars) | Input limited to 10 characters | Low | | |
+| V2-N-09 | Transaction rejected by user | Start create → reject in MetaMask | Error displayed, form preserved | Medium | | |
 
 ---
 
@@ -482,10 +491,11 @@
 | X-P-03 | Create Token → Create Market → Trade | Admin creates token → creates order book → investors trade | Full market lifecycle works | Critical | | |
 | X-P-04 | Settlement after trade match | Buy and sell orders match → create DvP settlement → execute | Atomic swap completes, balances correct | Critical | | |
 | X-P-05 | Governance → Compliance change | Create proposal to change compliance → vote → queue → execute | Compliance change enacted via governance | High | | |
-| X-P-06 | Role-based navigation | Switch between admin and investor accounts | Nav items and accessible pages change accordingly | High | | |
-| X-P-07 | Multi-page data consistency | Mint tokens in Minting page → check Dashboard + Portfolio | Balances consistent across all pages | High | | |
-| X-P-08 | V2 Token → Mint → Trade lifecycle | Create V2 token → mint via Minting → create market → trade | Full lifecycle with upgradeable token | High | | |
-| X-P-09 | Oracle Committee → Compliance attestation | Configure 2-of-3 oracle → sign attestation → transfer passes compliance | Multi-oracle compliance pipeline works | High | | |
+| X-P-06 | Role-based navigation (admin vs investor) | Switch between admin and investor accounts | Nav items and accessible pages change accordingly | High | | |
+| X-P-07 | Role-based navigation (agent) | Connect as agent | Agent sees KYC/Mint/Oracle but NOT Compliance/Tokens/Markets/Custody; badge shows "AGENT" (orange) | High | | |
+| X-P-08 | Multi-page data consistency | Mint tokens in Minting page → check Dashboard + Portfolio | Balances consistent across all pages | High | | |
+| X-P-09 | V2 Token → Mint → Trade lifecycle | Create V2 token → mint via Minting → create market → trade | Full lifecycle with upgradeable token | High | | |
+| X-P-10 | Oracle Committee → Compliance attestation | Configure 2-of-3 oracle → sign attestation → transfer passes compliance | Multi-oracle compliance pipeline works | High | | |
 
 ### 15.2 Negative Tests
 
@@ -506,19 +516,19 @@
 
 | Category | Positive | Negative | Total |
 |----------|----------|----------|-------|
-| 1. Wallet Connection & Network | 12 | 12 | 24 |
+| 1. Wallet Connection & Network | 12 | 16 | 28 |
 | 2. Dashboard | 7 | 6 | 13 |
 | 3. KYC Management | 8 | 10 | 18 |
-| 4. Token Management (V1) | 7 | 6 | 13 |
+| 4. Token Management (V1) | 7 | 7 | 14 |
 | 5. Token Minting | 9 | 10 | 19 |
 | 6. Trading | 14 | 12 | 26 |
 | 7. DvP Settlement | 9 | 12 | 21 |
-| 8. Compliance Rules | 9 | 8 | 17 |
+| 8. Compliance Rules | 9 | 9 | 18 |
 | 9. Governance | 12 | 10 | 22 |
 | 10. Portfolio | 6 | 10 | 16 |
-| 11. Market Management | 7 | 8 | 15 |
-| 12. Wallet Custody | 14 | 8 | 22 |
+| 11. Market Management | 7 | 9 | 16 |
+| 12. Wallet Custody | 14 | 9 | 23 |
 | 13. Oracle Committee | 10 | 10 | 20 |
-| 14. Token Factory V2 | 10 | 8 | 18 |
-| 15. Cross-Cutting / Integration | 9 | 8 | 17 |
-| **Total** | **143** | **138** | **281** |
+| 14. Token Factory V2 | 10 | 9 | 19 |
+| 15. Cross-Cutting / Integration | 10 | 8 | 18 |
+| **Total** | **144** | **147** | **291** |
