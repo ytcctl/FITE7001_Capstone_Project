@@ -6,7 +6,7 @@
 |------|---------|
 | Blockchain | Hardhat Devnet (Chain ID 31337) running locally or via Codespaces |
 | Contracts | All contracts deployed via `npx hardhat run scripts/deploy-and-update-frontend.js --network localhost` |
-| Wallets | Admin wallet (deployer), Agent wallet, 2+ Investor wallets |
+| Wallets | Admin wallet (deployer), Agent wallet, Operator wallet, 2+ Investor wallets |
 | Browser | MetaMask installed and configured for Hardhat Devnet |
 
 ---
@@ -29,6 +29,7 @@
 | W-P-10 | Role detection — admin | Connect with deployer key | `roles.isAdmin = true`, admin routes accessible | Critical | | |
 | W-P-11 | Role detection — agent | Connect with agent key | `roles.isAgent = true`, badge shows "AGENT" (orange), KYC/Mint/Oracle routes accessible, Compliance/Tokens/Markets/Custody hidden | Critical | | |
 | W-P-12 | Role detection — investor | Connect with regular wallet | `roles.isAdmin = false, isAgent = false`, admin routes hidden | Critical | | |
+| W-P-13 | Role detection — operator | Connect with operator key | `roles.isOperator = true`, badge shows "OPERATOR" (green), Settlement/Oracle accessible, KYC/Mint/Compliance/Tokens/Markets/Custody hidden | Critical | | |
 
 ### 1.2 Negative Tests
 
@@ -50,6 +51,12 @@
 | W-N-14 | Agent route access to `/tokens` | Connect as agent → navigate to `/tokens` via URL | Redirected to Dashboard (Agent has no on-chain role on TokenFactory) | Critical | | |
 | W-N-15 | Agent route access to `/markets` | Connect as agent → navigate to `/markets` via URL | Redirected to Dashboard (Agent has no on-chain role on OrderBookFactory) | Critical | | |
 | W-N-16 | Agent route access to `/custody` | Connect as agent → navigate to `/custody` via URL | Redirected to Dashboard (Agent has no on-chain role on WalletRegistry) | Critical | | |
+| W-N-17 | Operator route access to `/kyc` | Connect as operator → navigate to `/kyc` via URL | Redirected to Dashboard (Operator has no AGENT_ROLE on IdentityRegistry) | Critical | | |
+| W-N-18 | Operator route access to `/mint` | Connect as operator → navigate to `/mint` via URL | Redirected to Dashboard (Operator has no AGENT_ROLE on SecurityToken) | Critical | | |
+| W-N-19 | Operator route access to `/compliance` | Connect as operator → navigate to `/compliance` via URL | Redirected to Dashboard (Operator has no role on Compliance) | Critical | | |
+| W-N-20 | Operator route access to `/tokens` | Connect as operator → navigate to `/tokens` via URL | Redirected to Dashboard (Operator has no role on TokenFactory) | Critical | | |
+| W-N-21 | Operator route access to `/markets` | Connect as operator → navigate to `/markets` via URL | Redirected to Dashboard (Operator has no role on OrderBookFactory) | Critical | | |
+| W-N-22 | Operator route access to `/custody` | Connect as operator → navigate to `/custody` via URL | Redirected to Dashboard (Operator has no role on WalletRegistry) | Critical | | |
 
 ---
 
@@ -228,6 +235,7 @@
 | S-P-07 | Default deadline | Leave deadline as default (24 hours) | Settlement created with 24-hour deadline | Medium | | |
 | S-P-08 | Custom deadline | Enter 48 hours → Create | Deadline set to 48 hours from now | Medium | | |
 | S-P-09 | Settlement list display | Create multiple settlements | All settlements shown with correct ID, seller, buyer, amounts, status | Medium | | |
+| S-P-10 | Operator creates settlement | Connect as operator → create settlement | Tx succeeds (Operator has OPERATOR_ROLE on DvP), settlement appears | Critical | | |
 
 ### 7.2 Negative Tests
 
@@ -245,6 +253,7 @@
 | S-N-10 | Batch execute empty selection | Click "Batch Execute" with none selected | Button disabled when count = 0 | Low | | |
 | S-N-11 | Zero deadline | Enter 0 hours → Create | Validation error (deadline must be > 0) | Medium | | |
 | S-N-12 | Execute when seller has insufficient tokens | Seller sold tokens after creation → Execute | Tx reverts, error about insufficient balance | Critical | | |
+| S-N-13 | Investor creates settlement | Connect as investor → fill form → Create | Tx reverts on-chain (no OPERATOR_ROLE), error displayed | Critical | | |
 
 ---
 
@@ -440,7 +449,7 @@
 | OC-N-04 | Add zero address | Enter `0x0000…0000` → Add | Tx reverts, error: "zero address" | Medium | | |
 | OC-N-05 | Set threshold below 2 | Enter 1 → Update Threshold | Tx reverts, error: "threshold must be >=2" | Critical | | |
 | OC-N-06 | Set threshold above member count | 3 members → set threshold to 4 | Tx reverts, error: "threshold > members" | High | | |
-| OC-N-07 | Non-admin access | Connect as investor → navigate to `/oracle` | Route guard redirects to Dashboard | Critical | | |
+| OC-N-07 | Non-privileged access | Connect as investor → navigate to `/oracle` | Route guard redirects to Dashboard (investor has no oracle membership) | Critical | | |
 | OC-N-08 | Invalid address format | Enter "abc123" → Add Oracle | Tx fails with address format error | Medium | | |
 | OC-N-09 | Empty address | Leave address empty → click Add Oracle | Button disabled (required field) | Low | | |
 | OC-N-10 | Transaction rejected by user | Start add oracle → reject in MetaMask | Error displayed, form preserved | Medium | | |
@@ -493,9 +502,10 @@
 | X-P-05 | Governance → Compliance change | Create proposal to change compliance → vote → queue → execute | Compliance change enacted via governance | High | | |
 | X-P-06 | Role-based navigation (admin vs investor) | Switch between admin and investor accounts | Nav items and accessible pages change accordingly | High | | |
 | X-P-07 | Role-based navigation (agent) | Connect as agent | Agent sees KYC/Mint/Oracle but NOT Compliance/Tokens/Markets/Custody; badge shows "AGENT" (orange) | High | | |
-| X-P-08 | Multi-page data consistency | Mint tokens in Minting page → check Dashboard + Portfolio | Balances consistent across all pages | High | | |
-| X-P-09 | V2 Token → Mint → Trade lifecycle | Create V2 token → mint via Minting → create market → trade | Full lifecycle with upgradeable token | High | | |
-| X-P-10 | Oracle Committee → Compliance attestation | Configure 2-of-3 oracle → sign attestation → transfer passes compliance | Multi-oracle compliance pipeline works | High | | |
+| X-P-08 | Role-based navigation (operator) | Connect as operator | Operator sees Settlement/Oracle but NOT KYC/Mint/Compliance/Tokens/Markets/Custody; badge shows "OPERATOR" (green) | High | | |
+| X-P-09 | Multi-page data consistency | Mint tokens in Minting page → check Dashboard + Portfolio | Balances consistent across all pages | High | | |
+| X-P-10 | V2 Token → Mint → Trade lifecycle | Create V2 token → mint via Minting → create market → trade | Full lifecycle with upgradeable token | High | | |
+| X-P-11 | Oracle Committee → Compliance attestation | Configure 2-of-3 oracle → sign attestation → transfer passes compliance | Multi-oracle compliance pipeline works | High | | |
 
 ### 15.2 Negative Tests
 
@@ -516,13 +526,13 @@
 
 | Category | Positive | Negative | Total |
 |----------|----------|----------|-------|
-| 1. Wallet Connection & Network | 12 | 16 | 28 |
+| 1. Wallet Connection & Network | 13 | 22 | 35 |
 | 2. Dashboard | 7 | 6 | 13 |
 | 3. KYC Management | 8 | 10 | 18 |
 | 4. Token Management (V1) | 7 | 7 | 14 |
 | 5. Token Minting | 9 | 10 | 19 |
 | 6. Trading | 14 | 12 | 26 |
-| 7. DvP Settlement | 9 | 12 | 21 |
+| 7. DvP Settlement | 10 | 13 | 23 |
 | 8. Compliance Rules | 9 | 9 | 18 |
 | 9. Governance | 12 | 10 | 22 |
 | 10. Portfolio | 6 | 10 | 16 |
@@ -530,5 +540,5 @@
 | 12. Wallet Custody | 14 | 9 | 23 |
 | 13. Oracle Committee | 10 | 10 | 20 |
 | 14. Token Factory V2 | 10 | 9 | 19 |
-| 15. Cross-Cutting / Integration | 10 | 8 | 18 |
-| **Total** | **144** | **147** | **291** |
+| 15. Cross-Cutting / Integration | 11 | 8 | 19 |
+| **Total** | **147** | **154** | **301** |

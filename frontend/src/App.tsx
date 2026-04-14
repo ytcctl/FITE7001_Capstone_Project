@@ -17,7 +17,7 @@ import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
 import { AlertTriangle } from 'lucide-react';
 
-/** Route guard — allows Admin OR Agent (KYC, Minting, Oracle) */
+/** Route guard — allows Admin OR Agent (KYC, Minting) */
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { roles, rolesLoading, account } = useWeb3();
   if (!account || rolesLoading) return null;
@@ -31,6 +31,15 @@ const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { roles, rolesLoading, account } = useWeb3();
   if (!account || rolesLoading) return null;
   if (!roles.isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
+/** Route guard — allows Admin, Agent, OR Operator (Oracle Committee).
+ *  All three are initial oracle members. */
+const PrivilegedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { roles, rolesLoading, account } = useWeb3();
+  if (!account || rolesLoading) return null;
+  if (!roles.isAdmin && !roles.isAgent && !roles.isOperator) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -68,7 +77,8 @@ const App: React.FC = () => {
           {/* Admin + Agent routes (Agent has AGENT_ROLE on these contracts) */}
           <Route path="/kyc" element={<AdminRoute><KYCManagement /></AdminRoute>} />
           <Route path="/mint" element={<AdminRoute><TokenMinting /></AdminRoute>} />
-          <Route path="/oracle" element={<AdminRoute><OracleCommittee /></AdminRoute>} />
+          {/* Admin + Agent + Operator route (all are oracle members) */}
+          <Route path="/oracle" element={<PrivilegedRoute><OracleCommittee /></PrivilegedRoute>} />
           {/* Admin-only routes (Agent has NO on-chain role on these contracts) */}
           <Route path="/compliance" element={<AdminOnlyRoute><ComplianceRules /></AdminOnlyRoute>} />
           <Route path="/tokens" element={<AdminOnlyRoute><TokenManagement /></AdminOnlyRoute>} />

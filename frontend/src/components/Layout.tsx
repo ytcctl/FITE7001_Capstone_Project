@@ -34,6 +34,8 @@ interface NavItem {
   adminOrAgent?: boolean;
   /** Visible to Admin only (Agent has no on-chain role) */
   adminOnly?: boolean;
+  /** Visible to Admin + Agent + Operator (Oracle: all 3 are members) */
+  privileged?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -44,7 +46,7 @@ const navItems: NavItem[] = [
   { to: '/trading', label: 'Trading', icon: BarChart3 },
   { to: '/markets', label: 'Market Management', icon: Store, adminOnly: true },
   { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
-  { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, adminOrAgent: true },
+  { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, privileged: true },
   { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
   { to: '/custody', label: 'Wallet Custody', icon: Vault, adminOnly: true },
   { to: '/governance', label: 'Governance', icon: Vote },
@@ -67,6 +69,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, [showWalletMenu]);
 
   const isAdminOrAgent = roles.isAdmin || roles.isAgent;
+  const isPrivileged = roles.isAdmin || roles.isAgent || roles.isOperator;
   const shortAddr = account ? `${account.slice(0, 6)}…${account.slice(-4)}` : '';
 
   const handleTestAccount = async (key: string) => {
@@ -135,12 +138,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to;
-            // adminOnly = admin-only pages (no agent); adminOrAgent = admin + agent pages
-            const isRestricted = item.adminOnly || item.adminOrAgent;
+            // adminOnly = admin-only pages; adminOrAgent = admin + agent; privileged = admin + agent + operator
+            const isRestricted = item.adminOnly || item.adminOrAgent || item.privileged;
             const isHidden =
               !rolesLoading &&
               ((item.adminOnly && !roles.isAdmin) ||
-               (item.adminOrAgent && !isAdminOrAgent));
+               (item.adminOrAgent && !isAdminOrAgent) ||
+               (item.privileged && !isPrivileged));
 
             if (isHidden) return null;
 
@@ -177,9 +181,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   ? 'bg-yellow-500/20 text-yellow-400'
                   : roles.isAgent
                     ? 'bg-orange-500/20 text-orange-400'
-                    : 'bg-blue-500/20 text-blue-400'
+                    : roles.isOperator
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-blue-500/20 text-blue-400'
               }`}>
-                {rolesLoading ? '…' : roles.isAdmin ? 'ADMIN' : roles.isAgent ? 'AGENT' : 'INVESTOR'}
+                {rolesLoading ? '…' : roles.isAdmin ? 'ADMIN' : roles.isAgent ? 'AGENT' : roles.isOperator ? 'OPERATOR' : 'INVESTOR'}
               </span>
             </div>
           )}
