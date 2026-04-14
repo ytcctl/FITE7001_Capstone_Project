@@ -542,6 +542,7 @@ async function main() {
   walletRegistry: '${walletRegistryAddress}',
   multiSigWarm: '${multiSigWarmAddress}',
   orderBook: '${orderBookAddress}',
+  systemHealthCheck: '${systemHealthCheckAddress}',
 };`;
 
     if (oldBlock.test(content)) {

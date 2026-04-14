@@ -34,6 +34,7 @@ export const CONTRACT_ADDRESSES = {
   walletRegistry: '0xe52155361a36C7d445F2c6784B14Bf7A3C306e15',
   multiSigWarm: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
   orderBook: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
+  systemHealthCheck: '0x98142ec58835D34db876A78cb1A7e696b47AFD68',
 };
 
 // -----------------------------------------------------------------
