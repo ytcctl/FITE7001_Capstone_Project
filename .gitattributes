@@ -1,0 +1,6 @@
+# Ensure shell scripts always use LF (required for Linux/Codespaces)
+*.sh text eol=lf
+.devcontainer/** text eol=lf
+
+# Keep default for everything else
+* text=auto
