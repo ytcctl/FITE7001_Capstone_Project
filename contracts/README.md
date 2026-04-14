@@ -6,7 +6,7 @@
 
 ## Architecture Overview
 
-TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible) with four validator nodes — HKSTP, Platform Operator, Licensed Custodian, and Regulator Observer.
+TokenHub operates on a **Hardhat Network** (development) or **Hyperledger Besu** (production-like) EVM-compatible blockchain. The Hardhat Network is the recommended development environment — it auto-mines instantly, pre-funds accounts, and requires zero external dependencies. Besu is available as an optional production-like alternative with four validator nodes.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -22,7 +22,7 @@ TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible
          └─────────────────────────┬────────────────────────┘
                                    │
 ┌──────────────────────────────────▼───────────────────────────────────────┐
-│                  HYPERLEDGER BESU  (Permissioned EVM)                    │
+│                  HARDHAT NETWORK / BESU  (EVM)                           │
 │                                                                          │
 │  ┌─────────────────────┐  ┌───────────────────────┐  ┌───────────────┐  │
 │  │ HKSTPSecurityToken  │  │ HKSTPIdentityRegistry │  │ TokenFactory  │  │
@@ -524,13 +524,12 @@ npx hardhat compile
 | `npm test` | `hardhat test` | Run all Hardhat test suites |
 | `npm run test:besu` | `hardhat test … --network besu` | Besu end-to-end integration tests |
 | `npm run coverage` | `hardhat coverage` | Solidity code coverage report |
-| `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy to local Hardhat node |
-| `npm run deploy:besu` | `node scripts/deploy-besu.js` | **Unified deploy** (auto-spawns Hardhat node + contracts) |
+| `npm run deploy:local` | `hardhat run scripts/deploy.js --network localhost` | Deploy core contracts to local Hardhat node |
+| `npm run deploy:besu` | `node scripts/deploy-besu.js` | Besu deploy (auto-spawns node + block producer) |
 | `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
-| `npm run besu:start` | `powershell … start-besu.ps1 -Detach` | Start Besu Docker container |
-| `npm run besu:stop` | `docker stop/rm tokenhub-besu` | Stop & remove Besu container |
-| `npm run besu:logs` | `docker logs -f tokenhub-besu` | Tail Besu container logs |
 | `npm run clean` | `hardhat clean` | Remove artifacts & cache |
+
+> **Recommended workflow:** Use `deploy-and-update-frontend.js` (see §9 below) instead of the individual `deploy:local` script — it deploys all 14 contracts, seeds Investor1, and auto-updates the frontend config.
 
 ---
 
@@ -588,33 +587,40 @@ Hardhat Network is the recommended development blockchain — it auto-mines tran
 #### Quick Start (All-in-One)
 
 ```bash
-npm run compile
-npm run deploy:besu    # Launches Hardhat node + deploys all contracts
-```
-
-`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
-1. Checks if a node is running on port 8545 (Hardhat or Besu)
-2. If not, auto-spawns `npx hardhat node` as a managed child process
-3. If Besu Engine API is detected on port 8551, spawns the block producer
-4. Runs `npx hardhat run scripts/deploy.js --network localhost`
-5. Stops the block producer (if any) and leaves the node running
-
-#### Manual Start (Two Terminals)
-
-```bash
 # Terminal 1 — start the Hardhat node (stays running)
 npx hardhat node
 
-# Terminal 2 — deploy core contracts
-npx hardhat run scripts/deploy.js --network localhost
+# Terminal 2 — compile and deploy everything
+npx hardhat compile
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
+```
 
-# Terminal 2 — deploy OrderBook
-npx hardhat run scripts/deploy-orderbook.js --network localhost
+`deploy-and-update-frontend.js` is the **unified deploy script** that:
+1. Deploys all **14 contracts** (IdentityRegistry → Compliance → SecurityToken → … → OrderBook → SystemHealthCheck)
+2. Configures all roles, safe-lists, ONCHAINID wiring, governance, and custody links
+3. **Seeds Investor1** — registers identity, sets KYC claims 1–5, issues ERC-735 on-chain claims, mints 10,000 HKSAT + 5,000,000 THKD
+4. **Auto-updates** `frontend/src/config/contracts.ts` with all deployed addresses (including `orderBook`)
+5. Runs `SystemHealthCheck.fullHealthCheck()` to verify wiring
+
+> **Note:** The script auto-detects whether to use Hardhat Network (auto-mine) or Besu (Engine API block production) via `hasEngineAPI()` — no configuration needed.
+
+#### Manual Start (Legacy — Two Separate Steps)
+
+If you prefer the older per-script approach:
+
+```bash
+# Terminal 1 — start the Hardhat node
+npx hardhat node
+
+# Terminal 2 — deploy core contracts only (no OrderBook, no Investor1 seeding)
+npx hardhat run scripts/deploy.js --network localhost
 ```
 
 ### Hyperledger Besu Network (Optional — Production-like)
 
 Besu is available as an alternative for production-like testing with the Engine API block producer.
+
+> **Known issue:** Besu versions 23.x–26.x ignore genesis `alloc` — dev accounts start with 0 ETH. Hardhat Network is recommended for development.
 
 #### Prerequisites
 
@@ -636,71 +642,53 @@ ESCROW_ADDRESS=<escrow-address>
 CUSTODIAN_ADDRESS=<custodian-address>
 ```
 
-#### One-Command Deploy (Recommended)
-
-The unified launcher spawns the Engine-API block producer as a child process, deploys all 5 core contracts, configures roles, then cleans up automatically:
+#### Deploy on Besu
 
 ```bash
-# 1. Start the Besu container (if not already running)
+# 1. Start the Besu container
 npm run besu:start
-# or: .\besu\start-besu.ps1 -Detach
 
-# 2. Compile contracts
-npm run compile
-
-# 3. Deploy everything in one go
-npm run deploy:besu
+# 2. Compile and deploy (auto-detects Besu Engine API)
+npx hardhat compile
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 ```
 
-`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
-1. Checks if a node is running on port 8545 (Hardhat or Besu)
-2. If not, auto-spawns `npx hardhat node` as a managed child process
-3. If Besu Engine API is detected on port 8551, spawns the block producer
-4. Runs `npx hardhat run scripts/deploy.js --network localhost`
-5. Stops the block producer (if any) and leaves the node running
-
-> **Why a unified script?** It auto-detects whether to use Hardhat Network (auto-mine) or Besu (Engine API block production), handles spawning the node if needed, and coordinates everything in a single process.
-
-#### Deploy OrderBook (After Core Contracts)
-
-```bash
-# Deploy standalone OrderBook with embedded block producer
-npx hardhat run scripts/deploy-orderbook.js --network besu
-
-# Deploy OrderBookFactory + initial market
-npx hardhat run scripts/deploy-orderbook-factory.js --network besu
-```
-
-#### Manual Deploy (Advanced)
-
-If you prefer to run the block producer separately:
-
-```bash
-# Terminal 1 — start the block producer
-node besu/block-producer.js --interval 1000
-
-# Terminal 2 — deploy contracts
-npx hardhat run scripts/deploy.js --network besu
-```
+The unified script detects the Besu Engine API on port 8551 and automatically spawns the block producer during deployment.
 
 ### Deployment Order
 
-1. **`IdentityFactory`** — ONCHAINID minimal proxy factory
-2. **`HKSTPIdentityRegistry`** — KYC/AML claim storage (linked to IdentityFactory)
-3. **`HKSTPCompliance`** — attestation + module enforcement
-4. **`OracleCommittee`** — multi-oracle threshold committee
-5. **`HKSTPSecurityToken`** — linked to registry + compliance (or via `TokenFactory`)
-6. **`TokenFactory` / `TokenFactoryV2`** — deploy multiple startup tokens
-7. **`MockCashToken`** — tokenized HKD (replace with Project Ensemble contract in production)
-8. **`DvPSettlement`** — atomic settlement engine
-9. **`OrderBookFactory`** — multi-market order book factory (linked to `IdentityRegistry` for KYC)
-10. **`WalletRegistry`** — custody tier registry + 98/2 enforcement
-11. **`MultiSigWarm`** — warm wallet multi-sig
-12. **`HKSTPGovernor` + `HKSTPTimelock`** — governance stack
-13. **`SystemHealthCheck`** — run post-deployment wiring verification
-14. **`OrderBook`** — standalone order book (via `deploy-orderbook.js`, includes embedded block producer)
+The unified `deploy-and-update-frontend.js` deploys contracts in this order:
+
+| # | Contract | Purpose |
+|---|----------|---------|
+| 1 | `HKSTPIdentityRegistry` | KYC/AML claim storage |
+| 2 | `HKSTPCompliance` | Attestation + module enforcement |
+| 3 | `HKSTPSecurityToken` | ERC-3643 security token (linked to registry + compliance) |
+| 4 | `MockCashToken` | Tokenized HKD (THKD) — replace with Project Ensemble in production |
+| 5 | `DvPSettlement` | Atomic delivery-vs-payment settlement engine |
+| 6 | `TokenFactory` | One-click token deployment per startup |
+| 7 | `ClaimIssuer` | Trusted claim issuer for ERC-735 on-chain claims |
+| 8 | `IdentityFactory` | EIP-1167 minimal proxy ONCHAINID factory |
+| 9 | `HKSTPTimelock` | 48-hour execution delay for governance |
+| 10 | `HKSTPGovernor` | OZ Governor + KYC-gated voting |
+| 11 | `WalletRegistry` | Custody tier registry + 98/2 enforcement |
+| 12 | `MultiSigWarm` | 2-of-3 warm wallet multi-sig |
+| 13 | `OrderBook` | On-chain limit-order book with KYC gate |
+| 14 | `SystemHealthCheck` | Post-deployment wiring verification (optional) |
+
+After deployment, the script automatically:
+- Configures all roles (AGENT, OPERATOR, TOKEN, FACTORY, etc.)
+- Safe-lists treasury, escrow, DvP, and OrderBook addresses
+- Wires ONCHAINID (ClaimIssuer ↔ IdentityFactory ↔ Registry)
+- Wires governance (Governor → Timelock → Token)
+- Wires custody (WalletRegistry tracked tokens + MultiSigWarm signers)
+- Sets Cap.622 shareholder cap (50)
+- **Seeds Investor1** with full KYC + 10,000 HKSAT + 5,000,000 THKD
+- **Auto-updates** `frontend/src/config/contracts.ts`
 
 ### Post-Deployment Steps
+
+> **Note:** When using `deploy-and-update-frontend.js`, steps 1–11 are performed automatically. The steps below are only needed for manual or custom deployments.
 
 1. Grant `TOKEN_ROLE` on `HKSTPCompliance` to `HKSTPSecurityToken`
 2. Grant `AGENT_ROLE` on `HKSTPSecurityToken` to licensed custodian wallets
@@ -708,17 +696,13 @@ npx hardhat run scripts/deploy.js --network besu
 4. Set `maxSupply` on `HKSTPSecurityToken` (hard cap on total supply)
 5. Set `mintThreshold` on `HKSTPSecurityToken` (e.g. 1 % of supply) and grant `TIMELOCK_MINTER_ROLE` to `HKSTPTimelock`
 6. Grant `OPERATOR_ROLE` on `DvPSettlement` to the matching engine service account
-7. Register oracle members on `OracleCommittee` and set threshold
-8. Register investor identities via `IdentityFactory.deployIdentity()` + `HKSTPIdentityRegistry.registerIdentity()`
-9. Set KYC claims via `HKSTPIdentityRegistry.setClaim()`
-10. Create initial order book markets via `OrderBookFactory.createOrderBook()` (one per listed token)
-11. Safe-list each deployed OrderBook on its corresponding security token (`setSafeList(orderBookAddr, true)`)
-12. Register wallet tiers in `WalletRegistry` (hot, warm, cold)
-13. Configure `MultiSigWarm` signers
-14. Grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
-15. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
-16. Run `scripts/harden-admin.js` to finalize admin role configuration
-16. Run `scripts/harden-admin.js` to finalize admin role configuration
+7. Register investor identities via `IdentityFactory.deployIdentity()` + `HKSTPIdentityRegistry.registerIdentity()`
+8. Set KYC claims via `HKSTPIdentityRegistry.setClaim()`
+9. Safe-list each deployed OrderBook on its corresponding security token (`setSafeList(orderBookAddr, true)`)
+10. Register wallet tiers in `WalletRegistry` (hot, warm, cold)
+11. Configure `MultiSigWarm` signers and grant `PROPOSER_ROLE` / `EXECUTOR_ROLE` on `HKSTPTimelock` to `HKSTPGovernor`
+12. Run `SystemHealthCheck.fullHealthCheck()` to verify all wiring
+13. Run `scripts/harden-admin.js` to finalize admin role configuration
 
 ---
 
