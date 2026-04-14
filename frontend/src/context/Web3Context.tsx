@@ -18,6 +18,8 @@ import {
   SYSTEM_HEALTH_CHECK_ABI,
   ORDER_BOOK_ABI,
   ORDER_BOOK_FACTORY_ABI,
+  ORACLE_COMMITTEE_ABI,
+  TOKEN_FACTORY_V2_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -39,6 +41,8 @@ export interface Contracts {
   systemHealthCheck: ethers.Contract;
   orderBook: ethers.Contract;
   orderBookFactory: ethers.Contract;
+  oracleCommittee: ethers.Contract;
+  tokenFactoryV2: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -200,6 +204,8 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       systemHealthCheck: new ethers.Contract(addr('systemHealthCheck'), SYSTEM_HEALTH_CHECK_ABI, s),
       orderBook: new ethers.Contract(addr('orderBook'), ORDER_BOOK_ABI, s),
       orderBookFactory: new ethers.Contract(addr('orderBookFactory'), ORDER_BOOK_FACTORY_ABI, s),
+      oracleCommittee: new ethers.Contract(addr('oracleCommittee'), ORACLE_COMMITTEE_ABI, s),
+      tokenFactoryV2: new ethers.Contract(addr('tokenFactoryV2'), TOKEN_FACTORY_V2_ABI, s),
     };
     setContracts(c);
     return c;

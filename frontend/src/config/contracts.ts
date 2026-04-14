@@ -584,3 +584,68 @@ export const ORDER_BOOK_FACTORY_ABI = [
   'event MarketReactivated(uint256 indexed index, address securityToken)',
 ];
 
+// -----------------------------------------------------------------
+// OracleCommittee ABI
+// -----------------------------------------------------------------
+export const ORACLE_COMMITTEE_ABI = [
+  // Admin — manage oracle members
+  'function addOracle(address oracle) external',
+  'function removeOracle(address oracle) external',
+  'function setThreshold(uint256 newThreshold) external',
+  // Multi-sig attestation
+  'function verifyMultiAttestation(address from, address to, uint256 amount, uint256 expiry, uint256 nonce, bytes[] signatures) view returns (bool)',
+  'function consumeMultiAttestation(address from, address to, uint256 amount, uint256 expiry, uint256 nonce, bytes[] signatures) returns (bool)',
+  // Views
+  'function oracleMembers() view returns (address[])',
+  'function oracleCount() view returns (uint256)',
+  'function threshold() view returns (uint256)',
+  'function MAX_ORACLES() view returns (uint256)',
+  'function domainSeparator() view returns (bytes32)',
+  'function usedAttestations(bytes32) view returns (bool)',
+  // Access Control
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function grantRole(bytes32 role, address account) external',
+  'function revokeRole(bytes32 role, address account) external',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'function ORACLE_ROLE() view returns (bytes32)',
+  // Events
+  'event OracleMemberAdded(address indexed member)',
+  'event OracleMemberRemoved(address indexed member)',
+  'event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold)',
+  'event MultiAttestationConsumed(bytes32 indexed attestHash, address indexed from, address indexed to, uint256 validSignatures)',
+];
+
+// -----------------------------------------------------------------
+// TokenFactoryV2 ABI
+// -----------------------------------------------------------------
+export const TOKEN_FACTORY_V2_ABI = [
+  // Create token (ERC-1967 proxy)
+  'function createToken(string name, string symbol) returns (address proxyAddress)',
+  // Upgrade all proxies atomically
+  'function upgradeImplementation(address newImplementation) external',
+  // Admin
+  'function deactivateToken(uint256 index) external',
+  'function reactivateToken(uint256 index) external',
+  'function setInfrastructure(address identityRegistry, address compliance) external',
+  // Views
+  'function tokenCount() view returns (uint256)',
+  'function deployedProxyCount() view returns (uint256)',
+  'function getToken(uint256 index) view returns (tuple(string name, string symbol, address proxyAddress, address createdBy, uint256 createdAt, bool active))',
+  'function allTokens() view returns (tuple(string name, string symbol, address proxyAddress, address createdBy, uint256 createdAt, bool active)[])',
+  'function activeTokens() view returns (tuple(string name, string symbol, address proxyAddress, address createdBy, uint256 createdAt, bool active)[])',
+  'function getTokenBySymbol(string symbol) view returns (tuple(string name, string symbol, address proxyAddress, address createdBy, uint256 createdAt, bool active))',
+  'function currentImplementation() view returns (address)',
+  'function identityRegistry() view returns (address)',
+  'function compliance() view returns (address)',
+  'function deployedProxies(uint256) view returns (address)',
+  // Access Control
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'function UPGRADER_ROLE() view returns (bytes32)',
+  // Events
+  'event TokenCreated(uint256 indexed index, string name, string symbol, address proxyAddress, address createdBy)',
+  'event TokenDeactivated(uint256 indexed index, address proxyAddress)',
+  'event TokenReactivated(uint256 indexed index, address proxyAddress)',
+  'event ImplementationUpgraded(address indexed previousImpl, address indexed newImpl, uint256 tokensUpgraded)',
+  'event InfrastructureUpdated(address identityRegistry, address compliance)',
+];

@@ -12,6 +12,7 @@ import Governance from './pages/Governance';
 import WalletCustody from './pages/WalletCustody';
 import Trading from './pages/Trading';
 import MarketManagement from './pages/MarketManagement';
+import OracleCommittee from './pages/OracleCommittee';
 import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
 import { AlertTriangle } from 'lucide-react';
@@ -66,6 +67,7 @@ const App: React.FC = () => {
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/trading" element={<Trading />} />
           <Route path="/markets" element={<AdminRoute><MarketManagement /></AdminRoute>} />
+          <Route path="/oracle" element={<AdminRoute><OracleCommittee /></AdminRoute>} />
         </Routes>
       </Layout>
     </>

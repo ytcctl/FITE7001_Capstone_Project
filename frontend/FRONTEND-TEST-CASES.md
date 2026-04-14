@@ -4,10 +4,10 @@
 
 | Item | Details |
 |------|---------|
-| Blockchain | Besu Devnet (Chain ID 31337) running locally or via Codespaces |
-| Contracts | All contracts deployed via `npx hardhat run scripts/deploy.js --network besu` |
+| Blockchain | Hardhat Devnet (Chain ID 31337) running locally or via Codespaces |
+| Contracts | All contracts deployed via `npx hardhat run scripts/deploy-and-update-frontend.js --network localhost` |
 | Wallets | Admin wallet (deployer), Agent wallet, 2+ Investor wallets |
-| Browser | MetaMask installed and configured for Besu Devnet |
+| Browser | MetaMask installed and configured for Hardhat Devnet |
 
 ---
 
@@ -385,6 +385,10 @@
 | WC-P-08 | Multi-sig transactions | View recent transactions | Shows ID, To, Amount, Reason, Confirmations, Status |
 | WC-P-09 | Sweep audit trail | After sweep → check table | Shows time, from, to, amount, reason |
 | WC-P-10 | Refresh data | Click refresh button | All data (breakdown, wallets, txs, sweeps) reloaded |
+| WC-P-11 | Submit multi-sig transaction | Enter token, to, amount, reason → "Propose" | Tx proposed, appears with 0/N confirmations |
+| WC-P-12 | Confirm multi-sig transaction | Click "Confirm" on pending tx | Confirmation count increments |
+| WC-P-13 | Execute multi-sig transaction | Tx has enough confirmations → "Execute" | Tx executed, tokens transferred from warm wallet |
+| WC-P-14 | Cancel multi-sig transaction | Click "Cancel" on unexecuted tx | Tx marked as cancelled |
 
 ### 12.2 Negative Tests
 
@@ -401,9 +405,75 @@
 
 ---
 
-## 13. Cross-Cutting / Integration Tests
+## 13. Oracle Committee (Admin)
 
 ### 13.1 Positive Tests
+
+| ID | Test Case | Steps | Expected Result |
+|----|-----------|-------|-----------------|
+| OC-P-01 | Display oracle members | Open Oracle Committee page (admin) | Lists all oracle member addresses with index numbers |
+| OC-P-02 | Display threshold | Open page | Shows current threshold (e.g. "2-of-3") in summary card |
+| OC-P-03 | Display security level | Open page | "Multi-Sig" shown when threshold ≥ 2 |
+| OC-P-04 | Add oracle member | Enter valid address → "Add Oracle" | Tx succeeds, member appears in list, count increments |
+| OC-P-05 | Remove oracle member | Click trash icon on member row | Tx succeeds, member removed, count decrements |
+| OC-P-06 | Set threshold | Enter new threshold (e.g. 3) → "Update Threshold" | Tx succeeds, threshold card updates to "3-of-N" |
+| OC-P-07 | Max oracles display | Page shows "N / 5" member count | Max oracles (5) displayed in summary card |
+| OC-P-08 | YOU badge on own address | Admin's address is an oracle member | "YOU" badge shown next to that entry |
+| OC-P-09 | Refresh oracle data | Click refresh button | Member list and threshold reload from chain |
+| OC-P-10 | Successful status banner | Add oracle → check banner | Green success banner with address shown |
+
+### 13.2 Negative Tests
+
+| ID | Test Case | Steps | Expected Result |
+|----|-----------|-------|-----------------|
+| OC-N-01 | Add duplicate oracle | Add address that is already an oracle | Tx reverts, error: "already oracle" |
+| OC-N-02 | Add when at max capacity | 5 oracles exist → try to add 6th | Button disabled or error: "max oracles" |
+| OC-N-03 | Remove below threshold | threshold=2, 2 members → remove one | Error: "Cannot remove: would go below threshold" |
+| OC-N-04 | Add zero address | Enter `0x0000…0000` → Add | Tx reverts, error: "zero address" |
+| OC-N-05 | Set threshold below 2 | Enter 1 → Update Threshold | Tx reverts, error: "threshold must be >=2" |
+| OC-N-06 | Set threshold above member count | 3 members → set threshold to 4 | Tx reverts, error: "threshold > members" |
+| OC-N-07 | Non-admin access | Connect as investor → navigate to `/oracle` | Route guard redirects to Dashboard |
+| OC-N-08 | Invalid address format | Enter "abc123" → Add Oracle | Tx fails with address format error |
+| OC-N-09 | Empty address | Leave address empty → click Add Oracle | Button disabled (required field) |
+| OC-N-10 | Transaction rejected by user | Start add oracle → reject in MetaMask | Error displayed, form preserved |
+
+---
+
+## 14. Token Factory V2 — Upgradeable Proxies (Admin)
+
+### 14.1 Positive Tests
+
+| ID | Test Case | Steps | Expected Result |
+|----|-----------|-------|-----------------|
+| V2-P-01 | Switch to V2 tab | Open Token Management → click "V2 — Upgradeable Proxies" | V2 tab active, V2 create form and token list displayed |
+| V2-P-02 | Display current implementation | Open V2 tab | Shows current implementation address |
+| V2-P-03 | Create V2 token | Enter name + symbol → "Create Upgradeable Token" | Tx succeeds, proxy address shown in success banner, "UPGRADEABLE" badge in list |
+| V2-P-04 | V2 token list | Create 2 V2 tokens | Both appear with name, symbol, proxy address, supply, "UPGRADEABLE" badge |
+| V2-P-05 | Copy V2 proxy address | Click copy button on V2 token row | Proxy address copied to clipboard |
+| V2-P-06 | Deactivate V2 token | Click "Deactivate" on active V2 token | Status changes to "INACTIVE" (red) |
+| V2-P-07 | Reactivate V2 token | Click "Reactivate" on inactive V2 token | Status changes to "ACTIVE" (green) |
+| V2-P-08 | Upgrade implementation | Enter new implementation address → "Upgrade Implementation" | All V2 tokens upgraded atomically, success banner shown |
+| V2-P-09 | Symbol auto-uppercase | Enter "bat" as symbol | Auto-uppercased to "BAT" |
+| V2-P-10 | Token count display | Multiple V2 tokens exist | "N tokens" count shown in list header |
+
+### 14.2 Negative Tests
+
+| ID | Test Case | Steps | Expected Result |
+|----|-----------|-------|-----------------|
+| V2-N-01 | Duplicate symbol | Create "BAT" V2 token, then try "BAT" again | Error: "Symbol already exists" |
+| V2-N-02 | Empty name or symbol | Leave name empty → Create | Error: "Token name and symbol cannot be empty" or button disabled |
+| V2-N-03 | Upgrade to zero address | Enter `0x0000…0000` → Upgrade | Tx reverts, error: "zero impl" |
+| V2-N-04 | Upgrade to same implementation | Enter current impl address → Upgrade | Tx reverts, error: "same impl" |
+| V2-N-05 | Upgrade without UPGRADER_ROLE | Connect non-admin → try upgrade | Tx reverts (no role), error displayed |
+| V2-N-06 | Non-admin create V2 token | Connect as investor → try create | Route guard blocks access to page |
+| V2-N-07 | Symbol > 10 chars | Enter "VERYLONGSYM" (11 chars) | Input limited to 10 characters |
+| V2-N-08 | Transaction rejected by user | Start create → reject in MetaMask | Error displayed, form preserved |
+
+---
+
+## 15. Cross-Cutting / Integration Tests
+
+### 15.1 Positive Tests
 
 | ID | Test Case | Steps | Expected Result |
 |----|-----------|-------|-----------------|
@@ -414,8 +484,10 @@
 | X-P-05 | Governance → Compliance change | Create proposal to change compliance → vote → queue → execute | Compliance change enacted via governance |
 | X-P-06 | Role-based navigation | Switch between admin and investor accounts | Nav items and accessible pages change accordingly |
 | X-P-07 | Multi-page data consistency | Mint tokens in Minting page → check Dashboard + Portfolio | Balances consistent across all pages |
+| X-P-08 | V2 Token → Mint → Trade lifecycle | Create V2 token → mint via Minting → create market → trade | Full lifecycle with upgradeable token |
+| X-P-09 | Oracle Committee → Compliance attestation | Configure 2-of-3 oracle → sign attestation → transfer passes compliance | Multi-oracle compliance pipeline works |
 
-### 13.2 Negative Tests
+### 15.2 Negative Tests
 
 | ID | Test Case | Steps | Expected Result |
 |----|-----------|-------|-----------------|
@@ -437,7 +509,7 @@
 | 1. Wallet Connection & Network | 12 | 12 | 24 |
 | 2. Dashboard | 7 | 6 | 13 |
 | 3. KYC Management | 8 | 10 | 18 |
-| 4. Token Management | 7 | 6 | 13 |
+| 4. Token Management (V1) | 7 | 6 | 13 |
 | 5. Token Minting | 9 | 10 | 19 |
 | 6. Trading | 14 | 12 | 26 |
 | 7. DvP Settlement | 9 | 12 | 21 |
@@ -445,6 +517,8 @@
 | 9. Governance | 12 | 10 | 22 |
 | 10. Portfolio | 6 | 10 | 16 |
 | 11. Market Management | 7 | 8 | 15 |
-| 12. Wallet Custody | 10 | 8 | 18 |
-| 13. Cross-Cutting / Integration | 7 | 8 | 15 |
-| **Total** | **117** | **120** | **237** |
+| 12. Wallet Custody | 14 | 8 | 22 |
+| 13. Oracle Committee | 10 | 10 | 20 |
+| 14. Token Factory V2 | 10 | 8 | 18 |
+| 15. Cross-Cutting / Integration | 9 | 8 | 17 |
+| **Total** | **143** | **138** | **281** |

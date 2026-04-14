@@ -21,6 +21,7 @@ import {
   ChevronDown,
   X,
   UserPlus,
+  ShieldAlert,
 } from 'lucide-react';
 import { useWeb3, TEST_ACCOUNTS, getSavedAccounts, removeSavedAccount } from '../context/Web3Context';
 import type { SavedAccount } from '../context/Web3Context';
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { to: '/trading', label: 'Trading', icon: BarChart3 },
   { to: '/markets', label: 'Market Management', icon: Store, adminOnly: true },
   { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
+  { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, adminOnly: true },
   { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
   { to: '/custody', label: 'Wallet Custody', icon: Vault, adminOnly: true },
   { to: '/governance', label: 'Governance', icon: Vote },
