@@ -13,9 +13,29 @@
 export const NETWORK_CONFIG = {
   chainId: 31337,
   chainName: 'Hardhat Devnet',
+  /** Direct RPC — used only as fallback; prefer rpcUrlForBrowser() below */
   rpcUrl: 'http://127.0.0.1:8545',
   blockExplorer: '',
 };
+
+/**
+ * Returns the best RPC endpoint for the current browser environment.
+ * - In Codespaces / remote: uses the Vite `/rpc` proxy so the browser
+ *   never has to reach 127.0.0.1 directly.
+ * - Locally: uses the direct RPC URL for lowest latency.
+ */
+export function rpcUrlForBrowser(): string {
+  // Codespace: window.location.hostname looks like "<name>-3000.app.github.dev"
+  // Gitpod / generic cloud: hostname won't be localhost/127.0.0.1
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isRemote =
+    host !== '' &&
+    host !== 'localhost' &&
+    host !== '127.0.0.1' &&
+    !host.startsWith('192.168.') &&
+    !host.startsWith('10.');
+  return isRemote ? `${window.location.origin}/rpc` : NETWORK_CONFIG.rpcUrl;
+}
 
 // -----------------------------------------------------------------
 // Contract Addresses (update after deployment)

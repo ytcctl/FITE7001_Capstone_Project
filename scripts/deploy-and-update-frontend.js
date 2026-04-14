@@ -579,8 +579,33 @@ async function main() {
   );
 
   if (fs.existsSync(contractsFile)) {
-    console.log("\nUpdating frontend contract addresses...");
+    console.log("\nUpdating frontend config (network + contract addresses)...");
     let content = fs.readFileSync(contractsFile, "utf-8");
+
+    // ── Auto-detect chain ID from the running node ──
+    const network = await ethers.provider.getNetwork();
+    const liveChainId = Number(network.chainId);
+    const chainName = liveChainId === 31337 ? "Hardhat Devnet" : `Devnet (${liveChainId})`;
+    console.log(`     Chain ID detected: ${liveChainId} → ${chainName}`);
+
+    // Replace the NETWORK_CONFIG block
+    const oldNetworkBlock =
+      /export const NETWORK_CONFIG\s*=\s*\{[^}]+\};/;
+    const newNetworkBlock = `export const NETWORK_CONFIG = {
+  chainId: ${liveChainId},
+  chainName: '${chainName}',
+  rpcUrl: 'http://127.0.0.1:8545',
+  blockExplorer: '',
+};`;
+
+    if (oldNetworkBlock.test(content)) {
+      content = content.replace(oldNetworkBlock, newNetworkBlock);
+      console.log("     ✓ NETWORK_CONFIG updated");
+    } else {
+      console.log(
+        "     ⚠ Could not find NETWORK_CONFIG block — update manually"
+      );
+    }
 
     // Replace the CONTRACT_ADDRESSES block
     const oldBlock =
@@ -607,13 +632,15 @@ async function main() {
 
     if (oldBlock.test(content)) {
       content = content.replace(oldBlock, newBlock);
-      fs.writeFileSync(contractsFile, content, "utf-8");
-      console.log("     ✓ frontend/src/config/contracts.ts updated");
+      console.log("     ✓ CONTRACT_ADDRESSES updated");
     } else {
       console.log(
         "     ⚠ Could not find CONTRACT_ADDRESSES block — update manually"
       );
     }
+
+    fs.writeFileSync(contractsFile, content, "utf-8");
+    console.log("     ✓ frontend/src/config/contracts.ts saved");
   } else {
     console.log(
       "\n⚠ frontend/src/config/contracts.ts not found — skipping auto-update"

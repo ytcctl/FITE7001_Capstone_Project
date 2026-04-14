@@ -101,7 +101,7 @@ const Dashboard: React.FC = () => {
         <AlertCircle size={48} className="mx-auto mb-4 text-purple-400" />
         <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
         <p className="text-gray-400">
-          Connect MetaMask to interact with the TokenHub smart contracts on the Besu devnet.
+          Connect your wallet to interact with the TokenHub smart contracts on the devnet.
         </p>
       </div>
     );

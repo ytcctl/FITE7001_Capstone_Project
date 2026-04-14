@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import {
   NETWORK_CONFIG,
   CONTRACT_ADDRESSES,
+  rpcUrlForBrowser,
   IDENTITY_REGISTRY_ABI,
   COMPLIANCE_ABI,
   SECURITY_TOKEN_ABI,
@@ -54,7 +55,7 @@ export interface UserRoles {
 /** Connection mode: MetaMask (browser extension) or built-in (private key via RPC) */
 export type WalletMode = 'metamask' | 'builtin';
 
-/** Pre-configured test accounts for the Besu devnet */
+/** Pre-configured test accounts for the Hardhat / Besu devnet */
 export const TEST_ACCOUNTS = [
   { label: 'Admin / Deployer', address: '0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73', key: '0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63' },
   { label: 'Operator',         address: '0x627306090abaB3A6e1400e9345bC60c78a8BEf57', key: '0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3' },
@@ -211,7 +212,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return c;
   }, []);
 
-  /** Switch MetaMask to the Besu devnet (or add it) */
+  /** Switch MetaMask to the devnet (or add it) */
   const ensureNetwork = useCallback(async () => {
     if (!window.ethereum) return;
     try {
@@ -222,13 +223,15 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (switchError: unknown) {
       const err = switchError as { code?: number };
       if (err.code === 4902) {
+        // Use the browser-aware RPC URL so MetaMask can reach the node
+        // even when running inside Codespaces / remote environments.
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [
             {
               chainId: `0x${NETWORK_CONFIG.chainId.toString(16)}`,
               chainName: NETWORK_CONFIG.chainName,
-              rpcUrls: [NETWORK_CONFIG.rpcUrl],
+              rpcUrls: [rpcUrlForBrowser()],
               nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
             },
           ],
@@ -361,8 +364,9 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsConnecting(true);
     setError(null);
     try {
-      console.log('[Web3] Connecting via built-in wallet, RPC:', NETWORK_CONFIG.rpcUrl);
-      const rpcProvider = new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl);
+      const rpcUrl = rpcUrlForBrowser();
+      console.log('[Web3] Connecting via built-in wallet, RPC:', rpcUrl);
+      const rpcProvider = new ethers.JsonRpcProvider(rpcUrl);
       const network = await rpcProvider.getNetwork();
       const currentChainId = Number(network.chainId);
       console.log('[Web3] Connected to chain', currentChainId);
