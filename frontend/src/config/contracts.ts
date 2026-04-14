@@ -21,20 +21,23 @@ export const NETWORK_CONFIG = {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0xa775Fd3eb96956b2284e96298Bd12624A9C952D2',
-  compliance: '0xbBCeB59101A8399DB5e1dB03323BE7b00fEEF004',
-  securityToken: '0x619A83c9368aDa9fFb98c3F14b662724dD19E943',
-  cashToken: '0x7eF84473a4E772fB6aDfA1B0C6728A3dbf268Dd7',
-  dvpSettlement: '0x6aA8b700cD034Ab4B897B59447f268b33B8cF699',
-  tokenFactory: '0xc83003B2AD5C3EF3e93Cc3Ef0a48E84dc8DBD718',
-  claimIssuer: '0xF216B6b2D9E76F94f97bE597e2Cec81730520585',
-  identityFactory: '0x0F095aeA9540468B19829d02cC811Ebe5173D615',
-  timelock: '0x51D4903ef5F871273e5B4172898B18809CFd7881',
-  governor: '0xa2b80D63b1f72a4D26dfc33D62EbE80148Ddd326',
-  walletRegistry: '0xe52155361a36C7d445F2c6784B14Bf7A3C306e15',
-  multiSigWarm: '0x3b7f51aBe2E8e6Af03e1571dB791DDA7B5a68cE6',
-  orderBook: '0xEEE98917D56774d2F1FfAfbEA2e9b04Ce8ef7a11',
-  systemHealthCheck: '0x98142ec58835D34db876A78cb1A7e696b47AFD68',
+  identityRegistry: '0x6632F4E1B2f57BAf04f386B9Eabd32D40412886d',
+  compliance: '0xbb289ACd2D934057a49B47563999Bc150D2Cb34E',
+  securityToken: '0x5798Cf2507399e4B45fb9D2fbB255299e0070294',
+  cashToken: '0xA4Fc93C16B304fca36759D69ed2Eb213DaFd1171',
+  dvpSettlement: '0xc1Ef73B9ccc4612246d723F00d34EEef56DBD4c3',
+  tokenFactory: '0xddfF69F60b480aB37Dd79a2B93e4298fceFAf8De',
+  claimIssuer: '0x674AE43435966a74a257722fEd2D207CafF57698',
+  identityFactory: '0xe979891Da8c2af95146ef2eE7C6eBD20cBda5F45',
+  timelock: '0xdF40141Ea83D30453011fd3ca09d015590CC281C',
+  governor: '0x15B65A15775Fa82268dCc310c4D09EcB425fDF52',
+  walletRegistry: '0xBa590e0616272F94FdF886Da695782c7F9c0dC82',
+  multiSigWarm: '0x4D937dbA57F3228F3061994B5AFA24F924160Dc1',
+  oracleCommittee: '0x284f8B77512efF613A2873045626E7c34Fec09B0',
+  orderBookFactory: '0xC538fd0A079856cE824089c9210AC2dd40C844d8',
+  orderBook: '0x40975C6cacC3A693EF65183afF2c3418A0297850',
+  tokenFactoryV2: '0x0Be199A777EECc870a7b13045946Fef1803Dd9e1',
+  systemHealthCheck: '0xf03b5af17792D7F7707dc54474083BaCAD17e22F',
 };
 
 // -----------------------------------------------------------------

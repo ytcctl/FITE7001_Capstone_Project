@@ -169,7 +169,7 @@ async function main() {
   const custodianAddress = agent.address;
 
   // 1. IdentityRegistry
-  console.log("1/14  Deploying HKSTPIdentityRegistry...");
+  console.log("1/17  Deploying HKSTPIdentityRegistry...");
   const IdentityRegistry = await ethers.getContractFactory(
     "HKSTPIdentityRegistry"
   );
@@ -179,7 +179,7 @@ async function main() {
   console.log("     HKSTPIdentityRegistry:", registryAddress);
 
   // 2. Compliance
-  console.log("2/14  Deploying HKSTPCompliance...");
+  console.log("2/17  Deploying HKSTPCompliance...");
   const Compliance = await ethers.getContractFactory("HKSTPCompliance");
   const compliance = await Compliance.deploy(deployer.address, complianceOracle);
   await compliance.waitForDeployment();
@@ -187,7 +187,7 @@ async function main() {
   console.log("     HKSTPCompliance:", complianceAddress);
 
   // 3. SecurityToken
-  console.log("3/14  Deploying HKSTPSecurityToken...");
+  console.log("3/17  Deploying HKSTPSecurityToken...");
   const Token = await ethers.getContractFactory("HKSTPSecurityToken");
   const token = await Token.deploy(
     "HKSTP Alpha Startup Token",
@@ -202,7 +202,7 @@ async function main() {
   console.log("     HKSTPSecurityToken:", tokenAddress);
 
   // 4. MockCashToken
-  console.log("4/14  Deploying MockCashToken (tokenized HKD)...");
+  console.log("4/17  Deploying MockCashToken (tokenized HKD)...");
   const MockCash = await ethers.getContractFactory("MockCashToken");
   const cashToken = await MockCash.deploy("Tokenized HKD", "THKD", 6, deployer.address);
   await cashToken.waitForDeployment();
@@ -210,7 +210,7 @@ async function main() {
   console.log("     MockCashToken (THKD):", cashTokenAddress);
 
   // 5. DvPSettlement
-  console.log("5/14  Deploying DvPSettlement...");
+  console.log("5/17  Deploying DvPSettlement...");
   const DvP = await ethers.getContractFactory("DvPSettlement");
   const dvp = await DvP.deploy(deployer.address);
   await dvp.waitForDeployment();
@@ -218,7 +218,7 @@ async function main() {
   console.log("     DvPSettlement:", dvpAddress);
 
   // 6. TokenFactory
-  console.log("6/14  Deploying TokenFactory...");
+  console.log("6/17  Deploying TokenFactory...");
   const TokenFactory = await ethers.getContractFactory("TokenFactory");
   const tokenFactory = await TokenFactory.deploy(
     deployer.address,    // admin
@@ -230,7 +230,7 @@ async function main() {
   console.log("     TokenFactory:", tokenFactoryAddress);
 
   // 7. ClaimIssuer (Trusted Claim Issuer for ONCHAINID)
-  console.log("7/14  Deploying ClaimIssuer...");
+  console.log("7/17  Deploying ClaimIssuer...");
   const ClaimIssuerFactory = await ethers.getContractFactory("ClaimIssuer");
   const claimIssuer = await ClaimIssuerFactory.deploy(deployer.address, deployer.address);
   await claimIssuer.waitForDeployment();
@@ -238,7 +238,7 @@ async function main() {
   console.log("     ClaimIssuer:", claimIssuerAddress);
 
   // 8. IdentityFactory (deploys per-investor ONCHAINID contracts)
-  console.log("8/14  Deploying IdentityFactory...");
+  console.log("8/17  Deploying IdentityFactory...");
   const IdentityFactoryContract = await ethers.getContractFactory("IdentityFactory");
   const identityFactory = await IdentityFactoryContract.deploy(deployer.address);
   await identityFactory.waitForDeployment();
@@ -246,7 +246,7 @@ async function main() {
   console.log("     IdentityFactory:", identityFactoryAddress);
 
   // 9. Timelock (governance execution delay)
-  console.log("9/14  Deploying HKSTPTimelock...");
+  console.log("9/17  Deploying HKSTPTimelock...");
   const TIMELOCK_MIN_DELAY = 172800; // 48 hours (production)
   const Timelock = await ethers.getContractFactory("HKSTPTimelock");
   const timelock = await Timelock.deploy(
@@ -260,7 +260,7 @@ async function main() {
   console.log("     HKSTPTimelock:", timelockAddress);
 
   // 10. Governor (on-chain governance with snapshot voting)
-  console.log("10/14 Deploying HKSTPGovernor...");
+  console.log("10/17 Deploying HKSTPGovernor...");
   const VOTING_DELAY  = 14400;  // ~2 days at 12s/block
   const VOTING_PERIOD = 50400;  // ~7 days at 12s/block
   const QUORUM_PCT    = 10;     // 10% of total supply
@@ -281,7 +281,7 @@ async function main() {
   console.log("     HKSTPGovernor:", governorAddress);
 
   // 11. WalletRegistry (98/2 custody rule enforcement)
-  console.log("11/14 Deploying WalletRegistry...");
+  console.log("11/17 Deploying WalletRegistry...");
   const WalletRegistry = await ethers.getContractFactory("WalletRegistry");
   const walletRegistry = await WalletRegistry.deploy(deployer.address);
   await walletRegistry.waitForDeployment();
@@ -289,7 +289,7 @@ async function main() {
   console.log("     WalletRegistry:", walletRegistryAddress);
 
   // 12. MultiSigWarm (2-of-3 multi-sig for warm wallet)
-  console.log("12/14 Deploying MultiSigWarm...");
+  console.log("12/17 Deploying MultiSigWarm...");
   // Use deployer + first two deterministic Besu accounts as initial signers
   // In production, replace with actual custody officer keys
   const warmSigner1 = deployer.address;
@@ -301,10 +301,37 @@ async function main() {
   const multiSigWarmAddress = await multiSigWarm.getAddress();
   console.log("     MultiSigWarm:", multiSigWarmAddress);
 
-  // 13. OrderBook (on-chain order book for HKSAT/THKD)
-  console.log("13/14 Deploying OrderBook...");
-  const OrderBookFactory = await ethers.getContractFactory("OrderBook");
-  const orderBook = await OrderBookFactory.deploy(
+  // 13. OracleCommittee (multi-oracle threshold attestation)
+  console.log("13/17 Deploying OracleCommittee...");
+  // Use deployer + operator + agent as initial oracle members (2-of-3 threshold)
+  const oracleMembers = [deployer.address, operator.address, agent.address];
+  const OracleCommittee = await ethers.getContractFactory("OracleCommittee");
+  const oracleCommittee = await OracleCommittee.deploy(
+    deployer.address,    // admin
+    oracleMembers,       // initial oracle members
+    2                    // threshold (2-of-3)
+  );
+  await oracleCommittee.waitForDeployment();
+  const oracleCommitteeAddress = await oracleCommittee.getAddress();
+  console.log("     OracleCommittee:", oracleCommitteeAddress);
+
+  // 14. OrderBookFactory (deploys per-token OrderBooks)
+  console.log("14/17 Deploying OrderBookFactory...");
+  const OBFactory = await ethers.getContractFactory("OrderBookFactory");
+  const orderBookFactory = await OBFactory.deploy(
+    cashTokenAddress,    // shared cash token (THKD)
+    6,                   // cash token decimals
+    registryAddress,     // identityRegistry (KYC gate)
+    deployer.address     // admin
+  );
+  await orderBookFactory.waitForDeployment();
+  const orderBookFactoryAddress = await orderBookFactory.getAddress();
+  console.log("     OrderBookFactory:", orderBookFactoryAddress);
+
+  // 15. OrderBook (standalone on-chain order book for HKSAT/THKD)
+  console.log("15/17 Deploying OrderBook...");
+  const OrderBookContract = await ethers.getContractFactory("OrderBook");
+  const orderBook = await OrderBookContract.deploy(
     tokenAddress,        // securityToken
     cashTokenAddress,    // cashToken
     18,                  // HKSTPSecurityToken decimals
@@ -316,10 +343,23 @@ async function main() {
   const orderBookAddress = await orderBook.getAddress();
   console.log("     OrderBook:", orderBookAddress);
 
-  // 14. SystemHealthCheck (optional — deploy if contract exists)
+  // 16. TokenFactoryV2 (upgradeable proxy token factory)
+  console.log("16/17 Deploying TokenFactoryV2...");
+  const TokenFactoryV2 = await ethers.getContractFactory("TokenFactoryV2");
+  const tokenFactoryV2 = await TokenFactoryV2.deploy(
+    deployer.address,    // admin
+    registryAddress,     // identityRegistry
+    complianceAddress,   // compliance
+    tokenAddress         // implementation (use deployed SecurityToken as reference impl)
+  );
+  await tokenFactoryV2.waitForDeployment();
+  const tokenFactoryV2Address = await tokenFactoryV2.getAddress();
+  console.log("     TokenFactoryV2:", tokenFactoryV2Address);
+
+  // 17. SystemHealthCheck (optional — deploy if contract exists)
   let systemHealthCheckAddress = ethers.ZeroAddress;
   try {
-    console.log("14/14 Deploying SystemHealthCheck...");
+    console.log("17/17 Deploying SystemHealthCheck...");
     const SHC = await ethers.getContractFactory("SystemHealthCheck");
     const shc = await SHC.deploy();
     await shc.waitForDeployment();
@@ -429,6 +469,23 @@ async function main() {
   // OrderBook safe-listing (so escrow transfers succeed)
   await (await token.setSafeList(orderBookAddress, true)).wait();
   console.log("     OrderBook safe-listed on SecurityToken");
+
+  // OracleCommittee: grant DEFAULT_ADMIN_ROLE on Compliance to OracleCommittee
+  // so multi-oracle attestations can be consumed by the compliance contract
+  console.log("\nConfiguring OracleCommittee...");
+  await (await compliance.grantRole(COMPLIANCE_ADMIN_ROLE, oracleCommitteeAddress)).wait();
+  console.log("     DEFAULT_ADMIN_ROLE granted to OracleCommittee on Compliance");
+
+  // TokenFactoryV2: grant DEFAULT_ADMIN_ROLE on Compliance so V2 factory
+  // can wire TOKEN_ROLE for newly deployed proxy tokens
+  console.log("\nConfiguring TokenFactoryV2...");
+  await (await compliance.grantRole(COMPLIANCE_ADMIN_ROLE, tokenFactoryV2Address)).wait();
+  console.log("     DEFAULT_ADMIN_ROLE granted to TokenFactoryV2 on Compliance");
+
+  // OrderBookFactory: safe-list on SecurityToken (factory-deployed order books
+  // will still need individual safe-listing via createOrderBook post-hook)
+  await (await token.setSafeList(orderBookFactoryAddress, true)).wait();
+  console.log("     OrderBookFactory safe-listed on SecurityToken");
 
   // -----------------------------------------------------------------------
   // SEED INVESTOR1 (KYC + identity + tokens)
@@ -541,7 +598,10 @@ async function main() {
   governor: '${governorAddress}',
   walletRegistry: '${walletRegistryAddress}',
   multiSigWarm: '${multiSigWarmAddress}',
+  oracleCommittee: '${oracleCommitteeAddress}',
+  orderBookFactory: '${orderBookFactoryAddress}',
   orderBook: '${orderBookAddress}',
+  tokenFactoryV2: '${tokenFactoryV2Address}',
   systemHealthCheck: '${systemHealthCheckAddress}',
 };`;
 
@@ -611,7 +671,19 @@ async function main() {
     `║ MultiSigWarm          : ${multiSigWarmAddress}  ║`
   );
   console.log(
+    `║ OracleCommittee       : ${oracleCommitteeAddress}  ║`
+  );
+  console.log(
+    `║ OrderBookFactory      : ${orderBookFactoryAddress}  ║`
+  );
+  console.log(
     `║ OrderBook             : ${orderBookAddress}  ║`
+  );
+  console.log(
+    `║ TokenFactoryV2        : ${tokenFactoryV2Address}  ║`
+  );
+  console.log(
+    `║ SystemHealthCheck     : ${systemHealthCheckAddress}  ║`
   );
   console.log(
     "╠══════════════════════════════════════════════════════════════╣"
