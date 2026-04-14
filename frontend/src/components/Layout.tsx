@@ -83,9 +83,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   const handleCustomKey = async () => {
-    const trimmed = customKey.trim();
+    let trimmed = customKey.trim();
+    // Accept keys without 0x prefix (e.g. copied from MetaMask)
+    if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+      trimmed = `0x${trimmed}`;
+    }
     if (!/^0x[0-9a-fA-F]{64}$/.test(trimmed)) {
-      setKeyError('Invalid private key format (expected 0x + 64 hex chars)');
+      setKeyError('Invalid private key format (expected 64 hex chars, with or without 0x prefix)');
       return;
     }
     const label = customLabel.trim() || `Account ${savedAccounts.length + 1}`;
