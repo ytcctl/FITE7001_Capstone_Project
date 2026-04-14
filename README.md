@@ -959,9 +959,163 @@ The `dist/` folder can be served by any static hosting provider (Nginx, Vercel, 
 | 8546 | Besu WebSocket *(Besu only — not needed with Hardhat)* |
 | 8551 | Besu Engine API *(Besu only — not needed with Hardhat)* |
 
+### Sharing the Portal with Teammates for Testing
+
+If you need to let teammates access the running frontend without cloning the repo or installing anything locally, choose one of the options below.
+
+#### Option 1 — GitHub Codespaces (Recommended)
+
+Codespaces is the simplest approach — teammates only need a **web browser** and optionally **MetaMask**.
+
+**Setup (person who created the Codespace):**
+
+```bash
+# 1. Inside the Codespace terminal — start the blockchain
+npx hardhat node &
+
+# 2. Deploy all contracts + auto-update frontend addresses
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
+
+# 3. Start the frontend
+cd frontend && npm run dev
+```
+
+**Make ports public** so teammates can reach them:
+
+1. Open the **Ports** tab in Codespaces (bottom panel)
+2. Right-click port **3000** → **Port Visibility → Public**
+3. Right-click port **8545** → **Port Visibility → Public**
+4. Copy the forwarded URL for port 3000 (e.g. `https://<codespace>-3000.app.github.dev`)
+5. Share both URLs with your teammates
+
+**Teammate access (no GitHub Codespaces account required):**
+
+| What they need | Details |
+|----------------|---------|
+| Web browser | Open the shared port-3000 URL |
+| MetaMask *(optional)* | Add custom network → RPC URL = shared port-8545 URL, Chain ID = **31337** |
+| Built-in wallet | Teammates can also use the built-in Connect Wallet dropdown (select a test account or paste a dev private key) — **no MetaMask required** |
+
+> **Note:** The shared port-3000 URL serves the full frontend; the port-8545 URL serves the Hardhat JSON-RPC endpoint. Both must be set to **Public** visibility.
+
+#### Option 2 — Vercel / Netlify (Frontend Only)
+
+Deploy the static frontend to a free hosting service. The teammate's browser still needs access to a running blockchain node.
+
+```bash
+cd frontend
+npm run build          # outputs to frontend/dist/
+# Deploy dist/ to Vercel, Netlify, or GitHub Pages
+```
+
+| Pros | Cons |
+|------|------|
+| Persistent public URL | Frontend only — the blockchain node must still be accessible |
+| Free tier available | Need to expose port 8545 separately (e.g. via Codespaces or ngrok) |
+| CDN-backed, fast globally | Each redeploy after contract changes requires rebuilding |
+
+> Update `frontend/src/config/contracts.ts` with the publicly accessible RPC URL before building.
+
+#### Option 3 — ngrok (Tunnel from Local Machine)
+
+Expose your local dev server to the internet via a secure tunnel.
+
+```bash
+# Terminal 1 — local Hardhat node (already running)
+npx hardhat node
+
+# Terminal 2 — tunnel the frontend
+npx ngrok http 3000
+
+# Terminal 3 — tunnel the blockchain RPC
+npx ngrok http 8545
+```
+
+Share the ngrok URLs with teammates. They open the frontend URL in a browser and point MetaMask to the RPC URL.
+
+| Pros | Cons |
+|------|------|
+| Works from any local machine | Free tier: random URL changes on restart |
+| No deployment needed | Requires ngrok account for multiple tunnels |
+| Tunnels both frontend + RPC | Slower than Codespaces (traffic routed through ngrok) |
+
+#### Option 4 — Public Testnet (Sepolia / Amoy)
+
+Deploy contracts to a public EVM testnet for persistent shared access.
+
+| Pros | Cons |
+|------|------|
+| Persistent — survives restarts | Requires testnet ETH (faucets) |
+| Closest to production | Slower block times (~12 s on Sepolia) |
+| No tunneling or port forwarding | Deploying 14 contracts takes longer |
+
+> This option is best for final integration testing, not day-to-day development.
+
+#### Comparison Summary
+
+| Option | Setup Time | Teammate Requirements | Persistence | Best For |
+|--------|-----------|----------------------|-------------|----------|
+| **Codespaces** | ~3 min | Browser only | While Codespace is running | Day-to-day team testing ✅ |
+| **Vercel / Netlify** | ~10 min | Browser + RPC access | Permanent (frontend) | Demo / presentation |
+| **ngrok** | ~2 min | Browser + MetaMask | While tunnel is open | Quick ad-hoc sharing |
+| **Public Testnet** | ~30 min | Browser + MetaMask + testnet ETH | Permanent | Final integration testing |
+
 ---
 
-## 11  Security Considerations
+## 11  Role-Based Access Control (RBAC)
+
+The frontend enforces four role tiers. Roles are detected automatically from on-chain `AccessControl` state when a wallet connects.
+
+### Role Detection
+
+| Role | Badge | On-Chain Check |
+|------|-------|---------------|
+| **Admin** | 🟡 Yellow | `DEFAULT_ADMIN_ROLE` on `IdentityRegistry` |
+| **Agent / Custodian** | 🟠 Orange | `AGENT_ROLE` on `IdentityRegistry` |
+| **Operator** | 🟢 Green | `OPERATOR_ROLE` on `DvPSettlement` |
+| **Investor** | 🔵 Blue | Default (no privileged role) |
+
+### Page Access Matrix
+
+| Page | Route | Admin | Agent | Operator | Investor |
+|------|-------|:-----:|:-----:|:--------:|:--------:|
+| Dashboard | `/` | ✅ | ✅ | ✅ | ✅ |
+| Trading | `/trading` | ✅ | ✅ | ✅ | ✅ |
+| Portfolio | `/portfolio` | ✅ | ✅ | ✅ | ✅ |
+| Governance | `/governance` | ✅ | ✅ | ✅ | ✅ |
+| DvP Settlement | `/settlement` | ✅ | ✅ | ✅ | ✅ |
+| KYC Management | `/kyc` | ✅ | ✅ | ❌ | ❌ |
+| Token Minting | `/mint` | ✅ | ✅ | ❌ | ❌ |
+| Oracle Committee | `/oracle` | ✅ | ✅ | ✅ | ❌ |
+| Compliance Rules | `/compliance` | ✅ | ❌ | ❌ | ❌ |
+| Token Management | `/tokens` | ✅ | ❌ | ❌ | ❌ |
+| Market Management | `/markets` | ✅ | ❌ | ❌ | ❌ |
+| Wallet Custody | `/custody` | ✅ | ❌ | ❌ | ❌ |
+
+### Route Guards (App.tsx)
+
+| Guard | Roles Allowed | Protected Routes |
+|-------|--------------|-----------------|
+| `AdminOnlyRoute` | Admin | `/compliance`, `/tokens`, `/markets`, `/custody` |
+| `AdminRoute` | Admin + Agent | `/kyc`, `/mint` |
+| `PrivilegedRoute` | Admin + Agent + Operator | `/oracle` |
+| *(none)* | All authenticated | `/`, `/trading`, `/portfolio`, `/governance`, `/settlement` |
+
+### Start-Up Company Access
+
+Start-up companies listed on the HKSTP TokenHub platform are **Investor**-role users. They do not need any special on-chain role or admin access. Their interactions include:
+
+- **Dashboard** — view platform overview and token metrics
+- **Trading** — buy/sell security tokens on the order book (KYC required)
+- **Portfolio** — view their token holdings
+- **Governance** — vote on proposals (token-weighted, KYC-gated)
+- **DvP Settlement** — participate in atomic delivery-vs-payment settlements
+
+All administrative functions (KYC management, token issuance, compliance configuration, custody operations) are managed by HKSTP administrators on behalf of the start-up companies.
+
+---
+
+## 12  Security Considerations
 
 - All transfers are gated by the Identity Registry (both parties must be KYC-verified)
 - Compliance module checks run on every non-safe-listed transfer
@@ -989,7 +1143,7 @@ The `dist/` folder can be served by any static hosting provider (Nginx, Vercel, 
 
 ---
 
-## 12  SFC Regulatory Alignment
+## 13  SFC Regulatory Alignment
 
 | Requirement | Implementation |
 |-------------|----------------|
@@ -1012,7 +1166,7 @@ The `dist/` folder can be served by any static hosting provider (Nginx, Vercel, 
 
 ---
 
-## 13  Citation List
+## 14  Citation List
 
 1. Project Plan - Tokenizing HKSTP Startups v0.2.pdf
 2. [SFC Circular on Tokenisation (2 Nov 2023)](https://apps.sfc.hk/edistributionWeb/api/circular/list-content/circular/doc?lang=EN&refNo=23EC53)
