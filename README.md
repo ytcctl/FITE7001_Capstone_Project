@@ -715,6 +715,8 @@ cd frontend && npm run dev
 
 #### Dev Accounts (pre-funded with 1,000,000 ETH each)
 
+These addresses are **deterministic** — they are identical on every fresh Hardhat Network launch.
+
 | Role | Address | Private Key |
 |------|---------|-------------|
 | Deployer / Admin | `0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73` | `0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63` |
@@ -723,7 +725,23 @@ cd frontend && npm run dev
 | Seller | `0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef` | `0x0dbbe8e4ae425a6d2687f1a7e3ba17bc98c6736950282febeaea2cf4c0f57ecb` |
 | Buyer | `0x821aEa9a577a9b44299B9c15c88cf3087F3b5544` | `0xc88b703fb08cbea894b6aeff5a544fb92e78a18e19814cd85da83b71f772aa6c` |
 
-> **Note:** These are well-known dev keys — **never** use them on a public network.
+#### Seeded Investor Account (auto-provisioned by deploy script)
+
+The unified deploy script (`deploy-and-update-frontend.js`) automatically seeds this investor after contract deployment:
+
+| Role | Address | Private Key |
+|------|---------|-------------|
+| Investor1 | `0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3` | `0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a` |
+
+**Investor1 seeded state** (after deploy):
+- ✅ Identity registered in `HKSTPIdentityRegistry` (country: HK)
+- ✅ KYC claims verified (topics 1–5: AML, CFT, CDD, Accredited Investor, Domicile)
+- ✅ ERC-735 on-chain claims signed by `ClaimIssuer`
+- ✅ **10,000 HKSAT** (security tokens) minted
+- ✅ **5,000,000 THKD** (test HKD cash tokens) minted
+- ✅ Pre-funded with 1,000,000 ETH (Hardhat genesis)
+
+> **⚠️ Warning:** All keys above are well-known dev keys — **never** use them on a public network.
 
 ### Hyperledger Besu Network (Optional — Production-like)
 
