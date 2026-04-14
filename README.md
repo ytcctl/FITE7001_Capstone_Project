@@ -504,7 +504,8 @@ besu/
 
 .devcontainer/
 ├── devcontainer.json             # GitHub Codespaces / VS Code Dev Container config
-└── post-create.sh                # Auto-setup: install, compile, deploy, start frontend
+├── post-create.sh                # One-time setup: install deps + compile contracts
+└── start.sh                      # Runs on EVERY start/restart: node + deploy + frontend
 
 frontend/
 ├── src/
@@ -523,10 +524,11 @@ frontend/
 │       ├── Portfolio.tsx         # Token portfolio view
 │       ├── Settlement.tsx        # DvP settlement management
 │       ├── KYCManagement.tsx     # Identity & KYC claim management
-│       ├── TokenManagement.tsx   # Token lifecycle management
+│       ├── TokenManagement.tsx   # Token lifecycle management (V1 + V2 tabs)
 │       ├── TokenMinting.tsx      # Mint/burn security tokens
 │       ├── ComplianceRules.tsx   # Compliance module configuration
 │       ├── Governance.tsx        # On-chain governance proposals
+│       ├── OracleCommittee.tsx   # Multi-oracle threshold management
 │       └── WalletCustody.tsx     # Hot/warm/cold wallet management
 └── ...
 
@@ -556,15 +558,20 @@ The fastest way to get a running instance with zero local setup:
 
 1. Go to [github.com/ytcctl/FITE7001_Capstone_Project](https://github.com/ytcctl/FITE7001_Capstone_Project)
 2. Click **Code → Codespaces → Create codespace on main**
-3. Wait ~3 minutes — the `postCreateCommand` (`.devcontainer/post-create.sh`) automatically:
+3. Wait ~3 minutes — two lifecycle scripts run automatically:
+
+   **`postCreateCommand` → `post-create.sh`** *(runs once on first create)*
    - Installs all Node dependencies (`npm ci` for root + frontend)
-   - Compiles Solidity contracts
+   - Compiles Solidity contracts (`npx hardhat compile`)
+
+   **`postStartCommand` → `start.sh`** *(runs on every start / restart / resume)*
+   - Kills any stale Hardhat / Vite processes from the previous session
    - Starts **Hardhat Network** in background (chain ID 31337, auto-mine)
-   - Deploys all 12+ contracts via `deploy-and-update-frontend.js`
-   - Deploys OrderBook
-   - Seeds Investor1 (KYC + tokens) *(optional, may be skipped)*
-   - Auto-updates `frontend/src/config/contracts.ts` with deployed addresses
+   - Deploys all 17 contracts via `deploy-and-update-frontend.js`
+   - Auto-updates `frontend/src/config/contracts.ts` with deployed addresses + chain ID
+   - Seeds Investor1 (KYC + tokens)
    - Launches the Vite frontend on port 3000
+
 4. Codespaces auto-forwards port 3000 — click the URL to open the frontend
 5. Use the **built-in test accounts** in the Connect Wallet dropdown (no MetaMask needed), or import a dev key in MetaMask
 
@@ -572,6 +579,8 @@ The fastest way to get a running instance with zero local setup:
 |------|---------|
 | 3000 | Frontend (Vite) — auto-opens in browser |
 | 8545 | Hardhat JSON-RPC |
+
+> **Codespace restart:** When you stop and restart a Codespace, `start.sh` automatically re-deploys contracts and restarts the frontend — no manual intervention needed. All features (admin functions, Oracle Committee, etc.) will be available immediately.
 
 > **MetaMask in Codespaces:** Point MetaMask to the Codespaces-forwarded port 8545 URL (e.g. `https://<codespace>-8545.app.github.dev`), chain ID **31337**. Alternatively, use the built-in wallet (paste a dev private key directly in the Connect Wallet dropdown).
 
