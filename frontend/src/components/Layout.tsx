@@ -91,7 +91,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       trimmed = `0x${trimmed}`;
     }
     if (!/^0x[0-9a-fA-F]{64}$/.test(trimmed)) {
-      setKeyError('Invalid private key format (expected 64 hex chars, with or without 0x prefix)');
+      // Detect common mistake: user pasted an address (40 hex) instead of a private key (64 hex)
+      const hexOnly = trimmed.startsWith('0x') ? trimmed.slice(2) : trimmed;
+      if (/^[0-9a-fA-F]{40}$/.test(hexOnly)) {
+        setKeyError('This looks like a wallet address (40 hex chars), not a private key. A private key is 64 hex chars. Export it from MetaMask → Account Details → Show Private Key.');
+      } else {
+        setKeyError('Invalid private key format (expected 64 hex chars, with or without 0x prefix)');
+      }
       return;
     }
     const label = customLabel.trim() || `Account ${savedAccounts.length + 1}`;
