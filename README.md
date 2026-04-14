@@ -671,27 +671,46 @@ Hardhat Network is the recommended development blockchain — it auto-mines tran
 
 ```bash
 npm run compile
-npm run deploy:besu    # Launches Hardhat node + deploys all contracts
+
+# Terminal 1 — start Hardhat node (stays running)
+npx hardhat node
+
+# Terminal 2 — deploy all 14 contracts + configure roles + seed Investor1 + auto-update frontend
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 ```
 
-`npm run deploy:besu` runs `scripts/deploy-besu.js` which:
-1. Checks if a node is already running on port 8545
-2. If not, auto-spawns `npx hardhat node` as a managed child process
-3. Deploys all 5 core contracts via `npx hardhat run scripts/deploy.js --network localhost`
-4. Configures roles (TOKEN_ROLE, OPERATOR_ROLE, AGENT_ROLE) and safe-lists
-5. Leaves the Hardhat node running for frontend interaction
+`scripts/deploy-and-update-frontend.js` performs the following in a single run:
+1. Deploys all **14 contracts**: IdentityRegistry, Compliance, SecurityToken, MockCashToken, DvPSettlement, TokenFactory, ClaimIssuer, IdentityFactory, Timelock, Governor, WalletRegistry, MultiSigWarm, **OrderBook**, SystemHealthCheck
+2. Configures all roles: TOKEN_ROLE, OPERATOR_ROLE, AGENT_ROLE, DEPLOYER_ROLE, PROPOSER_ROLE, EXECUTOR_ROLE, CANCELLER_ROLE
+3. Safe-lists: Treasury, Escrow, WalletRegistry, MultiSigWarm, **OrderBook** on the SecurityToken
+4. Wires ONCHAINID: IdentityFactory → IdentityRegistry, ClaimIssuer as Trusted Issuer
+5. Wires Governance: Governor → Timelock, Timelock → SecurityToken admin
+6. Wires Custody: WalletRegistry tracks SecurityToken + CashToken, MultiSigWarm registered as WARM wallet
+7. Sets Cap. 622 shareholder cap (50)
+8. **Seeds Investor1** (`0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3`): registers identity, sets KYC claims (1–5), issues ERC-735 claims, mints 10,000 HKSAT + 5,000,000 THKD
+9. **Auto-updates** `frontend/src/config/contracts.ts` with all deployed addresses (including OrderBook)
 
-#### Manual Start (Two Terminals)
+> **No manual address updates needed** — the script writes all 13 contract addresses directly into the frontend config file.
+
+#### Alternative: Unified Launcher
+
+```bash
+npm run deploy:besu    # Auto-spawns Hardhat node + deploys core contracts
+```
+
+`npm run deploy:besu` runs `scripts/deploy-besu.js` which auto-detects whether a node is running and spawns one if needed. Note: this deploys only the 5 core contracts; for the full 14-contract deployment, use `deploy-and-update-frontend.js` above.
+
+#### Manual Start (Step-by-Step)
 
 ```bash
 # Terminal 1 — start the Hardhat node (stays running)
 npx hardhat node
 
-# Terminal 2 — deploy core contracts
-npx hardhat run scripts/deploy.js --network localhost
+# Terminal 2 — deploy everything (14 contracts + seed + auto-update)
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 
-# Terminal 2 — deploy OrderBook
-npx hardhat run scripts/deploy-orderbook.js --network localhost
+# Terminal 2 — start the frontend
+cd frontend && npm run dev
 ```
 
 #### Dev Accounts (pre-funded with 1,000,000 ETH each)
@@ -777,22 +796,29 @@ npx hardhat run scripts/deploy-orderbook.js --network besu
 npx hardhat run scripts/deploy-orderbook-factory.js --network besu
 ```
 
-### Deployment Order
+### Deployment Order (`deploy-and-update-frontend.js`)
 
-1. **`IdentityFactory`** — ONCHAINID minimal proxy factory
-2. **`HKSTPIdentityRegistry`** — KYC/AML claim storage (linked to IdentityFactory)
-3. **`HKSTPCompliance`** — attestation + module enforcement
-4. **`OracleCommittee`** — multi-oracle threshold committee
-5. **`HKSTPSecurityToken`** — linked to registry + compliance (or via `TokenFactory`)
-6. **`TokenFactory` / `TokenFactoryV2`** — deploy multiple startup tokens
-7. **`MockCashToken`** — tokenized HKD (replace with Project Ensemble contract in production)
-8. **`DvPSettlement`** — atomic settlement engine
-9. **`OrderBookFactory`** — multi-market order book factory (linked to `IdentityRegistry` for KYC)
-10. **`WalletRegistry`** — custody tier registry + 98/2 enforcement
-11. **`MultiSigWarm`** — warm wallet multi-sig
-12. **`HKSTPGovernor` + `HKSTPTimelock`** — governance stack
-13. **`SystemHealthCheck`** — run post-deployment wiring verification
-14. **`OrderBook`** — standalone order book (via `deploy-orderbook.js`, includes embedded block producer)
+| # | Contract | Purpose |
+|---|----------|---------|
+| 1 | **HKSTPIdentityRegistry** | KYC/AML claim storage, ONCHAINID wiring |
+| 2 | **HKSTPCompliance** | Attestation + module enforcement |
+| 3 | **HKSTPSecurityToken** | ERC-3643 security token (linked to registry + compliance) |
+| 4 | **MockCashToken** | Tokenized HKD (replace with Project Ensemble contract in production) |
+| 5 | **DvPSettlement** | Atomic settlement engine |
+| 6 | **TokenFactory** | Deploy multiple startup tokens via cloning |
+| 7 | **ClaimIssuer** | Trusted Claim Issuer for ONCHAINID ERC-735 claims |
+| 8 | **IdentityFactory** | ONCHAINID minimal proxy factory |
+| 9 | **HKSTPTimelock** | Governance execution delay (48 h) |
+| 10 | **HKSTPGovernor** | On-chain governance with KYC-gated voting |
+| 11 | **WalletRegistry** | Custody tier registry + 98/2 enforcement |
+| 12 | **MultiSigWarm** | 2-of-3 warm wallet multi-sig |
+| 13 | **OrderBook** | On-chain order book (HKSAT/THKD, KYC-gated) |
+| 14 | **SystemHealthCheck** | Post-deployment wiring verification (optional) |
+
+After deployment, the script also:
+- Configures all roles and safe-lists
+- Seeds **Investor1** with identity, KYC claims, 10,000 HKSAT + 5,000,000 THKD
+- Auto-updates `frontend/src/config/contracts.ts`
 
 ### Post-Deployment Steps
 
@@ -828,9 +854,11 @@ The Investor Portal is a **React 18 + Vite + Tailwind CSS** single-page applicat
 | Contracts deployed | Via `npm run deploy:besu` or `npx hardhat run scripts/deploy-and-update-frontend.js --network localhost` (see §9) |
 | MetaMask | *(Optional)* — configured for Chain ID **31337**; you can also use the built-in wallet |
 
-### Step 1 — Update Contract Addresses
+### Step 1 — Contract Addresses (Auto-Updated)
 
-After each fresh deployment, update `frontend/src/config/contracts.ts` with the new addresses printed in the deployment summary:
+When you deploy via `deploy-and-update-frontend.js`, it **automatically writes** all contract addresses into `frontend/src/config/contracts.ts` — no manual editing required.
+
+If you used a different deploy script, or need to update manually, edit the file with addresses from the deployment output:
 
 ```typescript
 // frontend/src/config/contracts.ts
@@ -840,7 +868,14 @@ export const CONTRACT_ADDRESSES = {
   securityToken:    '0x...',
   cashToken:        '0x...',
   dvpSettlement:    '0x...',
-  // ... other contracts
+  tokenFactory:     '0x...',
+  claimIssuer:      '0x...',
+  identityFactory:  '0x...',
+  timelock:         '0x...',
+  governor:         '0x...',
+  walletRegistry:   '0x...',
+  multiSigWarm:     '0x...',
+  orderBook:        '0x...',
 };
 ```
 
