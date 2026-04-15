@@ -380,3 +380,90 @@ regulatory inspection, "admin toggled a flag" is harder to defend than
 
 The Boolean path exists as a **backward-compatible fallback**, not as a
 production-grade compliance solution.
+
+---
+
+## 9. Delegate Votes — Activating On-Chain Voting Power
+
+HKSTPSecurityToken inherits OpenZeppelin's **ERC20Votes**, which tracks
+voting power through an explicit **delegation** mechanism rather than raw
+token balances. This design is intentional and has important implications.
+
+### Why Delegation Is Required
+
+| Concept | Detail |
+|---|---|
+| **ERC20Votes model** | Voting power = 0 by default, even if the wallet holds tokens. A holder must call `delegate(address)` to activate voting power. |
+| **Self-delegation** | Calling `delegate(myOwnAddress)` activates the holder's own tokens for governance voting. This is the most common case. |
+| **Delegate to another** | Calling `delegate(someoneElse)` transfers the holder's **voting weight** (not the tokens themselves) to another address. The delegator retains full token ownership and can transfer or redeem normally. |
+| **Snapshot-based** | Voting power is recorded at the block when a proposal is created (`proposalSnapshot`). This prevents **flash-loan attacks** — an attacker cannot borrow tokens, vote, and return them in the same block. |
+| **Re-delegation** | A holder can change their delegate at any time. The new delegate's power updates from the next block onward; past proposal snapshots are unaffected. |
+
+### Practical Impact
+
+- **New investor mints tokens → voting power is 0** until they self-delegate
+  via the Governance page's "Delegate Votes" button.
+- The frontend prompts delegation when `delegates(address)` returns
+  `address(0)`, indicating the holder has never delegated.
+- Delegation is a one-time transaction per address (persists across
+  subsequent mints/transfers unless explicitly changed).
+
+### Why Not Use Balance Directly?
+
+Using raw balances for voting would allow a single token to be counted
+multiple times by transferring it between wallets during a voting period.
+The delegation + snapshot model ensures each token's voting power is
+counted **exactly once** at the proposal snapshot block.
+
+---
+
+## 10. Signaling Proposals — Non-Executable Governance Votes
+
+The Governance page supports two proposal types: **Executable** and
+**Signaling**. They serve fundamentally different purposes.
+
+### Executable Proposals (Admin / Agent Only)
+
+Executable proposals encode a real on-chain transaction that is
+automatically executed if the vote passes and the timelock delay expires.
+
+| Action | Contract Call |
+|---|---|
+| Mint tokens | `securityToken.mint(to, amount)` |
+| Burn tokens | `securityToken.burn(from, amount)` |
+| Set max supply | `securityToken.setMaxSupply(newCap)` |
+| Set mint threshold | `securityToken.setMintThreshold(newThreshold)` |
+| Pause transfers | `securityToken.pause()` |
+| Unpause transfers | `securityToken.unpause()` |
+
+Only users with **Admin** or **Agent** roles can create executable
+proposals. This restriction prevents investors from unilaterally
+triggering privileged contract operations.
+
+### Signaling Proposals (All Token Holders)
+
+Signaling proposals carry **no on-chain execution payload** — they are
+governance votes that record token holder sentiment on the blockchain.
+
+| Aspect | Detail |
+|---|---|
+| **Who can create** | Any token holder (including start-up companies / investors) |
+| **On-chain effect** | None — no contract state changes regardless of outcome |
+| **Purpose** | Formal, auditable record of token holder opinion |
+| **Binding?** | No — admin decides whether to act on the result |
+
+#### Example Use Cases for Investors
+
+- Request listing of a new security token on the platform
+- Propose changes to compliance or KYC requirements
+- Signal support or opposition to a strategic direction
+- Vote on non-binding resolutions (e.g. dividend policy preferences)
+
+### Why Separate the Two Types?
+
+| Concern | How It's Addressed |
+|---|---|
+| **Investor voice** | Signaling proposals give every token holder a formal, on-chain mechanism to express their view — without requiring admin privilege. |
+| **Security** | Executable proposals are gated to admin/agent, preventing unauthorized minting, burning, or pausing. |
+| **Audit trail** | Both types are recorded on-chain with full vote tallies, making governance decisions transparent and verifiable. |
+| **Regulatory alignment** | Under HK SFC guidelines, investor participation in governance is encouraged, but privileged operations (supply changes, transfer restrictions) must remain under authorized control. |

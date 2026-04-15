@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
-import { SECURITY_TOKEN_ABI } from '../config/contracts';
+import { SECURITY_TOKEN_ABI, CONTRACT_ADDRESSES } from '../config/contracts';
 import {
   PlusCircle,
   BarChart3,
@@ -49,7 +49,7 @@ const MarketManagement: React.FC = () => {
   const [markets, setMarkets] = useState<MarketInfo[]>([]);
   const [marketsLoading, setMarketsLoading] = useState(true);
 
-  // Tokens from TokenFactory (for the "create market" picker)
+  // Tokens from default SecurityToken + V1 + V2 factories (for the "create market" picker)
   const [tokens, setTokens] = useState<FactoryToken[]>([]);
   const [tokensLoading, setTokensLoading] = useState(true);
 
@@ -91,17 +91,66 @@ const MarketManagement: React.FC = () => {
   }, [contracts]);
 
   // ---------------------------------------------------------------------------
-  // Load tokens from TokenFactory
+  // Load tokens from default SecurityToken + TokenFactory V1 + TokenFactoryV2
   // ---------------------------------------------------------------------------
 
   const loadTokens = useCallback(async () => {
-    if (!contracts?.tokenFactory || !provider) {
+    if (!provider) {
       setTokensLoading(false);
       return;
     }
     try {
-      const all = (await contracts.tokenFactory.allTokens()) as FactoryToken[];
-      setTokens(all.filter((t) => t.active));
+      const combined: FactoryToken[] = [];
+
+      // 1. Default HKSAT security token
+      try {
+        const stAddr = CONTRACT_ADDRESSES.securityToken;
+        const stContract = new ethers.Contract(stAddr, SECURITY_TOKEN_ABI, provider);
+        const [name, symbol] = await Promise.all([stContract.name(), stContract.symbol()]);
+        combined.push({
+          name,
+          symbol,
+          tokenAddress: stAddr,
+          createdBy: '',
+          createdAt: 0,
+          active: true,
+        });
+      } catch (err) {
+        console.error('[MarketMgmt] default security token error:', err);
+      }
+
+      // 2. V1 factory tokens (EIP-1167)
+      if (contracts?.tokenFactory) {
+        try {
+          const v1All = (await contracts.tokenFactory.allTokens()) as FactoryToken[];
+          combined.push(...v1All.filter((t) => t.active));
+        } catch (err) {
+          console.error('[MarketMgmt] V1 factory error:', err);
+        }
+      }
+
+      // 3. V2 factory tokens (ERC-1967)
+      if (contracts?.tokenFactoryV2) {
+        try {
+          const v2All = await contracts.tokenFactoryV2.allTokens();
+          for (const t of v2All) {
+            if (t.active) {
+              combined.push({
+                name: t.name,
+                symbol: t.symbol,
+                tokenAddress: t.proxyAddress,
+                createdBy: t.createdBy,
+                createdAt: Number(t.createdAt),
+                active: true,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[MarketMgmt] V2 factory error:', err);
+        }
+      }
+
+      setTokens(combined);
     } catch (err) {
       console.error('[MarketMgmt] loadTokens error:', err);
     } finally {
@@ -292,7 +341,7 @@ const MarketManagement: React.FC = () => {
         ) : tokens.length === 0 ? (
           <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
             <AlertTriangle size={16} />
-            No tokens found in TokenFactory. Create a token first.
+            No tokens found. Create a token first via Token Management.
           </div>
         ) : (
           <form onSubmit={handleCreateMarket} className="space-y-4">

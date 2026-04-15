@@ -207,6 +207,7 @@ const Governance: React.FC = () => {
   // ─── Create proposal ─────────────────────────────────────
   const handlePropose = async () => {
     if (!contracts || !proposalDescription) return;
+    if (proposalType === 'executable' && !roles.isAdmin && !roles.isAgent) return;
     setProposing(true);
     setStatus(null);
     try {
@@ -488,16 +489,18 @@ const Governance: React.FC = () => {
               >
                 Signaling
               </button>
-              <button
-                onClick={() => setProposalType('executable')}
-                className={`px-4 py-2 text-sm rounded-xl border transition-colors ${
-                  proposalType === 'executable'
-                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
-                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                Executable Action
-              </button>
+              {(roles.isAdmin || roles.isAgent) && (
+                <button
+                  onClick={() => setProposalType('executable')}
+                  className={`px-4 py-2 text-sm rounded-xl border transition-colors ${
+                    proposalType === 'executable'
+                      ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  Executable Action
+                </button>
+              )}
             </div>
           </div>
 
