@@ -322,13 +322,17 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Market Overview — Top 10 Markets */}
-      {markets.length > 0 && (
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 size={20} className="text-cyan-400" />
-            <h3 className="font-bold text-white">Market Overview</h3>
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 size={20} className="text-cyan-400" />
+          <h3 className="font-bold text-white">Market Overview</h3>
+          {markets.length > 0 && (
             <span className="text-sm text-gray-500 ml-auto">Top {markets.length} by trade volume</span>
-          </div>
+          )}
+        </div>
+        {markets.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">No active markets. Markets are created via the Market Management page.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -356,8 +360,8 @@ const Dashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* System Health Check — admin/agent only */}
       {(roles.isAdmin || roles.isAgent) && (
