@@ -389,10 +389,14 @@ async function main() {
   await (await compliance.grantRole(COMPLIANCE_ADMIN_ROLE, tokenFactoryAddress)).wait();
   console.log("     DEFAULT_ADMIN_ROLE granted to TokenFactory on Compliance");
 
-  // Grant OPERATOR_ROLE on DvP to the operator account
+  // Grant OPERATOR_ROLE on DvP to operator + both investor accounts
   const OPERATOR_ROLE = await dvp.OPERATOR_ROLE();
   await (await dvp.grantRole(OPERATOR_ROLE, operator.address)).wait();
   console.log("     OPERATOR_ROLE granted to operator on DvPSettlement:", operator.address);
+  await (await dvp.grantRole(OPERATOR_ROLE, investor1.address)).wait();
+  console.log("     OPERATOR_ROLE granted to investor1 on DvPSettlement:", investor1.address);
+  await (await dvp.grantRole(OPERATOR_ROLE, investor2.address)).wait();
+  console.log("     OPERATOR_ROLE granted to investor2 on DvPSettlement:", investor2.address);
 
   // Grant AGENT_ROLE on BOTH IdentityRegistry and SecurityToken to the agent/custodian
   const AGENT_ROLE_TOKEN    = await token.AGENT_ROLE();
