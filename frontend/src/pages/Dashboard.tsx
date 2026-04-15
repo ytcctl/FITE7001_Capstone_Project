@@ -110,7 +110,7 @@ const Dashboard: React.FC = () => {
           try {
             const tok = new ethers.Contract(t[addrField], SECURITY_TOKEN_ABI, provider);
             const [bal, supply] = await Promise.all([tok.balanceOf(account), tok.totalSupply()]);
-            if (bal > 0n) {
+            if (bal > 0n || roles.isAdmin) {
               tokens.push({ name: t.name, symbol: t.symbol, address: t[addrField], balance: ethers.formatUnits(bal, 18), totalSupply: ethers.formatUnits(supply, 18) });
             }
           } catch (e) { console.warn(`Skip factory token ${t.name}:`, e); }
@@ -158,10 +158,19 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             icon={<Users size={20} />}
-            label="Total Supply"
-            value={`${Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${tokenSymbol}`}
+            label={`${tokenSymbol} Total Supply`}
+            value={Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             accent="amber"
           />
+          {factoryTokens.map((ft) => (
+            <StatCard
+              key={ft.address}
+              icon={<Users size={20} />}
+              label={`${ft.symbol} Total Supply`}
+              value={Number(ft.totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              accent="amber"
+            />
+          ))}
         </div>
       )}
 
@@ -172,6 +181,7 @@ const Dashboard: React.FC = () => {
           <h3 className="font-bold text-white mb-4">My Token Holdings</h3>
           <div className="space-y-3">
             {/* Primary Security Token */}
+            {Number(tokenBalance) > 0 && (
             <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
               <div>
                 <p className="text-sm text-gray-400">{tokenName}</p>
@@ -182,7 +192,9 @@ const Dashboard: React.FC = () => {
                 <span className="text-sm text-gray-400">{tokenSymbol}</span>
               </p>
             </div>
+            )}
             {/* Cash Token */}
+            {Number(cashBalance) > 0 && (
             <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
               <div>
                 <p className="text-sm text-gray-400">Cash Token</p>
@@ -193,8 +205,9 @@ const Dashboard: React.FC = () => {
                 <span className="text-sm text-gray-400">{cashSymbol}</span>
               </p>
             </div>
+            )}
             {/* Factory-deployed tokens */}
-            {factoryTokens.map((ft) => (
+            {factoryTokens.filter((ft) => Number(ft.balance) > 0).map((ft) => (
               <div key={ft.address} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
                 <div>
                   <p className="text-sm text-gray-400">{ft.name}</p>
@@ -206,7 +219,7 @@ const Dashboard: React.FC = () => {
                 </p>
               </div>
             ))}
-            {factoryTokens.length === 0 && Number(tokenBalance) === 0 && Number(cashBalance) === 0 && (
+            {factoryTokens.filter((ft) => Number(ft.balance) > 0).length === 0 && Number(tokenBalance) === 0 && Number(cashBalance) === 0 && (
               <p className="text-sm text-gray-500 text-center py-2">No token holdings</p>
             )}
           </div>
