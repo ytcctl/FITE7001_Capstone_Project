@@ -393,10 +393,10 @@ async function main() {
   const OPERATOR_ROLE = await dvp.OPERATOR_ROLE();
   await (await dvp.grantRole(OPERATOR_ROLE, operator.address)).wait();
   console.log("     OPERATOR_ROLE granted to operator on DvPSettlement:", operator.address);
-  await (await dvp.grantRole(OPERATOR_ROLE, investor1.address)).wait();
-  console.log("     OPERATOR_ROLE granted to investor1 on DvPSettlement:", investor1.address);
-  await (await dvp.grantRole(OPERATOR_ROLE, investor2.address)).wait();
-  console.log("     OPERATOR_ROLE granted to investor2 on DvPSettlement:", investor2.address);
+  await (await dvp.grantRole(OPERATOR_ROLE, seller.address)).wait();
+  console.log("     OPERATOR_ROLE granted to seller on DvPSettlement:", seller.address);
+  await (await dvp.grantRole(OPERATOR_ROLE, buyer.address)).wait();
+  console.log("     OPERATOR_ROLE granted to buyer on DvPSettlement:", buyer.address);
 
   // Grant AGENT_ROLE on BOTH IdentityRegistry and SecurityToken to the agent/custodian
   const AGENT_ROLE_TOKEN    = await token.AGENT_ROLE();
