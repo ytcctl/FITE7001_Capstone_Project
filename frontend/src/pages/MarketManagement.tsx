@@ -43,7 +43,7 @@ interface MarketInfo {
 // ---------------------------------------------------------------------------
 
 const MarketManagement: React.FC = () => {
-  const { contracts, account, provider } = useWeb3();
+  const { contracts, account, provider, signer } = useWeb3();
 
   // All markets from factory
   const [markets, setMarkets] = useState<MarketInfo[]>([]);
@@ -238,6 +238,18 @@ const MarketManagement: React.FC = () => {
           }
         } catch {
           /* skip */
+        }
+      }
+
+      // Safe-list the new OrderBook on the security token so escrow
+      // transfers (sell → OrderBook → buyer) pass compliance checks.
+      if (obAddr && signer) {
+        try {
+          const secToken = new ethers.Contract(selectedTokenAddr, SECURITY_TOKEN_ABI, signer);
+          const slTx = await secToken.setSafeList(obAddr, true);
+          await slTx.wait();
+        } catch (slErr) {
+          console.warn('Auto safe-list failed (admin may need AGENT_ROLE on this token):', slErr);
         }
       }
 
