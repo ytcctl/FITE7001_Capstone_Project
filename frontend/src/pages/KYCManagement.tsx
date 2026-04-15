@@ -9,6 +9,7 @@ const KYCManagement: React.FC = () => {
   // Register Identity
   const [regAddress, setRegAddress] = useState('');
   const [regCountry, setRegCountry] = useState('HK');
+  const [regMode, setRegMode] = useState<'onchainid' | 'boolean'>('onchainid');
   // Issue Signed Claim (ONCHAINID)
   const [claimAddress, setClaimAddress] = useState('');
   const [claimTopic, setClaimTopic] = useState(1);
@@ -33,22 +34,53 @@ const KYCManagement: React.FC = () => {
     let addr: string;
     try { addr = ethers.getAddress(regAddress.trim()); } catch { setTxStatus('✗ Invalid Ethereum address'); return; }
     setIsSubmitting(true);
-    setTxStatus('Registering identity (auto-deploying ONCHAINID contract)…');
-    try {
-      const tx = await contracts.identityRegistry.registerIdentity(
-        addr,
-        ethers.ZeroAddress,  // auto-deploy via factory
-        regCountry
-      );
-      setTxStatus('Transaction submitted. Waiting for confirmation…');
-      await tx.wait();
-      const identityAddr = await contracts.identityRegistry.identity(addr);
-      setTxStatus(`✓ Identity registered. ONCHAINID: ${identityAddr}`);
-      setRegAddress('');
-    } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Transaction failed'}`);
-    } finally {
-      setIsSubmitting(false);
+
+    if (regMode === 'onchainid') {
+      setTxStatus('Registering identity (auto-deploying ONCHAINID contract)…');
+      try {
+        const tx = await contracts.identityRegistry.registerIdentity(
+          addr,
+          ethers.ZeroAddress,  // auto-deploy via factory
+          regCountry
+        );
+        setTxStatus('Transaction submitted. Waiting for confirmation…');
+        await tx.wait();
+        const identityAddr = await contracts.identityRegistry.identity(addr);
+        setTxStatus(`✓ Identity registered. ONCHAINID: ${identityAddr}`);
+        setRegAddress('');
+      } catch (e: any) {
+        setTxStatus(`✗ ${e?.reason || e?.message || 'Transaction failed'}`);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      // Boolean path: temporarily clear IdentityFactory → register → restore
+      try {
+        const savedFactory = await contracts.identityRegistry.identityFactory();
+        if (savedFactory !== ethers.ZeroAddress) {
+          setTxStatus('Step 1/3 — Temporarily clearing IdentityFactory…');
+          const tx1 = await contracts.identityRegistry.setIdentityFactory(ethers.ZeroAddress);
+          await tx1.wait();
+        }
+        setTxStatus('Step 2/3 — Registering identity (Boolean mode, no ONCHAINID)…');
+        const tx2 = await contracts.identityRegistry.registerIdentity(
+          addr,
+          ethers.ZeroAddress,
+          regCountry
+        );
+        await tx2.wait();
+        if (savedFactory !== ethers.ZeroAddress) {
+          setTxStatus('Step 3/3 — Restoring IdentityFactory…');
+          const tx3 = await contracts.identityRegistry.setIdentityFactory(savedFactory);
+          await tx3.wait();
+        }
+        setTxStatus('✓ Identity registered (Boolean mode — no ONCHAINID). Use "Set Boolean Claim" to verify.');
+        setRegAddress('');
+      } catch (e: any) {
+        setTxStatus(`✗ ${e?.reason || e?.message || 'Transaction failed'}`);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -327,6 +359,39 @@ const KYCManagement: React.FC = () => {
                 maxLength={2}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Identity Mode</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRegMode('onchainid')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all ${
+                    regMode === 'onchainid'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  ONCHAINID (ERC-735)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegMode('boolean')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all ${
+                    regMode === 'boolean'
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/25'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  Boolean (Simple)
+                </button>
+              </div>
+              {regMode === 'boolean' && (
+                <p className="text-xs text-amber-400/80 mt-2">
+                  No Identity contract will be deployed. Verification uses simple on/off claim flags.
+                  Set boolean claims after registration to complete KYC.
+                </p>
+              )}
             </div>
             <button
               onClick={handleRegister}

@@ -339,3 +339,44 @@ no effect on `isVerified()` in this case.
 
 To revert an investor to the boolean path, the Identity contract address
 must be cleared (re-register with `address(0)`).
+
+### 8.4 Regulatory Compliance Considerations (Hong Kong)
+
+Hong Kong's SFC and AMLO require KYC/AML due diligence, investor
+accreditation, ongoing monitoring, and auditable record-keeping. These are
+**off-chain processes** — neither on-chain path performs KYC; they both
+record the outcome and enforce transfer restrictions.
+
+| Concern | Boolean (Simple) | ONCHAINID (ERC-735) |
+|---|---|---|
+| Transfer blocking | ✓ Same enforcement | ✓ Same enforcement |
+| Who attests | Admin only (self-attestation) | Independent ClaimIssuer (third-party) |
+| Cryptographic proof | None — just a flag | Signed claim with issuer signature |
+| Non-repudiation | Weak — admin can flip any flag | Strong — issuer signature is verifiable |
+| Claim expiry | Not supported | Built-in (auto-expires) |
+| Audit trail | Minimal (on/off event logs) | Rich (issuer, signature, data, expiry) |
+| Regulatory inspection | "Admin says investor is verified" | "Licensed KYC provider X attested on date Y, expires Z" |
+
+**Boolean claims do not violate HK regulations** as long as:
+
+- Proper off-chain KYC/AML was conducted and documented.
+- The admin setting the boolean flag is authorised and accountable.
+- Off-chain records can be produced on regulatory request.
+
+However, Boolean claims represent a **single point of trust** (the admin)
+with no cryptographic proof, no expiry, and a weaker audit trail. In a
+regulatory inspection, "admin toggled a flag" is harder to defend than
+"licensed KYC provider signed cryptographic attestation on [date] with
+[evidence hash]".
+
+#### Recommended Usage by Scenario
+
+| Scenario | Recommended Path |
+|---|---|
+| Production / live STO | **ONCHAINID** — stronger compliance posture |
+| Development / testing | **Boolean** — faster iteration, no ClaimIssuer needed |
+| Demo / proof-of-concept | **Boolean** — simpler to show the flow |
+| Interim (ClaimIssuer temporarily unavailable) | **Boolean** — temporary bridge, upgrade to ONCHAINID later |
+
+The Boolean path exists as a **backward-compatible fallback**, not as a
+production-grade compliance solution.
