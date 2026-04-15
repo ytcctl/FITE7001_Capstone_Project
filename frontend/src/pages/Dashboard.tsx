@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
-import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
-import { Coins, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, ORDER_BOOK_ABI, ORDER_BOOK_FACTORY_ABI } from '../config/contracts';
+import { Coins, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2, TrendingUp, BarChart3 } from 'lucide-react';
 import { ethers } from 'ethers';
 
 interface FactoryToken { name: string; symbol: string; address: string; balance: string; totalSupply: string }
+interface MarketInfo { name: string; symbol: string; securityToken: string; orderBook: string; lastPrice: string; tradeCount: number; bestBid: string; bestAsk: string }
 
 const Dashboard: React.FC = () => {
   const { account, contracts, chainId, roles } = useWeb3();
@@ -21,6 +22,8 @@ const Dashboard: React.FC = () => {
   const [claimStatus, setClaimStatus] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [factoryTokens, setFactoryTokens] = useState<FactoryToken[]>([]);
+  const [markets, setMarkets] = useState<MarketInfo[]>([]);
+  const [priceMap, setPriceMap] = useState<Record<string, string>>({}); // tokenAddr -> last price
 
   // System Health state
   interface HealthResult { name: string; passed: boolean; detail: string }
@@ -123,6 +126,49 @@ const Dashboard: React.FC = () => {
       try { await fetchFactoryTokens(await contracts.tokenFactoryV2.allTokens(), 'proxyAddress'); } catch (e) { console.warn('V2 factory load error:', e); }
       setFactoryTokens(tokens);
     } catch (e) { console.warn('Factory token loading failed:', e); }
+
+    // Load market overview (all order books) and build price map
+    try {
+      const provider = (contracts.securityToken as any).runner?.provider ?? contracts.securityToken.runner;
+      const factory = new ethers.Contract(CONTRACT_ADDRESSES.orderBookFactory, ORDER_BOOK_FACTORY_ABI, provider);
+      const allMkts: any[] = await factory.activeMarkets();
+      const mkts: MarketInfo[] = [];
+      const prices: Record<string, string> = {};
+
+      for (const m of allMkts) {
+        try {
+          const ob = new ethers.Contract(m.orderBook, ORDER_BOOK_ABI, provider);
+          const [tc, bid, ask] = await Promise.all([
+            ob.tradeCount(),
+            ob.bestBid(),
+            ob.bestAsk(),
+          ]);
+          const count = Number(tc);
+          let lastPrice = '—';
+          if (count > 0) {
+            const trade = await ob.getTrade(count - 1);
+            lastPrice = ethers.formatUnits(trade.price, 6);
+          }
+          mkts.push({
+            name: m.name,
+            symbol: m.symbol,
+            securityToken: m.securityToken,
+            orderBook: m.orderBook,
+            lastPrice,
+            tradeCount: count,
+            bestBid: Number(bid) > 0 ? ethers.formatUnits(bid, 6) : '—',
+            bestAsk: Number(ask) > 0 ? ethers.formatUnits(ask, 6) : '—',
+          });
+          if (lastPrice !== '—') {
+            prices[m.securityToken.toLowerCase()] = lastPrice;
+          }
+        } catch (e) { console.warn(`Skip market ${m.name}:`, e); }
+      }
+      // Sort by trade count descending (most active first)
+      mkts.sort((a, b) => b.tradeCount - a.tradeCount);
+      setMarkets(mkts.slice(0, 10));
+      setPriceMap(prices);
+    } catch (e) { console.warn('Market overview loading failed:', e); }
   }, [contracts, account]);
 
   useEffect(() => {
@@ -191,10 +237,15 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-400">{tokenName}</p>
                 <p className="text-xs text-gray-500">{tokenSymbol}</p>
               </div>
-              <p className="text-lg font-bold text-white">
-                {Number(tokenBalance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                <span className="text-sm text-gray-400">{tokenSymbol}</span>
-              </p>
+              <div className="text-right">
+                <p className="text-lg font-bold text-white">
+                  {Number(tokenBalance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                  <span className="text-sm text-gray-400">{tokenSymbol}</span>
+                </p>
+                {priceMap[CONTRACT_ADDRESSES.securityToken.toLowerCase()] && (
+                  <p className="text-xs text-gray-500">Last: {Number(priceMap[CONTRACT_ADDRESSES.securityToken.toLowerCase()]).toLocaleString()} {cashSymbol}</p>
+                )}
+              </div>
             </div>
             )}
             {/* Cash Token */}
@@ -217,10 +268,15 @@ const Dashboard: React.FC = () => {
                   <p className="text-sm text-gray-400">{ft.name}</p>
                   <p className="text-xs text-gray-500">{ft.symbol} · {ft.address.slice(0, 8)}…{ft.address.slice(-4)}</p>
                 </div>
-                <p className="text-lg font-bold text-white">
-                  {Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                  <span className="text-sm text-gray-400">{ft.symbol}</span>
-                </p>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-white">
+                    {Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                    <span className="text-sm text-gray-400">{ft.symbol}</span>
+                  </p>
+                  {priceMap[ft.address.toLowerCase()] && (
+                    <p className="text-xs text-gray-500">Last: {Number(priceMap[ft.address.toLowerCase()]).toLocaleString()} {cashSymbol}</p>
+                  )}
+                </div>
               </div>
             ))}
             {factoryTokens.filter((ft) => Number(ft.balance) > 0).length === 0 && Number(tokenBalance) === 0 && Number(cashBalance) === 0 && (
@@ -264,6 +320,44 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Market Overview — Top 10 Markets */}
+      {markets.length > 0 && (
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 size={20} className="text-cyan-400" />
+            <h3 className="font-bold text-white">Market Overview</h3>
+            <span className="text-sm text-gray-500 ml-auto">Top {markets.length} by trade volume</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left text-gray-400 font-medium py-2 px-3">Market</th>
+                  <th className="text-right text-gray-400 font-medium py-2 px-3">Last Price</th>
+                  <th className="text-right text-gray-400 font-medium py-2 px-3">Best Bid</th>
+                  <th className="text-right text-gray-400 font-medium py-2 px-3">Best Ask</th>
+                  <th className="text-right text-gray-400 font-medium py-2 px-3">Trades</th>
+                </tr>
+              </thead>
+              <tbody>
+                {markets.map((m) => (
+                  <tr key={m.orderBook} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-3">
+                      <p className="text-white font-medium">{m.name}</p>
+                      <p className="text-xs text-gray-500">{m.symbol} · {m.securityToken.slice(0, 8)}…{m.securityToken.slice(-4)}</p>
+                    </td>
+                    <td className="py-3 px-3 text-right font-medium text-white">{m.lastPrice !== '—' ? `${Number(m.lastPrice).toLocaleString()} ${cashSymbol}` : '—'}</td>
+                    <td className="py-3 px-3 text-right text-emerald-400">{m.bestBid !== '—' ? Number(m.bestBid).toLocaleString() : '—'}</td>
+                    <td className="py-3 px-3 text-right text-red-400">{m.bestAsk !== '—' ? Number(m.bestAsk).toLocaleString() : '—'}</td>
+                    <td className="py-3 px-3 text-right text-gray-300">{m.tradeCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* System Health Check — admin/agent only */}
       {(roles.isAdmin || roles.isAgent) && (

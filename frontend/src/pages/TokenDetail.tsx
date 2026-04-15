@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
-import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
+import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, ORDER_BOOK_ABI, ORDER_BOOK_FACTORY_ABI, DVP_SETTLEMENT_ABI } from '../config/contracts';
 import { ethers } from 'ethers';
-import { ArrowLeft, RefreshCw, Loader2, Coins, Users, Shield, AlertCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, Coins, Users, Shield, AlertCircle, BarChart3, ArrowRightLeft, Repeat } from 'lucide-react';
 
 interface Shareholder {
   identity: string;
@@ -11,6 +11,10 @@ interface Shareholder {
   balance: string;
   verified: boolean;
 }
+
+interface TradeRecord { id: number; buyer: string; seller: string; price: string; quantity: string; cashAmount: string; timestamp: number }
+interface DvpRecord { id: number; seller: string; buyer: string; tokenAmount: string; cashAmount: string; status: number; timestamp: number }
+interface TransferRecord { from: string; to: string; value: string; blockNumber: number }
 
 const TokenDetail: React.FC = () => {
   const { address } = useParams<{ address: string }>();
@@ -27,6 +31,10 @@ const TokenDetail: React.FC = () => {
   const [shareholders, setShareholders] = useState<Shareholder[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPrimary, setIsPrimary] = useState(false);
+  const [trades, setTrades] = useState<TradeRecord[]>([]);
+  const [dvpRecords, setDvpRecords] = useState<DvpRecord[]>([]);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [cashSymbol, setCashSymbol] = useState('THKD');
 
   const loadTokenDetail = useCallback(async () => {
     if (!address || !contracts || !account) return;
@@ -85,6 +93,72 @@ const TokenDetail: React.FC = () => {
         setShareholderCount(0);
         setShareholders([]);
       }
+
+      // Load cash symbol
+      try { setCashSymbol(await new ethers.Contract(CONTRACT_ADDRESSES.cashToken, ['function symbol() view returns (string)'], provider).symbol()); } catch {}
+
+      // Load last 10 trades from the OrderBook for this token
+      try {
+        const factory = new ethers.Contract(CONTRACT_ADDRESSES.orderBookFactory, ORDER_BOOK_FACTORY_ABI, provider);
+        const obAddr: string = await factory.getOrderBook(address);
+        if (obAddr !== ethers.ZeroAddress) {
+          const ob = new ethers.Contract(obAddr, ORDER_BOOK_ABI, provider);
+          const tc = Number(await ob.tradeCount());
+          if (tc > 0) {
+            const from = Math.max(0, tc - 10);
+            const batch: any[] = await ob.getTradesBatch(from, tc);
+            setTrades(batch.map((t: any) => ({
+              id: Number(t.id),
+              buyer: t.buyer,
+              seller: t.seller,
+              price: ethers.formatUnits(t.price, 6),
+              quantity: ethers.formatUnits(t.quantity, 18),
+              cashAmount: ethers.formatUnits(t.cashAmount, 6),
+              timestamp: Number(t.timestamp),
+            })).reverse());
+          }
+        }
+      } catch (e) { console.warn('Trade loading error:', e); }
+
+      // Load last 10 DvP settlements involving this token
+      try {
+        const dvp = new ethers.Contract(CONTRACT_ADDRESSES.dvpSettlement, DVP_SETTLEMENT_ABI, provider);
+        const sc = Number(await dvp.settlementCount());
+        const dvps: DvpRecord[] = [];
+        for (let i = sc - 1; i >= 0 && dvps.length < 10; i--) {
+          try {
+            const s = await dvp.settlements(i);
+            if (s.securityToken.toLowerCase() === address.toLowerCase()) {
+              dvps.push({
+                id: i,
+                seller: s.seller,
+                buyer: s.buyer,
+                tokenAmount: ethers.formatUnits(s.tokenAmount, 18),
+                cashAmount: ethers.formatUnits(s.cashAmount, 6),
+                status: Number(s.status),
+                timestamp: Number(s.tradeTimestamp),
+              });
+            }
+          } catch { break; }
+        }
+        setDvpRecords(dvps);
+      } catch (e) { console.warn('DvP loading error:', e); }
+
+      // Load last 10 Transfer events for this token
+      try {
+        const tok = new ethers.Contract(address, SECURITY_TOKEN_ABI, provider);
+        const filter = tok.filters.Transfer();
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = Math.max(0, currentBlock - 10000);
+        const logs = await tok.queryFilter(filter, fromBlock, currentBlock);
+        const recent = logs.slice(-10).reverse();
+        setTransfers(recent.map((log: any) => ({
+          from: log.args[0],
+          to: log.args[1],
+          value: ethers.formatUnits(log.args[2], 18),
+          blockNumber: log.blockNumber,
+        })));
+      } catch (e) { console.warn('Transfer log loading error:', e); }
     } catch (e) {
       console.error('TokenDetail load error:', e);
     } finally {
@@ -212,6 +286,136 @@ const TokenDetail: React.FC = () => {
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Trades */}
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 size={20} className="text-cyan-400" />
+              <h3 className="font-bold text-white">Recent Trades</h3>
+              <span className="text-sm text-gray-500 ml-auto">Last {trades.length}</span>
+            </div>
+            {trades.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">No trades found</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">#</th>
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">Buyer</th>
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">Seller</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Price</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Quantity</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Cash Amount</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trades.map((t) => (
+                      <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 px-3 text-gray-500">{t.id}</td>
+                        <td className="py-3 px-3 font-mono text-xs text-emerald-300">{t.buyer.slice(0, 8)}…{t.buyer.slice(-4)}</td>
+                        <td className="py-3 px-3 font-mono text-xs text-red-300">{t.seller.slice(0, 8)}…{t.seller.slice(-4)}</td>
+                        <td className="py-3 px-3 text-right text-white">{Number(t.price).toLocaleString()} {cashSymbol}</td>
+                        <td className="py-3 px-3 text-right text-gray-300">{Number(t.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                        <td className="py-3 px-3 text-right text-gray-300">{Number(t.cashAmount).toLocaleString()} {cashSymbol}</td>
+                        <td className="py-3 px-3 text-right text-gray-500 text-xs">{new Date(t.timestamp * 1000).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recent DvP Settlements */}
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Repeat size={20} className="text-amber-400" />
+              <h3 className="font-bold text-white">Recent DvP Settlements</h3>
+              <span className="text-sm text-gray-500 ml-auto">Last {dvpRecords.length}</span>
+            </div>
+            {dvpRecords.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">No DvP settlements found</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">ID</th>
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">Seller</th>
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">Buyer</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Tokens</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Cash</th>
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">Status</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dvpRecords.map((d) => {
+                      const statusLabels: Record<number, { text: string; cls: string }> = {
+                        0: { text: 'Pending', cls: 'text-amber-400' },
+                        1: { text: 'Executed', cls: 'text-emerald-400' },
+                        2: { text: 'Cancelled', cls: 'text-red-400' },
+                        3: { text: 'Failed', cls: 'text-red-400' },
+                      };
+                      const st = statusLabels[d.status] || { text: 'Unknown', cls: 'text-gray-400' };
+                      return (
+                        <tr key={d.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-3 text-gray-500">{d.id}</td>
+                          <td className="py-3 px-3 font-mono text-xs text-gray-300">{d.seller.slice(0, 8)}…{d.seller.slice(-4)}</td>
+                          <td className="py-3 px-3 font-mono text-xs text-gray-300">{d.buyer.slice(0, 8)}…{d.buyer.slice(-4)}</td>
+                          <td className="py-3 px-3 text-right text-white">{Number(d.tokenAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                          <td className="py-3 px-3 text-right text-gray-300">{Number(d.cashAmount).toLocaleString()} {cashSymbol}</td>
+                          <td className={`py-3 px-3 font-medium ${st.cls}`}>{st.text}</td>
+                          <td className="py-3 px-3 text-right text-gray-500 text-xs">{d.timestamp > 0 ? new Date(d.timestamp * 1000).toLocaleString() : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Transfers */}
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ArrowRightLeft size={20} className="text-purple-400" />
+              <h3 className="font-bold text-white">Recent Transfers</h3>
+              <span className="text-sm text-gray-500 ml-auto">Last {transfers.length}</span>
+            </div>
+            {transfers.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">No transfers found</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">From</th>
+                      <th className="text-left text-gray-400 font-medium py-2 px-3">To</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Amount</th>
+                      <th className="text-right text-gray-400 font-medium py-2 px-3">Block</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transfers.map((tr, i) => (
+                      <tr key={`${tr.blockNumber}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 px-3 font-mono text-xs text-gray-300">
+                          {tr.from === ethers.ZeroAddress ? <span className="text-emerald-400">Mint</span> : `${tr.from.slice(0, 8)}…${tr.from.slice(-4)}`}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-xs text-gray-300">
+                          {tr.to === ethers.ZeroAddress ? <span className="text-red-400">Burn</span> : `${tr.to.slice(0, 8)}…${tr.to.slice(-4)}`}
+                        </td>
+                        <td className="py-3 px-3 text-right font-medium text-white">{Number(tr.value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                        <td className="py-3 px-3 text-right text-gray-500">#{tr.blockNumber}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
