@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
 import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
 import { Coins, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
@@ -8,6 +9,7 @@ interface FactoryToken { name: string; symbol: string; address: string; balance:
 
 const Dashboard: React.FC = () => {
   const { account, contracts, chainId, roles } = useWeb3();
+  const navigate = useNavigate();
   const [tokenName, setTokenName] = useState('—');
   const [tokenSymbol, setTokenSymbol] = useState('—');
   const [totalSupply, setTotalSupply] = useState('0');
@@ -161,6 +163,7 @@ const Dashboard: React.FC = () => {
             label={`${tokenSymbol} Total Supply`}
             value={Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             accent="amber"
+            onClick={() => navigate(`/token/${CONTRACT_ADDRESSES.securityToken}`)}
           />
           {factoryTokens.map((ft) => (
             <StatCard
@@ -169,6 +172,7 @@ const Dashboard: React.FC = () => {
               label={`${ft.symbol} Total Supply`}
               value={Number(ft.totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               accent="amber"
+              onClick={() => navigate(`/token/${ft.address}`)}
             />
           ))}
         </div>
@@ -356,8 +360,12 @@ const StatCard: React.FC<{
   label: string;
   value: string;
   accent: string;
-}> = ({ icon, label, value, accent }) => (
-  <div className="glass-card p-6 hover:border-purple-500/30 transition-colors">
+  onClick?: () => void;
+}> = ({ icon, label, value, accent, onClick }) => (
+  <div
+    className={`glass-card p-6 hover:border-purple-500/30 transition-colors ${onClick ? 'cursor-pointer' : ''}`}
+    onClick={onClick}
+  >
     <div className="flex items-center gap-2 mb-2">
       <span className={accentColors[accent] || 'text-gray-400'}>{icon}</span>
       <span className="text-sm text-gray-400 font-medium">{label}</span>
