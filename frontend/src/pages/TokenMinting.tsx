@@ -639,6 +639,7 @@ const TokenMinting: React.FC = () => {
           submitLabel={`Mint ${ctSymbol}`}
           submitColor="from-emerald-600 to-cyan-600"
           isSubmitting={isSubmitting}
+          note={`Only the contract owner (Admin / Deployer) can mint ${ctSymbol}.`}
         />
         <TokenActionCard
           title={`Burn ${ctSymbol}`}
@@ -652,6 +653,7 @@ const TokenMinting: React.FC = () => {
           submitLabel={`Burn ${ctSymbol}`}
           submitColor="from-red-600 to-orange-600"
           isSubmitting={isSubmitting}
+          note={`Only the contract owner (Admin / Deployer) can burn ${ctSymbol}.`}
         />
       </div>
     </div>
@@ -673,12 +675,18 @@ const TokenActionCard: React.FC<{
   submitColor: string;
   isSubmitting: boolean;
   disabled?: boolean;
-}> = ({ title, icon, addressLabel, address, onAddressChange, amount, onAmountChange, onSubmit, submitLabel, submitColor, isSubmitting, disabled }) => (
+  note?: string;
+}> = ({ title, icon, addressLabel, address, onAddressChange, amount, onAmountChange, onSubmit, submitLabel, submitColor, isSubmitting, disabled, note }) => (
   <div className="glass-card p-6">
     <div className="flex items-center gap-2 mb-4">
       {icon}
       <h3 className="font-bold text-white">{title}</h3>
     </div>
+    {note && (
+      <p className="text-xs text-amber-400/80 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2 mb-4">
+        ⚠ {note}
+      </p>
+    )}
     <div className="space-y-3">
       <div>
         <label className="block text-sm text-gray-400 mb-1">{addressLabel}</label>
