@@ -266,3 +266,76 @@ Token Holder
   exceeded even through governance.
 - **Timelock transparency**: The 48-hour execution delay allows stakeholders
   to observe and react to approved proposals before they take effect.
+
+---
+
+## 8. KYC Verification Paths — Boolean vs ONCHAINID Claims
+
+`isVerified()` in the Identity Registry supports two verification paths.
+The path used is determined automatically per investor at call time:
+
+```
+investor registered?
+  └─ NO  → return false
+  └─ YES → has identityContract AND trustedIssuers.length > 0 ?
+              └─ YES → ONCHAINID path (cryptographic ERC-735 claims)
+              └─ NO  → Boolean path (simple flag per claim topic)
+```
+
+### 8.1 Boolean (Simple) Claims
+
+Boolean claims are the lightweight / backward-compatible path. They are used
+when **either** of the following is true:
+
+1. **No Identity contract linked** — investor was registered with
+   `identityContract = address(0)`.
+2. **No Trusted Issuers configured** — the `_trustedIssuers` array on the
+   Identity Registry is empty (no `addTrustedIssuer()` has been called).
+
+With the boolean path, verification simply checks that
+`_claims[investor][topic] == true` for every required claim topic.
+
+#### Procedure (Boolean Path)
+
+1. Register the investor without an Identity contract:
+   `registerIdentity(investor, address(0), "HK")`
+2. Set boolean claims for each required topic:
+   `setClaim(investor, 1, true)` (KYC),
+   `setClaim(investor, 7, true)` (Accredited Investor), etc.
+3. `isVerified(investor)` returns `true`.
+4. The investor can now receive minted tokens, participate in DvP settlement,
+   transfer tokens, and trade on the OrderBook.
+
+### 8.2 ONCHAINID (Cryptographic) Claims
+
+The ONCHAINID path is used when **both** conditions are met:
+
+1. The investor has an **Identity contract** linked
+   (`identityContract != address(0)`).
+2. At least one **Trusted Issuer** has been added to the Identity Registry.
+
+With this path, verification reads ERC-735 claims from the investor's
+Identity contract, validates each claim's cryptographic signature against the
+Trusted ClaimIssuer, and checks for revocation and expiry.
+
+#### Procedure (ONCHAINID Path)
+
+1. Deploy or assign an Identity contract for the investor.
+2. Register the investor with the Identity contract:
+   `registerIdentity(investor, identityAddress, "HK")`
+3. Deploy a ClaimIssuer and add it as a Trusted Issuer:
+   `addTrustedIssuer(claimIssuerAddress, [1, 7])`
+4. Issue signed claims via the ClaimIssuer onto the investor's Identity
+   contract (with signature, data, and optional expiry).
+5. `isVerified(investor)` returns `true` if valid, non-revoked, non-expired
+   claims exist for every required topic from a trusted issuer.
+
+### 8.3 Path Priority
+
+Once an investor has **both** an Identity contract linked **and** Trusted
+Issuers are configured, the ONCHAINID path takes priority and boolean claims
+are ignored for that investor. Boolean claims set via `setClaim()` will have
+no effect on `isVerified()` in this case.
+
+To revert an investor to the boolean path, the Identity contract address
+must be cleared (re-register with `address(0)`).
