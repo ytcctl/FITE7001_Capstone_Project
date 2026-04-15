@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { CLAIM_TOPICS, CONTRACT_ADDRESSES } from '../config/contracts';
+import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
 import { TrendingUp, Coins, ShieldCheck, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { ethers } from 'ethers';
+
+interface FactoryToken { name: string; symbol: string; address: string; balance: string; totalSupply: string }
 
 const Dashboard: React.FC = () => {
   const { account, contracts, chainId, roles } = useWeb3();
@@ -16,6 +18,7 @@ const Dashboard: React.FC = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [claimStatus, setClaimStatus] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [factoryTokens, setFactoryTokens] = useState<FactoryToken[]>([]);
 
   // System Health state
   interface HealthResult { name: string; passed: boolean; detail: string }
@@ -54,46 +57,75 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  useEffect(() => {
+  const loadDashboard = useCallback(async () => {
     if (!contracts || !account) {
       setLoading(false);
       return;
     }
-    const load = async () => {
-      try {
-        const [name, symbol, supply, bal, cBal, cSym, verified, registered] = await Promise.all([
-          contracts.securityToken.name(),
-          contracts.securityToken.symbol(),
-          contracts.securityToken.totalSupply(),
-          contracts.securityToken.balanceOf(account),
-          contracts.cashToken.balanceOf(account),
-          contracts.cashToken.symbol(),
-          contracts.identityRegistry.isVerified(account),
-          contracts.identityRegistry.contains(account),
-        ]);
-        setTokenName(name);
-        setTokenSymbol(symbol);
-        setTotalSupply(ethers.formatUnits(supply, 18));
-        setTokenBalance(ethers.formatUnits(bal, 18));
-        setCashBalance(ethers.formatUnits(cBal, 6));
-        setCashSymbol(cSym);
-        setIsVerified(verified);
-        setIsRegistered(registered);
+    setLoading(true);
+    try {
+      const [name, symbol, supply, bal, cBal, cSym, verified, registered] = await Promise.all([
+        contracts.securityToken.name(),
+        contracts.securityToken.symbol(),
+        contracts.securityToken.totalSupply(),
+        contracts.securityToken.balanceOf(account),
+        contracts.cashToken.balanceOf(account),
+        contracts.cashToken.symbol(),
+        contracts.identityRegistry.isVerified(account),
+        contracts.identityRegistry.contains(account),
+      ]);
+      setTokenName(name);
+      setTokenSymbol(symbol);
+      setTotalSupply(ethers.formatUnits(supply, 18));
+      setTokenBalance(ethers.formatUnits(bal, 18));
+      setCashBalance(ethers.formatUnits(cBal, 6));
+      setCashSymbol(cSym);
+      setIsVerified(verified);
+      setIsRegistered(registered);
 
-        // Load claim status
-        const claims: Record<number, boolean> = {};
-        for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
-          claims[topic] = await contracts.identityRegistry.hasClaim(account, topic);
-        }
-        setClaimStatus(claims);
-      } catch (e) {
-        console.error('Dashboard load error:', e);
-      } finally {
-        setLoading(false);
+      // Load claim status
+      const claims: Record<number, boolean> = {};
+      for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
+        claims[topic] = await contracts.identityRegistry.hasClaim(account, topic);
       }
-    };
-    load();
+      setClaimStatus(claims);
+    } catch (e) {
+      console.error('Dashboard load error:', e);
+    } finally {
+      setLoading(false);
+    }
+
+    // Load factory-deployed tokens (V1 — EIP-1167 + V2 — ERC-1967)
+    try {
+      const defaultAddr = (await contracts.securityToken.getAddress()).toLowerCase();
+      const provider = (contracts.securityToken as any).runner?.provider ?? contracts.securityToken.runner;
+      const seen = new Set<string>([defaultAddr]);
+      const tokens: FactoryToken[] = [];
+
+      const fetchFactoryTokens = async (allTokens: any[], addrField: string) => {
+        for (const t of allTokens) {
+          const addr = (t[addrField] as string).toLowerCase();
+          if (seen.has(addr) || !t.active) continue;
+          seen.add(addr);
+          try {
+            const tok = new ethers.Contract(t[addrField], SECURITY_TOKEN_ABI, provider);
+            const [bal, supply] = await Promise.all([tok.balanceOf(account), tok.totalSupply()]);
+            if (bal > 0n) {
+              tokens.push({ name: t.name, symbol: t.symbol, address: t[addrField], balance: ethers.formatUnits(bal, 18), totalSupply: ethers.formatUnits(supply, 18) });
+            }
+          } catch (e) { console.warn(`Skip factory token ${t.name}:`, e); }
+        }
+      };
+
+      try { await fetchFactoryTokens(await contracts.tokenFactory.allTokens(), 'tokenAddress'); } catch (e) { console.warn('V1 factory load error:', e); }
+      try { await fetchFactoryTokens(await contracts.tokenFactoryV2.allTokens(), 'proxyAddress'); } catch (e) { console.warn('V2 factory load error:', e); }
+      setFactoryTokens(tokens);
+    } catch (e) { console.warn('Factory token loading failed:', e); }
   }, [contracts, account]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
   if (!account) {
     return (
@@ -109,11 +141,16 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h2 className="text-2xl font-bold text-white">Dashboard</h2>
-        <p className="text-gray-400">
-          Connected to {account.slice(0, 6)}…{account.slice(-4)} · Chain {chainId}
-        </p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Dashboard</h2>
+          <p className="text-gray-400">
+            Connected to {account.slice(0, 6)}…{account.slice(-4)} · Chain {chainId}
+          </p>
+        </div>
+        <button onClick={loadDashboard} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Refresh">
+          <RefreshCw size={18} className={`text-gray-400 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </header>
 
       {/* Stats Grid */}
@@ -130,18 +167,23 @@ const Dashboard: React.FC = () => {
           value={Number(cashBalance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
           accent="cyan"
         />
-        <StatCard
-          icon={<Users size={20} />}
-          label="Total Supply"
-          value={Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          accent="amber"
-        />
-        <StatCard
-          icon={<ShieldCheck size={20} />}
-          label="KYC Status"
-          value={isVerified ? 'Verified ✓' : isRegistered ? 'Registered' : 'Not Registered'}
-          accent={isVerified ? 'emerald' : 'red'}
-        />
+        {roles.isAdmin && (
+          <StatCard
+            icon={<Users size={20} />}
+            label="Total Supply"
+            value={Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            accent="amber"
+          />
+        )}
+        {factoryTokens.map((ft) => (
+          <StatCard
+            key={ft.address}
+            icon={<Coins size={20} />}
+            label={`${ft.symbol} Balance`}
+            value={Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+            accent="purple"
+          />
+        ))}
       </div>
 
       {/* Token Info + KYC Claims */}
@@ -152,7 +194,7 @@ const Dashboard: React.FC = () => {
           <dl className="space-y-3">
             <InfoRow label="Name" value={tokenName} />
             <InfoRow label="Symbol" value={tokenSymbol} />
-            <InfoRow label="Total Supply" value={`${Number(totalSupply).toLocaleString()} ${tokenSymbol}`} />
+            {roles.isAdmin && <InfoRow label="Total Supply" value={`${Number(totalSupply).toLocaleString()} ${tokenSymbol}`} />}
             <InfoRow label="Your Balance" value={`${Number(tokenBalance).toLocaleString()} ${tokenSymbol}`} />
           </dl>
         </div>
@@ -161,6 +203,20 @@ const Dashboard: React.FC = () => {
         <div className="glass-card p-6">
           <h3 className="font-bold text-white mb-4">KYC / AML Claims</h3>
           <div className="space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm text-gray-300">KYC Status</span>
+              <span
+                className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                  isVerified
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : isRegistered
+                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                      : 'bg-red-500/20 text-red-400 border-red-500/30'
+                }`}
+              >
+                {isVerified ? 'Verified ✓' : isRegistered ? 'Registered' : 'Not Registered'}
+              </span>
+            </div>
             {Object.entries(CLAIM_TOPICS).map(([id, name]) => (
               <div key={id} className="flex items-center justify-between">
                 <span className="text-sm text-gray-300">{name}</span>
@@ -178,6 +234,27 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Factory-deployed Start-up Tokens */}
+      {factoryTokens.length > 0 && (
+        <div className="glass-card p-6">
+          <h3 className="font-bold text-white mb-4">Start-up Tokens (Factory-Deployed)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {factoryTokens.map((ft) => (
+              <div key={ft.address} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <p className="text-sm text-gray-400 mb-1">{ft.name}</p>
+                <p className="text-xl font-bold text-white">
+                  {Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                  <span className="text-sm text-gray-400">{ft.symbol}</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Supply: {Number(ft.totalSupply).toLocaleString()} · {ft.address.slice(0, 8)}…{ft.address.slice(-4)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* System Health Check — admin/agent only */}
       {(roles.isAdmin || roles.isAgent) && (

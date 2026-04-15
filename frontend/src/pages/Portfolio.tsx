@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { CLAIM_TOPICS } from '../config/contracts';
+import { CLAIM_TOPICS, SECURITY_TOKEN_ABI } from '../config/contracts';
 import { Briefcase, Send, RefreshCw, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { ethers } from 'ethers';
+
+interface FactoryHolding { name: string; symbol: string; address: string; balance: string; decimals: number }
 
 const Portfolio: React.FC = () => {
   const { account, contracts } = useWeb3();
@@ -17,17 +19,20 @@ const Portfolio: React.FC = () => {
   const [claims, setClaims] = useState<Record<number, boolean>>({});
   const [isFrozen, setIsFrozen] = useState(false);
   const [isSafeListed, setIsSafeListed] = useState(false);
+  const [factoryHoldings, setFactoryHoldings] = useState<FactoryHolding[]>([]);
 
   // Transfer
   const [transferTo, setTransferTo] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
-  const [transferType, setTransferType] = useState<'security' | 'cash'>('security');
+  const [transferType, setTransferType] = useState<string>('security');
 
   const [txStatus, setTxStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadPortfolio = async () => {
     if (!contracts || !account) return;
+
+    // Load default token balances & identity status
     try {
       const [bal, cBal, sym, cSym, verified, registered, ctry, frozen, safe] = await Promise.all([
         contracts.securityToken.balanceOf(account),
@@ -58,6 +63,34 @@ const Portfolio: React.FC = () => {
     } catch (e) {
       console.error('Portfolio load error:', e);
     }
+
+    // Load factory-deployed tokens (V1 — EIP-1167 + V2 — ERC-1967)
+    // Runs independently so factory tokens still appear even if identity checks above fail
+    try {
+      const defaultAddr = (await contracts.securityToken.getAddress()).toLowerCase();
+      const provider = (contracts.securityToken as any).runner?.provider ?? contracts.securityToken.runner;
+      const seen = new Set<string>([defaultAddr]);
+      const holdings: FactoryHolding[] = [];
+
+      const fetchHoldings = async (allTokens: any[], addrField: string) => {
+        for (const t of allTokens) {
+          const addr = (t[addrField] as string).toLowerCase();
+          if (seen.has(addr) || !t.active) continue;
+          seen.add(addr);
+          try {
+            const tok = new ethers.Contract(t[addrField], SECURITY_TOKEN_ABI, provider);
+            const b = await tok.balanceOf(account);
+            if (b > 0n) {
+              holdings.push({ name: t.name, symbol: t.symbol, address: t[addrField], balance: ethers.formatUnits(b, 18), decimals: 18 });
+            }
+          } catch (e) { console.warn(`Skip factory token ${t.name}:`, e); }
+        }
+      };
+
+      try { await fetchHoldings(await contracts.tokenFactory.allTokens(), 'tokenAddress'); } catch (e) { console.warn('V1 factory load error:', e); }
+      try { await fetchHoldings(await contracts.tokenFactoryV2.allTokens(), 'proxyAddress'); } catch (e) { console.warn('V2 factory load error:', e); }
+      setFactoryHoldings(holdings);
+    } catch (e) { console.warn('Factory token loading failed:', e); }
   };
 
   useEffect(() => {
@@ -66,15 +99,36 @@ const Portfolio: React.FC = () => {
 
   const handleTransfer = async () => {
     if (!contracts || !transferTo || !transferAmount) return;
+    let to: string;
+    try { to = ethers.getAddress(transferTo.trim()); } catch { setTxStatus('✗ Invalid recipient address'); return; }
     setIsSubmitting(true);
-    const token = transferType === 'security' ? 'securityToken' : 'cashToken';
-    const decimals = transferType === 'security' ? 18 : 6;
-    const sym = transferType === 'security' ? tokenSymbol : cashSymbol;
-    setTxStatus(`Transferring ${transferAmount} ${sym}…`);
     try {
-      const tx = await contracts[token].transfer(transferTo, ethers.parseUnits(transferAmount, decimals));
+      let tokenContract: ethers.Contract;
+      let decimals: number;
+      let sym: string;
+
+      if (transferType === 'security') {
+        tokenContract = contracts.securityToken;
+        decimals = 18;
+        sym = tokenSymbol;
+      } else if (transferType === 'cash') {
+        tokenContract = contracts.cashToken;
+        decimals = 6;
+        sym = cashSymbol;
+      } else {
+        // Factory-deployed token (transferType is the address)
+        const holding = factoryHoldings.find(h => h.address === transferType);
+        if (!holding) return;
+        const provider = (contracts.securityToken as any).runner ?? contracts.securityToken.runner;
+        tokenContract = new ethers.Contract(holding.address, SECURITY_TOKEN_ABI, provider);
+        decimals = holding.decimals;
+        sym = holding.symbol;
+      }
+
+      setTxStatus(`Transferring ${transferAmount} ${sym}…`);
+      const tx = await tokenContract.transfer(to, ethers.parseUnits(transferAmount, decimals));
       await tx.wait();
-      setTxStatus(`✓ Transferred ${transferAmount} ${sym} to ${transferTo.slice(0, 10)}…`);
+      setTxStatus(`✓ Transferred ${transferAmount} ${sym} to ${to.slice(0, 10)}…`);
       setTransferAmount('');
       loadPortfolio();
     } catch (e: any) {
@@ -132,6 +186,16 @@ const Portfolio: React.FC = () => {
             <span className="text-lg text-gray-400">{cashSymbol}</span>
           </p>
         </div>
+        {factoryHoldings.map((fh) => (
+          <div key={fh.address} className="glass-card p-6">
+            <p className="text-sm text-gray-400 mb-1">{fh.name}</p>
+            <p className="text-3xl font-bold text-white">
+              {Number(fh.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+              <span className="text-lg text-gray-400">{fh.symbol}</span>
+            </p>
+            <p className="text-xs text-gray-500 mt-1">{fh.address.slice(0, 10)}…{fh.address.slice(-4)}</p>
+          </div>
+        ))}
       </div>
 
       {/* Identity Status */}
@@ -172,11 +236,14 @@ const Portfolio: React.FC = () => {
             <label className="block text-sm text-gray-400 mb-1">Token Type</label>
             <select
               value={transferType}
-              onChange={(e) => setTransferType(e.target.value as 'security' | 'cash')}
+              onChange={(e) => setTransferType(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
             >
               <option value="security" className="bg-slate-800">{tokenSymbol} (Security)</option>
               <option value="cash" className="bg-slate-800">{cashSymbol} (Cash)</option>
+              {factoryHoldings.map((fh) => (
+                <option key={fh.address} value={fh.address} className="bg-slate-800">{fh.symbol} ({fh.name})</option>
+              ))}
             </select>
           </div>
           <div>

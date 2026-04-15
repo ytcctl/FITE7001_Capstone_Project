@@ -13,7 +13,6 @@
 export const NETWORK_CONFIG = {
   chainId: 31337,
   chainName: 'Hardhat Devnet',
-  /** Direct RPC — used only as fallback; prefer rpcUrlForBrowser() below */
   rpcUrl: 'http://127.0.0.1:8545',
   blockExplorer: '',
 };
@@ -41,23 +40,23 @@ export function rpcUrlForBrowser(): string {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x6632F4E1B2f57BAf04f386B9Eabd32D40412886d',
-  compliance: '0xbb289ACd2D934057a49B47563999Bc150D2Cb34E',
-  securityToken: '0x5798Cf2507399e4B45fb9D2fbB255299e0070294',
-  cashToken: '0xA4Fc93C16B304fca36759D69ed2Eb213DaFd1171',
-  dvpSettlement: '0xc1Ef73B9ccc4612246d723F00d34EEef56DBD4c3',
-  tokenFactory: '0xddfF69F60b480aB37Dd79a2B93e4298fceFAf8De',
-  claimIssuer: '0x674AE43435966a74a257722fEd2D207CafF57698',
-  identityFactory: '0xe979891Da8c2af95146ef2eE7C6eBD20cBda5F45',
-  timelock: '0xdF40141Ea83D30453011fd3ca09d015590CC281C',
-  governor: '0x15B65A15775Fa82268dCc310c4D09EcB425fDF52',
-  walletRegistry: '0xBa590e0616272F94FdF886Da695782c7F9c0dC82',
-  multiSigWarm: '0x4D937dbA57F3228F3061994B5AFA24F924160Dc1',
-  oracleCommittee: '0x284f8B77512efF613A2873045626E7c34Fec09B0',
-  orderBookFactory: '0xC538fd0A079856cE824089c9210AC2dd40C844d8',
-  orderBook: '0x40975C6cacC3A693EF65183afF2c3418A0297850',
-  tokenFactoryV2: '0x0Be199A777EECc870a7b13045946Fef1803Dd9e1',
-  systemHealthCheck: '0xf03b5af17792D7F7707dc54474083BaCAD17e22F',
+  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
+  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
+  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
+  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
+  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
+  tokenFactory: '0x05d91B9031A655d08E654177336d08543ac4B711',
+  claimIssuer: '0xfeae27388A65eE984F452f86efFEd42AaBD438FD',
+  identityFactory: '0xe135783649BfA7c9c4c6F8E528C7f56166efC8a6',
+  timelock: '0xC9Bc439c8723c5c6fdbBE14E5fF3a1224f8A0f7C',
+  governor: '0xDE87AF9156a223404885002669D3bE239313Ae33',
+  walletRegistry: '0x686AfD6e502A81D2e77f2e038A23C0dEf4949A20',
+  multiSigWarm: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
+  oracleCommittee: '0x9ab7CA8a88F8e351f9b0eEEA5777929210199295',
+  orderBookFactory: '0x43D1F9096674B5722D359B6402381816d5B22F28',
+  orderBook: '0x4245CF4518CB2C280f5e9c6a03c90C147F80B4d9',
+  tokenFactoryV2: '0x5EB5888938e3fE7b334b1838B19C1e828c5148aA',
+  systemHealthCheck: '0x4261D524bc701dA4AC49339e5F8b299977045eA5',
 };
 
 // -----------------------------------------------------------------

@@ -82,7 +82,7 @@ const TokenMinting: React.FC = () => {
       // fallback if the contract isn't available
     }
 
-    // Fetch factory-deployed tokens
+    // Fetch factory-deployed tokens (V1 — EIP-1167 clones)
     try {
       const all = await contracts.tokenFactory.allTokens();
       for (const t of all) {
@@ -99,6 +99,24 @@ const TokenMinting: React.FC = () => {
       }
     } catch {
       // TokenFactory might not be deployed yet — that's fine
+    }
+
+    // Fetch factory-deployed tokens (V2 — ERC-1967 proxies)
+    try {
+      const allV2 = await contracts.tokenFactoryV2.allTokens();
+      for (const t of allV2) {
+        if (options.find(o => o.address.toLowerCase() === t.proxyAddress.toLowerCase())) continue;
+        if (t.active) {
+          options.push({
+            name: t.name,
+            symbol: t.symbol,
+            address: t.proxyAddress,
+            active: t.active,
+          });
+        }
+      }
+    } catch {
+      // TokenFactoryV2 might not be deployed yet — that's fine
     }
 
     setTokenOptions(options);
@@ -163,19 +181,34 @@ const TokenMinting: React.FC = () => {
   }, [loadInfo]);
 
   const handleMint = async () => {
-    if (!mintTo || !mintAmount) return;
+    if (!mintTo || !mintAmount || !contracts) return;
+    let to: string;
+    try { to = ethers.getAddress(mintTo.trim()); } catch { setTxStatus('✗ Invalid recipient address'); return; }
     setIsSubmitting(true);
     setTxStatus(`Minting ${mintAmount} ${stSymbol}…`);
     try {
+      // Pre-check: verify the recipient is registered & verified in the identity registry
+      const recipientVerified = await contracts.identityRegistry.isVerified(to);
+      if (!recipientVerified) {
+        const recipientRegistered = await contracts.identityRegistry.contains(to);
+        if (!recipientRegistered) {
+          setTxStatus(`✗ Mint failed: recipient ${to.slice(0, 10)}… is not registered in the Identity Registry. Register and verify the investor in KYC Management first.`);
+          setIsSubmitting(false);
+          return;
+        }
+        setTxStatus(`✗ Mint failed: recipient ${to.slice(0, 10)}… is registered but NOT verified. Complete KYC verification (set required claims) in KYC Management first.`);
+        setIsSubmitting(false);
+        return;
+      }
       const tokenContract = await getSelectedTokenContract();
       if (!tokenContract) throw new Error('No token selected');
-      const tx = await (tokenContract as ethers.Contract).mint(mintTo, ethers.parseUnits(mintAmount, 18));
+      const tx = await (tokenContract as ethers.Contract).mint(to, ethers.parseUnits(mintAmount, 18));
       await tx.wait();
-      setTxStatus(`✓ Minted ${mintAmount} ${stSymbol} to ${mintTo.slice(0, 10)}…`);
+      setTxStatus(`✓ Minted ${mintAmount} ${stSymbol} to ${to.slice(0, 10)}…`);
       setMintAmount('');
       loadInfo();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Mint failed'}`);
+      setTxStatus(`✗ ${e?.reason || e?.data?.message || e?.message || 'Mint failed'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -183,14 +216,16 @@ const TokenMinting: React.FC = () => {
 
   const handleBurn = async () => {
     if (!burnFrom || !burnAmount) return;
+    let from: string;
+    try { from = ethers.getAddress(burnFrom.trim()); } catch { setTxStatus('✗ Invalid address'); return; }
     setIsSubmitting(true);
     setTxStatus(`Burning ${burnAmount} ${stSymbol}…`);
     try {
       const tokenContract = await getSelectedTokenContract();
       if (!tokenContract) throw new Error('No token selected');
-      const tx = await (tokenContract as ethers.Contract).burn(burnFrom, ethers.parseUnits(burnAmount, 18));
+      const tx = await (tokenContract as ethers.Contract).burn(from, ethers.parseUnits(burnAmount, 18));
       await tx.wait();
-      setTxStatus(`✓ Burned ${burnAmount} ${stSymbol} from ${burnFrom.slice(0, 10)}…`);
+      setTxStatus(`✓ Burned ${burnAmount} ${stSymbol} from ${from.slice(0, 10)}…`);
       setBurnAmount('');
       loadInfo();
     } catch (e: any) {
@@ -202,12 +237,14 @@ const TokenMinting: React.FC = () => {
 
   const handleCashMint = async () => {
     if (!contracts || !cashMintTo || !cashMintAmount) return;
+    let to: string;
+    try { to = ethers.getAddress(cashMintTo.trim()); } catch { setTxStatus('✗ Invalid recipient address'); return; }
     setIsSubmitting(true);
     setTxStatus(`Minting ${cashMintAmount} ${ctSymbol}…`);
     try {
-      const tx = await contracts.cashToken.mint(cashMintTo, ethers.parseUnits(cashMintAmount, 6));
+      const tx = await contracts.cashToken.mint(to, ethers.parseUnits(cashMintAmount, 6));
       await tx.wait();
-      setTxStatus(`✓ Minted ${cashMintAmount} ${ctSymbol} to ${cashMintTo.slice(0, 10)}…`);
+      setTxStatus(`✓ Minted ${cashMintAmount} ${ctSymbol} to ${to.slice(0, 10)}…`);
       setCashMintAmount('');
       loadInfo();
     } catch (e: any) {
@@ -219,12 +256,14 @@ const TokenMinting: React.FC = () => {
 
   const handleCashBurn = async () => {
     if (!contracts || !cashBurnFrom || !cashBurnAmount) return;
+    let from: string;
+    try { from = ethers.getAddress(cashBurnFrom.trim()); } catch { setTxStatus('✗ Invalid address'); return; }
     setIsSubmitting(true);
     setTxStatus(`Burning ${cashBurnAmount} ${ctSymbol}…`);
     try {
-      const tx = await contracts.cashToken.burn(cashBurnFrom, ethers.parseUnits(cashBurnAmount, 6));
+      const tx = await contracts.cashToken.burn(from, ethers.parseUnits(cashBurnAmount, 6));
       await tx.wait();
-      setTxStatus(`✓ Burned ${cashBurnAmount} ${ctSymbol} from ${cashBurnFrom.slice(0, 10)}…`);
+      setTxStatus(`✓ Burned ${cashBurnAmount} ${ctSymbol} from ${from.slice(0, 10)}…`);
       setCashBurnAmount('');
       loadInfo();
     } catch (e: any) {
