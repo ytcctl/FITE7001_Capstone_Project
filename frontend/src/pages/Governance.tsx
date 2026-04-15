@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
+import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
 import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer } from 'lucide-react';
 
 // Proposal state enum (matches GovernorCountingSimple)
@@ -70,6 +71,10 @@ const Governance: React.FC = () => {
   const [proposalDescription, setProposalDescription] = useState('');
   const [proposalTarget, setProposalTarget] = useState('');
   const [proposing, setProposing] = useState(false);
+  const [proposalType, setProposalType] = useState<'signaling' | 'executable'>('signaling');
+  const [proposalAction, setProposalAction] = useState('mint');
+  const [actionParam1, setActionParam1] = useState('');
+  const [actionParam2, setActionParam2] = useState('');
 
   // ─── Voting ───────────────────────────────────────────────
   const [voting, setVoting] = useState<string | null>(null);
@@ -205,18 +210,70 @@ const Governance: React.FC = () => {
     setProposing(true);
     setStatus(null);
     try {
-      // Simple proposal: transfer 0 ETH to target (or self if empty)
-      const target = proposalTarget || await contracts.governor.getAddress();
+      let target: string;
+      let value = 0n;
+      let calldata: string;
+
+      if (proposalType === 'executable') {
+        const iface = new ethers.Interface(SECURITY_TOKEN_ABI);
+        target = CONTRACT_ADDRESSES.securityToken;
+
+        switch (proposalAction) {
+          case 'mint': {
+            if (!actionParam1 || !actionParam2) throw new Error('Recipient address and amount are required');
+            const to = ethers.getAddress(actionParam1.trim());
+            const amount = ethers.parseEther(actionParam2);
+            calldata = iface.encodeFunctionData('mint', [to, amount]);
+            break;
+          }
+          case 'burn': {
+            if (!actionParam1 || !actionParam2) throw new Error('Address and amount are required');
+            const from = ethers.getAddress(actionParam1.trim());
+            const amount = ethers.parseEther(actionParam2);
+            calldata = iface.encodeFunctionData('burn', [from, amount]);
+            break;
+          }
+          case 'setMaxSupply': {
+            if (!actionParam1) throw new Error('Max supply value is required');
+            const cap = ethers.parseEther(actionParam1);
+            calldata = iface.encodeFunctionData('setMaxSupply', [cap]);
+            break;
+          }
+          case 'setMintThreshold': {
+            if (!actionParam1) throw new Error('Threshold value is required');
+            const threshold = ethers.parseEther(actionParam1);
+            calldata = iface.encodeFunctionData('setMintThreshold', [threshold]);
+            break;
+          }
+          case 'pause': {
+            calldata = iface.encodeFunctionData('pause');
+            break;
+          }
+          case 'unpause': {
+            calldata = iface.encodeFunctionData('unpause');
+            break;
+          }
+          default:
+            throw new Error('Unknown action');
+        }
+      } else {
+        // Signaling proposal: no on-chain action
+        target = proposalTarget || await contracts.governor.getAddress();
+        calldata = '0x';
+      }
+
       const tx = await contracts.governor.propose(
         [target],
-        [0],
-        ['0x'],
+        [value],
+        [calldata],
         proposalDescription
       );
       await tx.wait();
       setStatus({ type: 'success', message: 'Proposal created successfully!' });
       setProposalDescription('');
       setProposalTarget('');
+      setActionParam1('');
+      setActionParam2('');
       await loadProposals();
     } catch (e: any) {
       setStatus({ type: 'error', message: e.reason || e.message || 'Proposal failed' });
@@ -417,6 +474,33 @@ const Governance: React.FC = () => {
           <h3 className="font-bold text-white">Create Proposal</h3>
         </div>
         <div className="space-y-3">
+          {/* Proposal Type */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Proposal Type</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setProposalType('signaling')}
+                className={`px-4 py-2 text-sm rounded-xl border transition-colors ${
+                  proposalType === 'signaling'
+                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                }`}
+              >
+                Signaling
+              </button>
+              <button
+                onClick={() => setProposalType('executable')}
+                className={`px-4 py-2 text-sm rounded-xl border transition-colors ${
+                  proposalType === 'executable'
+                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                }`}
+              >
+                Executable Action
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm text-gray-400 mb-1">Description</label>
             <textarea
@@ -427,16 +511,87 @@ const Governance: React.FC = () => {
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm resize-none"
             />
           </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Target address (optional)</label>
-            <input
-              type="text"
-              value={proposalTarget}
-              onChange={(e) => setProposalTarget(e.target.value)}
-              placeholder="0x… (leave empty for signaling proposal)"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
-            />
-          </div>
+
+          {proposalType === 'signaling' && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Target address (optional)</label>
+              <input
+                type="text"
+                value={proposalTarget}
+                onChange={(e) => setProposalTarget(e.target.value)}
+                placeholder="0x… (leave empty for signaling proposal)"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
+              />
+            </div>
+          )}
+
+          {proposalType === 'executable' && (
+            <>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Action</label>
+                <select
+                  value={proposalAction}
+                  onChange={(e) => { setProposalAction(e.target.value); setActionParam1(''); setActionParam2(''); }}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm appearance-none cursor-pointer"
+                >
+                  <option value="mint" className="bg-gray-900">Mint tokens (large mint via Timelock)</option>
+                  <option value="burn" className="bg-gray-900">Burn tokens</option>
+                  <option value="setMaxSupply" className="bg-gray-900">Set max supply cap</option>
+                  <option value="setMintThreshold" className="bg-gray-900">Set mint threshold</option>
+                  <option value="pause" className="bg-gray-900">Pause token transfers</option>
+                  <option value="unpause" className="bg-gray-900">Unpause token transfers</option>
+                </select>
+              </div>
+
+              <div className="text-xs text-gray-500 bg-white/5 rounded-xl px-4 py-2">
+                Target: <span className="font-mono text-gray-400">{CONTRACT_ADDRESSES.securityToken.slice(0, 10)}…{CONTRACT_ADDRESSES.securityToken.slice(-4)}</span>
+                <span className="ml-2">(HKSTPSecurityToken)</span>
+              </div>
+
+              {(proposalAction === 'mint' || proposalAction === 'burn') && (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">
+                      {proposalAction === 'mint' ? 'Recipient address' : 'Address to burn from'}
+                    </label>
+                    <input
+                      type="text"
+                      value={actionParam1}
+                      onChange={(e) => setActionParam1(e.target.value)}
+                      placeholder="0x…"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Amount (tokens)</label>
+                    <input
+                      type="text"
+                      value={actionParam2}
+                      onChange={(e) => setActionParam2(e.target.value)}
+                      placeholder="e.g. 500000"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+
+              {(proposalAction === 'setMaxSupply' || proposalAction === 'setMintThreshold') && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    {proposalAction === 'setMaxSupply' ? 'Max supply (tokens, 0 = unlimited)' : 'Mint threshold (tokens, 0 = disabled)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={actionParam1}
+                    onChange={(e) => setActionParam1(e.target.value)}
+                    placeholder="e.g. 1000000"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
           <button
             onClick={handlePropose}
             disabled={proposing || !proposalDescription}
