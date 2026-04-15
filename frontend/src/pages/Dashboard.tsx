@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
-import { TrendingUp, Coins, ShieldCheck, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Coins, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { ethers } from 'ethers';
 
 interface FactoryToken { name: string; symbol: string; address: string; balance: string; totalSupply: string }
@@ -153,50 +153,63 @@ const Dashboard: React.FC = () => {
         </button>
       </header>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon={<Coins size={20} />}
-          label={`${tokenSymbol} Balance`}
-          value={Number(tokenBalance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-          accent="purple"
-        />
-        <StatCard
-          icon={<TrendingUp size={20} />}
-          label={`${cashSymbol} Balance`}
-          value={Number(cashBalance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-          accent="cyan"
-        />
-        {roles.isAdmin && (
+      {/* Admin-only Stats */}
+      {roles.isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             icon={<Users size={20} />}
             label="Total Supply"
-            value={Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            value={`${Number(totalSupply).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${tokenSymbol}`}
             accent="amber"
           />
-        )}
-        {factoryTokens.map((ft) => (
-          <StatCard
-            key={ft.address}
-            icon={<Coins size={20} />}
-            label={`${ft.symbol} Balance`}
-            value={Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-            accent="purple"
-          />
-        ))}
-      </div>
+        </div>
+      )}
 
-      {/* Token Info + KYC Claims */}
+      {/* Token Holdings + KYC Claims */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Token Info */}
+        {/* My Token Holdings */}
         <div className="glass-card p-6">
-          <h3 className="font-bold text-white mb-4">Security Token</h3>
-          <dl className="space-y-3">
-            <InfoRow label="Name" value={tokenName} />
-            <InfoRow label="Symbol" value={tokenSymbol} />
-            {roles.isAdmin && <InfoRow label="Total Supply" value={`${Number(totalSupply).toLocaleString()} ${tokenSymbol}`} />}
-            <InfoRow label="Your Balance" value={`${Number(tokenBalance).toLocaleString()} ${tokenSymbol}`} />
-          </dl>
+          <h3 className="font-bold text-white mb-4">My Token Holdings</h3>
+          <div className="space-y-3">
+            {/* Primary Security Token */}
+            <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              <div>
+                <p className="text-sm text-gray-400">{tokenName}</p>
+                <p className="text-xs text-gray-500">{tokenSymbol}</p>
+              </div>
+              <p className="text-lg font-bold text-white">
+                {Number(tokenBalance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                <span className="text-sm text-gray-400">{tokenSymbol}</span>
+              </p>
+            </div>
+            {/* Cash Token */}
+            <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              <div>
+                <p className="text-sm text-gray-400">Cash Token</p>
+                <p className="text-xs text-gray-500">{cashSymbol}</p>
+              </div>
+              <p className="text-lg font-bold text-white">
+                {Number(cashBalance).toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <span className="text-sm text-gray-400">{cashSymbol}</span>
+              </p>
+            </div>
+            {/* Factory-deployed tokens */}
+            {factoryTokens.map((ft) => (
+              <div key={ft.address} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm text-gray-400">{ft.name}</p>
+                  <p className="text-xs text-gray-500">{ft.symbol} · {ft.address.slice(0, 8)}…{ft.address.slice(-4)}</p>
+                </div>
+                <p className="text-lg font-bold text-white">
+                  {Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                  <span className="text-sm text-gray-400">{ft.symbol}</span>
+                </p>
+              </div>
+            ))}
+            {factoryTokens.length === 0 && Number(tokenBalance) === 0 && Number(cashBalance) === 0 && (
+              <p className="text-sm text-gray-500 text-center py-2">No token holdings</p>
+            )}
+          </div>
         </div>
 
         {/* KYC Claim Status */}
@@ -234,27 +247,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Factory-deployed Start-up Tokens */}
-      {factoryTokens.length > 0 && (
-        <div className="glass-card p-6">
-          <h3 className="font-bold text-white mb-4">Start-up Tokens (Factory-Deployed)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {factoryTokens.map((ft) => (
-              <div key={ft.address} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <p className="text-sm text-gray-400 mb-1">{ft.name}</p>
-                <p className="text-xl font-bold text-white">
-                  {Number(ft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                  <span className="text-sm text-gray-400">{ft.symbol}</span>
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Supply: {Number(ft.totalSupply).toLocaleString()} · {ft.address.slice(0, 8)}…{ft.address.slice(-4)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* System Health Check — admin/agent only */}
       {(roles.isAdmin || roles.isAgent) && (
@@ -358,13 +350,6 @@ const StatCard: React.FC<{
       <span className="text-sm text-gray-400 font-medium">{label}</span>
     </div>
     <p className="text-2xl font-bold text-white">{value}</p>
-  </div>
-);
-
-const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex justify-between items-center">
-    <dt className="text-sm text-gray-400">{label}</dt>
-    <dd className="text-sm font-medium text-white">{value}</dd>
   </div>
 );
 
