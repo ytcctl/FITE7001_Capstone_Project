@@ -256,6 +256,19 @@ const Trading: React.FC = () => {
   const fetchData = useCallback(async () => {
     if (!obContract || !secTokenContract || !account || !contracts) return;
 
+    // Fetch balances independently so they always update even if order-book
+    // queries fail.
+    try {
+      const [secBal, cashBal] = await Promise.all([
+        secTokenContract.balanceOf(account) as Promise<bigint>,
+        contracts.cashToken.balanceOf(account) as Promise<bigint>,
+      ]);
+      setSecBalance(secBal);
+      setCashBalance(cashBal);
+    } catch (err) {
+      console.error('[Trading] balance fetch error:', err);
+    }
+
     try {
       const [buyIds, sellIds, traderIds, bBid, bAsk, sp, oc, tc] = await Promise.all([
         obContract.getBuyOrderIds() as Promise<bigint[]>,
@@ -355,13 +368,6 @@ const Trading: React.FC = () => {
         setDailyChange(null);
       }
 
-      // Balances
-      const [secBal, cashBal] = await Promise.all([
-        secTokenContract.balanceOf(account) as Promise<bigint>,
-        contracts.cashToken.balanceOf(account) as Promise<bigint>,
-      ]);
-      setSecBalance(secBal);
-      setCashBalance(cashBal);
     } catch (err) {
       console.error('[Trading] fetchData error:', err);
     } finally {
