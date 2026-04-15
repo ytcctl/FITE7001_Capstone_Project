@@ -18,7 +18,9 @@ const { ethers } = require("hardhat");
  */
 describe("DvPSettlement", function () {
   let dvp, securityToken, cashToken, registry, compliance;
-  let admin, operator, pauser, agent, seller, buyer, outsider;
+  let admin, operator, agent, seller, buyer;
+  // admin  doubles as pauser (granted PAUSER_ROLE below)
+  // buyer  doubles as outsider for access-control tests (no OPERATOR_ROLE)
 
   const SECURITY_AMOUNT = ethers.parseUnits("100", 18);
   const CASH_AMOUNT     = ethers.parseUnits("5000", 6);  // 5,000 tokenized HKD
@@ -30,7 +32,7 @@ describe("DvPSettlement", function () {
   }
 
   beforeEach(async function () {
-    [admin, operator, pauser, agent, seller, buyer, outsider] = await ethers.getSigners();
+    [admin, operator, agent, seller, buyer] = await ethers.getSigners();
 
     // Deploy Identity Registry
     const IdentityRegistry = await ethers.getContractFactory("HKSTPIdentityRegistry");
@@ -62,7 +64,7 @@ describe("DvPSettlement", function () {
     const OPERATOR_ROLE = await dvp.OPERATOR_ROLE();
     const PAUSER_ROLE   = await dvp.PAUSER_ROLE();
     await dvp.connect(admin).grantRole(OPERATOR_ROLE, operator.address);
-    await dvp.connect(admin).grantRole(PAUSER_ROLE,   pauser.address);
+    await dvp.connect(admin).grantRole(PAUSER_ROLE, admin.address);
 
     // Grant AGENT_ROLE on token and registry to admin
     const TOKEN_AGENT    = await securityToken.AGENT_ROLE();
@@ -135,7 +137,7 @@ describe("DvPSettlement", function () {
     it("should reject creation by non-operator", async function () {
       const deadline = await getDeadline();
       await expect(
-        dvp.connect(outsider).createSettlement(
+        dvp.connect(buyer).createSettlement(
           seller.address, buyer.address,
           await securityToken.getAddress(), SECURITY_AMOUNT,
           await cashToken.getAddress(),     CASH_AMOUNT,
@@ -192,7 +194,7 @@ describe("DvPSettlement", function () {
       const sellerCashBefore   = await cashToken.balanceOf(seller.address);
       const buyerSecBefore     = await securityToken.balanceOf(buyer.address);
 
-      await dvp.connect(operator).executeSettlement(settlementId);
+      await dvp.connect(admin).executeSettlement(settlementId);
 
       expect(await securityToken.balanceOf(seller.address)).to.equal(0n);
       expect(await securityToken.balanceOf(buyer.address)).to.equal(SECURITY_AMOUNT);
@@ -204,20 +206,20 @@ describe("DvPSettlement", function () {
     });
 
     it("should emit SettlementExecuted", async function () {
-      await expect(dvp.connect(operator).executeSettlement(settlementId))
+      await expect(dvp.connect(admin).executeSettlement(settlementId))
         .to.emit(dvp, "SettlementExecuted");
     });
 
     it("should reject execution by non-operator", async function () {
       await expect(
-        dvp.connect(outsider).executeSettlement(settlementId)
+        dvp.connect(buyer).executeSettlement(settlementId)
       ).to.be.reverted;
     });
 
     it("should reject executing the same settlement twice", async function () {
-      await dvp.connect(operator).executeSettlement(settlementId);
+      await dvp.connect(admin).executeSettlement(settlementId);
       await expect(
-        dvp.connect(operator).executeSettlement(settlementId)
+        dvp.connect(admin).executeSettlement(settlementId)
       ).to.be.revertedWith("DvPSettlement: not pending");
     });
 
@@ -225,7 +227,7 @@ describe("DvPSettlement", function () {
       // Transfer seller's security tokens away to cause insufficient balance
       await securityToken.connect(seller).transfer(buyer.address, SECURITY_AMOUNT);
       await expect(
-        dvp.connect(operator).executeSettlement(settlementId)
+        dvp.connect(admin).executeSettlement(settlementId)
       ).to.be.reverted;
     });
 
@@ -233,7 +235,7 @@ describe("DvPSettlement", function () {
       // Transfer buyer's cash tokens away
       await cashToken.connect(buyer).transfer(seller.address, CASH_AMOUNT);
       await expect(
-        dvp.connect(operator).executeSettlement(settlementId)
+        dvp.connect(admin).executeSettlement(settlementId)
       ).to.be.reverted;
     });
 
@@ -254,7 +256,7 @@ describe("DvPSettlement", function () {
       await ethers.provider.send("evm_mine");
 
       await expect(
-        dvp.connect(operator).executeSettlement(shortId)
+        dvp.connect(admin).executeSettlement(shortId)
       ).to.be.revertedWith("DvPSettlement: deadline passed");
     });
 
@@ -265,8 +267,15 @@ describe("DvPSettlement", function () {
       await registry.connect(admin).setClaim(buyer.address, 1, false);
 
       await expect(
-        dvp.connect(operator).executeSettlement(settlementId)
+        dvp.connect(admin).executeSettlement(settlementId)
       ).to.be.reverted;
+    });
+
+    it("should reject execution by the creator of the settlement", async function () {
+      // operator created the settlement — operator cannot execute it
+      await expect(
+        dvp.connect(operator).executeSettlement(settlementId)
+      ).to.be.revertedWith("DvPSettlement: creator cannot execute own settlement");
     });
   });
 
@@ -276,7 +285,7 @@ describe("DvPSettlement", function () {
 
   describe("Pause", function () {
     it("should block settlement creation when paused", async function () {
-      await dvp.connect(pauser).pause();
+      await dvp.connect(admin).pause();
       const deadline = await getDeadline();
       await expect(
         dvp.connect(operator).createSettlement(
@@ -297,9 +306,9 @@ describe("DvPSettlement", function () {
         deadline, MATCH_ID
       );
 
-      await dvp.connect(pauser).pause();
+      await dvp.connect(admin).pause();
       await expect(
-        dvp.connect(operator).executeSettlement(0)
+        dvp.connect(admin).executeSettlement(0)
       ).to.be.reverted;
     });
 
@@ -312,9 +321,9 @@ describe("DvPSettlement", function () {
         deadline, MATCH_ID
       );
 
-      await dvp.connect(pauser).pause();
-      await dvp.connect(pauser).unpause();
-      await dvp.connect(operator).executeSettlement(0);
+      await dvp.connect(admin).pause();
+      await dvp.connect(admin).unpause();
+      await dvp.connect(admin).executeSettlement(0);
 
       const s = await dvp.getSettlement(0);
       expect(s.status).to.equal(1); // Settled
@@ -362,7 +371,7 @@ describe("DvPSettlement", function () {
       await ethers.provider.send("evm_increaseTime", [10]);
       await ethers.provider.send("evm_mine");
 
-      await expect(dvp.connect(outsider).markFailed(expiredId))
+      await expect(dvp.connect(buyer).markFailed(expiredId))
         .to.emit(dvp, "SettlementFailed");
 
       const s = await dvp.getSettlement(expiredId);
@@ -370,12 +379,12 @@ describe("DvPSettlement", function () {
     });
 
     it("should reject markFailed before deadline has passed", async function () {
-      await expect(dvp.connect(outsider).markFailed(id))
+      await expect(dvp.connect(buyer).markFailed(id))
         .to.be.revertedWith("DvPSettlement: deadline not passed");
     });
 
     it("should reject cancellation by non-operator", async function () {
-      await expect(dvp.connect(outsider).cancelSettlement(id))
+      await expect(dvp.connect(buyer).cancelSettlement(id))
         .to.be.reverted;
     });
   });
@@ -468,7 +477,7 @@ describe("DvPSettlement", function () {
 
     it("should revert when called by non-operator", async function () {
       await expect(
-        dvp.connect(outsider).setTravelRuleData(
+        dvp.connect(buyer).setTravelRuleData(
           id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO
         )
       ).to.be.reverted;
@@ -484,7 +493,7 @@ describe("DvPSettlement", function () {
 
     it("should revert when settlement is not pending", async function () {
       // Execute the settlement first
-      await dvp.connect(operator).executeSettlement(id);
+      await dvp.connect(admin).executeSettlement(id);
       await expect(
         dvp.connect(operator).setTravelRuleData(
           id, ORIGINATOR_VASP, BENEFICIARY_VASP, ORIGINATOR_INFO, BENEFICIARY_INFO

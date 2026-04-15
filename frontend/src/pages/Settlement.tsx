@@ -1,18 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, CASH_TOKEN_ABI } from '../config/contracts';
 import { ArrowRightLeft, Plus, Play, XCircle, RefreshCw, Loader2, CheckSquare } from 'lucide-react';
 import { ethers } from 'ethers';
 
+interface TokenOption {
+  name: string;
+  symbol: string;
+  address: string;
+}
+
 interface SettlementData {
   id: number;
   seller: string;
   buyer: string;
+  securityToken: string;
+  securitySymbol: string;
+  cashToken: string;
+  cashSymbol: string;
   tokenAmount: string;
   cashAmount: string;
   status: number;
   matchId: string;
   deadline: number;
+  createdBy: string;
 }
 
 const STATUS_LABELS = ['Pending', 'Settled', 'Failed', 'Cancelled'];
@@ -25,6 +36,10 @@ const STATUS_COLORS = [
 
 const Settlement: React.FC = () => {
   const { account, contracts } = useWeb3();
+
+  // Token selector
+  const [tokenOptions, setTokenOptions] = useState<TokenOption[]>([]);
+  const [selectedSecurityToken, setSelectedSecurityToken] = useState('');
 
   // Create
   const [seller, setSeller] = useState('');
@@ -41,22 +56,87 @@ const Settlement: React.FC = () => {
   // Batch execute
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+  // Load available security tokens from factory contracts
+  const loadTokenOptions = useCallback(async () => {
+    if (!contracts) return;
+    const options: TokenOption[] = [];
+    // Default security token
+    try {
+      const [name, symbol] = await Promise.all([
+        contracts.securityToken.name(),
+        contracts.securityToken.symbol(),
+      ]);
+      const addr = await contracts.securityToken.getAddress();
+      options.push({ name, symbol, address: addr });
+    } catch {}
+    // V1 factory tokens
+    try {
+      const all = await contracts.tokenFactory.allTokens();
+      for (const t of all) {
+        if (!t.active) continue;
+        if (options.find(o => o.address.toLowerCase() === t.tokenAddress.toLowerCase())) continue;
+        options.push({ name: t.name, symbol: t.symbol, address: t.tokenAddress });
+      }
+    } catch {}
+    // V2 factory tokens
+    try {
+      const allV2 = await contracts.tokenFactoryV2.allTokens();
+      for (const t of allV2) {
+        if (!t.active) continue;
+        if (options.find(o => o.address.toLowerCase() === t.proxyAddress.toLowerCase())) continue;
+        options.push({ name: t.name, symbol: t.symbol, address: t.proxyAddress });
+      }
+    } catch {}
+    setTokenOptions(options);
+    if (options.length > 0 && !selectedSecurityToken) {
+      setSelectedSecurityToken(options[0].address);
+    }
+  }, [contracts, selectedSecurityToken]);
+
+  // Cache resolved ERC-20 symbols so we don't re-query the same token contract
+  const symbolCache = React.useRef<Record<string, string>>({});
+
+  const resolveSymbol = async (tokenAddr: string, provider: ethers.Provider): Promise<string> => {
+    const key = tokenAddr.toLowerCase();
+    if (symbolCache.current[key]) return symbolCache.current[key];
+    try {
+      const c = new ethers.Contract(tokenAddr, ['function symbol() view returns (string)'], provider);
+      const sym = await c.symbol();
+      symbolCache.current[key] = sym;
+      return sym;
+    } catch {
+      const short = `${tokenAddr.slice(0, 6)}…${tokenAddr.slice(-4)}`;
+      symbolCache.current[key] = short;
+      return short;
+    }
+  };
+
   const loadSettlements = async () => {
     if (!contracts) return;
     try {
       const count = await contracts.dvpSettlement.settlementCount();
+      const provider = (contracts.dvpSettlement.runner as ethers.Signer).provider!;
       const items: SettlementData[] = [];
       for (let i = 0; i < Number(count); i++) {
         const s = await contracts.dvpSettlement.settlements(i);
+        const [securitySymbol, cashSymbol] = await Promise.all([
+          resolveSymbol(s.securityToken, provider),
+          resolveSymbol(s.cashToken, provider),
+        ]);
         items.push({
           id: i,
           seller: s.seller,
           buyer: s.buyer,
+          securityToken: s.securityToken,
+          securitySymbol,
+          cashToken: s.cashToken,
+          cashSymbol,
           tokenAmount: ethers.formatUnits(s.tokenAmount, 18),
           cashAmount: ethers.formatUnits(s.cashAmount, 6),
           status: Number(s.status),
           matchId: s.matchId,
           deadline: Number(s.settlementDeadline),
+          createdBy: s.createdBy,
         });
       }
       setSettlements(items);
@@ -67,10 +147,11 @@ const Settlement: React.FC = () => {
 
   useEffect(() => {
     loadSettlements();
+    loadTokenOptions();
   }, [contracts]);
 
   const handleCreate = async () => {
-    if (!contracts || !seller || !buyer || !tokenAmount || !cashAmount) return;
+    if (!contracts || !seller || !buyer || !tokenAmount || !cashAmount || !selectedSecurityToken) return;
     setIsSubmitting(true);
     setTxStatus('Creating settlement…');
     try {
@@ -79,7 +160,7 @@ const Settlement: React.FC = () => {
       const tx = await contracts.dvpSettlement.createSettlement(
         seller,
         buyer,
-        CONTRACT_ADDRESSES.securityToken,
+        selectedSecurityToken,
         ethers.parseUnits(tokenAmount, 18),
         CONTRACT_ADDRESSES.cashToken,
         ethers.parseUnits(cashAmount, 6),
@@ -283,6 +364,21 @@ const Settlement: React.FC = () => {
             />
           </div>
           <div>
+            <label className="block text-sm text-gray-400 mb-1">Security Token</label>
+            <select
+              value={selectedSecurityToken}
+              onChange={(e) => setSelectedSecurityToken(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
+            >
+              {tokenOptions.length === 0 && <option value="">Loading tokens…</option>}
+              {tokenOptions.map((t) => (
+                <option key={t.address} value={t.address} className="bg-gray-900">
+                  {t.symbol} — {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm text-gray-400 mb-1">Security Token Amount</label>
             <input
               type="text"
@@ -314,7 +410,7 @@ const Settlement: React.FC = () => {
           <div className="flex items-end">
             <button
               onClick={handleCreate}
-              disabled={isSubmitting || !seller || !buyer || !tokenAmount || !cashAmount}
+              disabled={isSubmitting || !seller || !buyer || !tokenAmount || !cashAmount || !selectedSecurityToken}
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && <Loader2 size={16} className="animate-spin" />}
@@ -371,9 +467,12 @@ const Settlement: React.FC = () => {
                   <th className="px-6 py-3 font-medium">ID</th>
                   <th className="px-6 py-3 font-medium">Seller</th>
                   <th className="px-6 py-3 font-medium">Buyer</th>
-                  <th className="px-6 py-3 font-medium">Tokens</th>
-                  <th className="px-6 py-3 font-medium">Cash</th>
+                  <th className="px-6 py-3 font-medium">Security Token</th>
+                  <th className="px-6 py-3 font-medium">Amount</th>
+                  <th className="px-6 py-3 font-medium">Cash Token</th>
+                  <th className="px-6 py-3 font-medium">Cash Amt</th>
                   <th className="px-6 py-3 font-medium">Status</th>
+                  <th className="px-6 py-3 font-medium">Created By</th>
                   <th className="px-6 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -393,23 +492,41 @@ const Settlement: React.FC = () => {
                     <td className="px-6 py-4 text-sm font-mono text-gray-300">#{s.id}</td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300">{s.seller.slice(0, 8)}…</td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300">{s.buyer.slice(0, 8)}…</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className="text-purple-300 font-medium">{s.securitySymbol}</span>
+                      <span className="block text-[10px] font-mono text-gray-500" title={s.securityToken}>{s.securityToken.slice(0, 6)}…{s.securityToken.slice(-4)}</span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-white">{Number(s.tokenAmount).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className="text-emerald-300 font-medium">{s.cashSymbol}</span>
+                      <span className="block text-[10px] font-mono text-gray-500" title={s.cashToken}>{s.cashToken.slice(0, 6)}…{s.cashToken.slice(-4)}</span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-white">{Number(s.cashAmount).toLocaleString()}</td>
                     <td className="px-6 py-4">
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s.status]}`}>
                         {STATUS_LABELS[s.status]}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-sm font-mono text-gray-300" title={s.createdBy}>
+                      {s.createdBy.slice(0, 8)}…
+                      {account && s.createdBy.toLowerCase() === account.toLowerCase() && (
+                        <span className="block text-[10px] text-amber-400">(you)</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       {s.status === 0 && (
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => handleExecute(s.id)}
-                            className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20"
-                          >
-                            <Play size={12} className="inline mr-1" />
-                            Execute
-                          </button>
+                          {account && s.createdBy.toLowerCase() === account.toLowerCase() ? (
+                            <span className="text-xs text-gray-500 italic">Awaiting counterparty</span>
+                          ) : (
+                            <button
+                              onClick={() => handleExecute(s.id)}
+                              className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20"
+                            >
+                              <Play size={12} className="inline mr-1" />
+                              Execute
+                            </button>
+                          )}
                           <button
                             onClick={() => handleCancel(s.id)}
                             className="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/20"

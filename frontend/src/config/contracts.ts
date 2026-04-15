@@ -265,7 +265,7 @@ export const DVP_SETTLEMENT_ABI = [
   'function executeSettlement(uint256 id) external',
   'function cancelSettlement(uint256 id) external',
   // Views
-  'function settlements(uint256 id) view returns (address seller, address buyer, address securityToken, uint256 tokenAmount, address cashToken, uint256 cashAmount, uint256 tradeTimestamp, uint256 settlementDeadline, uint8 status, bytes32 matchId)',
+  'function settlements(uint256 id) view returns (address seller, address buyer, address securityToken, uint256 tokenAmount, address cashToken, uint256 cashAmount, uint256 tradeTimestamp, uint256 settlementDeadline, uint8 status, bytes32 matchId, address createdBy)',
   'function settlementCount() view returns (uint256)',
   // Pause
   'function pause() external',

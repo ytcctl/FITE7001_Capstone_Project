@@ -53,6 +53,7 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         uint256 settlementDeadline; // Unix timestamp; execution must occur before this
         SettlementStatus status;
         bytes32 matchId;            // Off-chain matching engine trade ID
+        address createdBy;          // Who created this settlement (cannot execute it)
     }
 
     /**
@@ -181,7 +182,8 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
             tradeTimestamp:     block.timestamp,
             settlementDeadline: deadline,
             status:             SettlementStatus.Pending,
-            matchId:            matchId
+            matchId:            matchId,
+            createdBy:          msg.sender
         });
 
         emit SettlementCreated(
@@ -209,6 +211,7 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         Settlement storage s = settlements[id];
         require(s.status == SettlementStatus.Pending, "DvPSettlement: not pending");
         require(block.timestamp <= s.settlementDeadline, "DvPSettlement: deadline passed");
+        require(msg.sender != s.createdBy, "DvPSettlement: creator cannot execute own settlement");
 
         // Mark settled BEFORE external calls (checks-effects-interactions)
         s.status = SettlementStatus.Settled;
@@ -295,6 +298,12 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
             // Skip non-pending or expired
             if (s.status != SettlementStatus.Pending) {
                 if (stopOnFailure) revert("DvPSettlement: not pending");
+                failCount++;
+                continue;
+            }
+            // Creator cannot execute their own settlement
+            if (msg.sender == s.createdBy) {
+                if (stopOnFailure) revert("DvPSettlement: creator cannot execute own settlement");
                 failCount++;
                 continue;
             }
