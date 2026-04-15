@@ -23,3 +23,7 @@ Error: spawn xdg-open ENOENT
 11:16:33 AM [vite] hmr update /src/pages/Trading.tsx, /src/index.css
 11:16:40 AM [vite] hmr update /src/pages/Trading.tsx, /src/index.css
 11:17:13 AM [vite] hmr update /src/pages/Trading.tsx, /src/index.css
+11:31:00 AM [vite] hmr update /src/pages/Settlement.tsx, /src/index.css
+11:31:14 AM [vite] hmr update /src/pages/Settlement.tsx, /src/index.css
+11:31:37 AM [vite] hmr update /src/pages/Settlement.tsx, /src/index.css
+11:33:20 AM [vite] hmr update /src/pages/Settlement.tsx, /src/index.css

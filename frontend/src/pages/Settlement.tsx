@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { CONTRACT_ADDRESSES } from '../config/contracts';
+import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, CASH_TOKEN_ABI } from '../config/contracts';
 import { ArrowRightLeft, Plus, Play, XCircle, RefreshCw, Loader2, CheckSquare } from 'lucide-react';
 import { ethers } from 'ethers';
 
@@ -103,6 +103,36 @@ const Settlement: React.FC = () => {
     setIsSubmitting(true);
     setTxStatus(`Executing settlement #${id}…`);
     try {
+      // Fetch settlement details to check required approvals
+      const s = await contracts.dvpSettlement.settlements(id);
+      const dvpAddr = await contracts.dvpSettlement.getAddress();
+      const signer = (contracts.dvpSettlement as any).runner as ethers.Signer;
+      const me = await signer.getAddress();
+      const meLower = me.toLowerCase();
+
+      // Check & approve security token (seller → DvP)
+      if (meLower === s.seller.toLowerCase()) {
+        const secToken = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, signer);
+        const allowanceSec: bigint = await secToken.allowance(me, dvpAddr);
+        if (allowanceSec < s.tokenAmount) {
+          setTxStatus(`Approving security token for settlement #${id}…`);
+          const appTx = await secToken.approve(dvpAddr, s.tokenAmount);
+          await appTx.wait();
+        }
+      }
+
+      // Check & approve cash token (buyer → DvP)
+      if (meLower === s.buyer.toLowerCase()) {
+        const cashToken = new ethers.Contract(s.cashToken, CASH_TOKEN_ABI, signer);
+        const allowanceCash: bigint = await cashToken.allowance(me, dvpAddr);
+        if (allowanceCash < s.cashAmount) {
+          setTxStatus(`Approving cash token for settlement #${id}…`);
+          const appTx = await cashToken.approve(dvpAddr, s.cashAmount);
+          await appTx.wait();
+        }
+      }
+
+      setTxStatus(`Executing settlement #${id}…`);
       const tx = await contracts.dvpSettlement.executeSettlement(id);
       await tx.wait();
       setTxStatus(`✓ Settlement #${id} executed — DvP atomic swap complete`);
@@ -153,8 +183,34 @@ const Settlement: React.FC = () => {
     if (!contracts || selectedIds.size === 0) return;
     setIsSubmitting(true);
     const ids = Array.from(selectedIds);
-    setTxStatus(`Batch executing ${ids.length} settlement(s)…`);
+    setTxStatus(`Batch executing ${ids.length} settlement(s)… approving tokens…`);
     try {
+      const dvpAddr = await contracts.dvpSettlement.getAddress();
+      const signer = (contracts.dvpSettlement as any).runner as ethers.Signer;
+      const me = (await signer.getAddress()).toLowerCase();
+
+      // Approve all tokens the connected user owes across selected settlements
+      for (const id of ids) {
+        const s = await contracts.dvpSettlement.settlements(id);
+        if (me === s.seller.toLowerCase()) {
+          const secToken = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, signer);
+          const allowance: bigint = await secToken.allowance(await signer.getAddress(), dvpAddr);
+          if (allowance < s.tokenAmount) {
+            const appTx = await secToken.approve(dvpAddr, s.tokenAmount);
+            await appTx.wait();
+          }
+        }
+        if (me === s.buyer.toLowerCase()) {
+          const cashToken = new ethers.Contract(s.cashToken, CASH_TOKEN_ABI, signer);
+          const allowance: bigint = await cashToken.allowance(await signer.getAddress(), dvpAddr);
+          if (allowance < s.cashAmount) {
+            const appTx = await cashToken.approve(dvpAddr, s.cashAmount);
+            await appTx.wait();
+          }
+        }
+      }
+
+      setTxStatus(`Batch executing ${ids.length} settlement(s)…`);
       const tx = await contracts.dvpSettlement.executeBatchSettlement(ids, false);
       const receipt = await tx.wait();
       setTxStatus(`✓ Batch execute complete — ${ids.length} settlement(s) processed`);
