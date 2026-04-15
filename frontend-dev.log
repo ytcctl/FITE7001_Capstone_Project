@@ -10,3 +10,5 @@ Error: spawn xdg-open ENOENT
 9:46:23 AM [vite] hmr update /src/App.tsx, /src/index.css, /src/context/Web3Context.tsx, /src/pages/TokenManagement.tsx, /src/pages/Dashboard.tsx, /src/pages/KYCManagement.tsx, /src/pages/Settlement.tsx, /src/pages/TokenMinting.tsx, /src/pages/Governance.tsx, /src/pages/Portfolio.tsx, /src/pages/WalletCustody.tsx, /src/pages/TokenDetail.tsx, /src/pages/Trading.tsx, /src/pages/MarketManagement.tsx
 10:24:56 AM [vite] hmr update /src/pages/TokenMinting.tsx, /src/index.css
 10:25:08 AM [vite] hmr update /src/pages/TokenMinting.tsx, /src/index.css
+10:30:30 AM [vite] hmr update /src/pages/Dashboard.tsx, /src/index.css
+10:31:01 AM [vite] hmr update /src/pages/Dashboard.tsx, /src/index.css

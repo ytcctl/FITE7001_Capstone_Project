@@ -169,7 +169,7 @@ const Dashboard: React.FC = () => {
       setMarkets(mkts.slice(0, 10));
       setPriceMap(prices);
     } catch (e) { console.warn('Market overview loading failed:', e); }
-  }, [contracts, account]);
+  }, [contracts, account, roles.isAdmin]);
 
   useEffect(() => {
     loadDashboard();
