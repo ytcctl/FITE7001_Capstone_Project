@@ -270,19 +270,19 @@ const Trading: React.FC = () => {
       setTotalTrades(Number(tc));
 
       if (buyIds.length > 0) {
-        setBuyOrders(await obContract.getOrdersBatch(buyIds) as OrderData[]);
+        setBuyOrders(await obContract.getOrdersBatch([...buyIds]) as OrderData[]);
       } else {
         setBuyOrders([]);
       }
 
       if (sellIds.length > 0) {
-        setSellOrders(await obContract.getOrdersBatch(sellIds) as OrderData[]);
+        setSellOrders(await obContract.getOrdersBatch([...sellIds]) as OrderData[]);
       } else {
         setSellOrders([]);
       }
 
       if (traderIds.length > 0) {
-        setMyOrders(await obContract.getOrdersBatch(traderIds) as OrderData[]);
+        setMyOrders(await obContract.getOrdersBatch([...traderIds]) as OrderData[]);
       } else {
         setMyOrders([]);
       }
