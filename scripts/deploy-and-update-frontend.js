@@ -186,6 +186,14 @@ async function main() {
   const complianceAddress = await compliance.getAddress();
   console.log("     HKSTPCompliance:", complianceAddress);
 
+  // XX neutral jurisdiction is set in the constructor, but verify it here
+  // (safe-listed addresses use "XX" so they pass jurisdiction checks)
+  const xxSet = await compliance.allowedJurisdictions(ethers.encodeBytes32String("XX").slice(0, 6));
+  if (!xxSet) {
+    await (await compliance.setJurisdiction(ethers.encodeBytes32String("XX").slice(0, 6), true)).wait();
+    console.log("     XX neutral jurisdiction added");
+  }
+
   // 3. SecurityToken
   console.log("3/17  Deploying HKSTPSecurityToken...");
   const Token = await ethers.getContractFactory("HKSTPSecurityToken");

@@ -80,6 +80,11 @@ contract HKSTPCompliance is AccessControl, EIP712 {
 
         // HK is approved by default
         allowedJurisdictions[bytes2("HK")] = true;
+
+        // XX is the neutral country code used by safe-listed operational
+        // addresses (OrderBook escrow, custody, etc.) so they pass
+        // jurisdiction checks when one side of a transfer is safe-listed.
+        allowedJurisdictions[bytes2("XX")] = true;
     }
 
     // -------------------------------------------------------------------------
