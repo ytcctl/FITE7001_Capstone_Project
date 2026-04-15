@@ -97,6 +97,11 @@ function fmtPrice(price: bigint): string {
   });
 }
 
+/** Convert an ethers Result (Proxy/tuple) to a plain OrderData object. */
+function toPlainOrder(o: OrderData): OrderData {
+  return { id: o.id, trader: o.trader, side: o.side, price: o.price, quantity: o.quantity, filled: o.filled, timestamp: o.timestamp, status: o.status };
+}
+
 function timeAgo(ts: bigint): string {
   const diff = Math.floor(Date.now() / 1000) - Number(ts);
   if (diff < 60) return `${diff}s ago`;
@@ -270,21 +275,32 @@ const Trading: React.FC = () => {
       setTotalTrades(Number(tc));
 
       if (buyIds.length > 0) {
-        setBuyOrders(await obContract.getOrdersBatch([...buyIds]) as OrderData[]);
+        const raw = await obContract.getOrdersBatch([...buyIds]) as OrderData[];
+        setBuyOrders(raw.map(toPlainOrder));
       } else {
         setBuyOrders([]);
       }
 
       if (sellIds.length > 0) {
-        setSellOrders(await obContract.getOrdersBatch([...sellIds]) as OrderData[]);
+        const raw = await obContract.getOrdersBatch([...sellIds]) as OrderData[];
+        setSellOrders(raw.map(toPlainOrder));
       } else {
         setSellOrders([]);
       }
 
       if (traderIds.length > 0) {
-        setMyOrders(await obContract.getOrdersBatch([...traderIds]) as OrderData[]);
+        const raw = await obContract.getOrdersBatch([...traderIds]) as OrderData[];
+        const activeOrders = raw.map(toPlainOrder);
+        // Merge: keep locally-cancelled orders so the user sees the status change
+        setMyOrders(prev => {
+          const cancelled = prev.filter(o => Number(o.status) === OrderStatus.Cancelled);
+          const activeIds = new Set(activeOrders.map(o => o.id.toString()));
+          const kept = cancelled.filter(o => !activeIds.has(o.id.toString()));
+          return [...activeOrders, ...kept];
+        });
       } else {
-        setMyOrders([]);
+        // Preserve any locally-cancelled orders
+        setMyOrders(prev => prev.filter(o => Number(o.status) === OrderStatus.Cancelled));
       }
 
       const tradeTotal = Number(tc);
@@ -439,6 +455,18 @@ const Trading: React.FC = () => {
     try {
       const tx = await obContract.cancelOrder(orderId);
       await tx.wait();
+
+      // Update local state to show Cancelled status instead of removing the order.
+      // The contract removes cancelled orders from getTraderOrders(), so a plain
+      // refetch would make the row disappear.  We mark it cancelled locally first,
+      // then refetch the rest of the book data in the background.
+      setMyOrders(prev =>
+        prev.map(o =>
+          o.id === orderId
+            ? { ...toPlainOrder(o), status: OrderStatus.Cancelled as unknown as bigint }
+            : o,
+        ),
+      );
       fetchData();
     } catch (err) {
       console.error('Cancel failed:', err);
@@ -808,21 +836,21 @@ const Trading: React.FC = () => {
                       <tr key={i} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-2 px-3 text-gray-300 font-mono">#{Number(o.id)}</td>
                         <td className="py-2 px-3">
-                          <span className={`font-semibold ${o.side === Side.Buy ? 'text-green-400' : 'text-red-400'}`}>
-                            {o.side === Side.Buy ? 'BUY' : 'SELL'}
+                          <span className={`font-semibold ${Number(o.side) === Side.Buy ? 'text-green-400' : 'text-red-400'}`}>
+                            {Number(o.side) === Side.Buy ? 'BUY' : 'SELL'}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right text-white font-mono">{fmtPrice(o.price)}</td>
                         <td className="py-2 px-3 text-right text-gray-300 font-mono">{fmtSec(o.quantity)}</td>
                         <td className="py-2 px-3 text-right text-gray-400 font-mono">{fmtSec(o.filled)}</td>
                         <td className="py-2 px-3 text-center">
-                          <span className={`text-xs font-semibold ${STATUS_COLORS[o.status]}`}>
-                            {STATUS_LABELS[o.status]}
+                          <span className={`text-xs font-semibold ${STATUS_COLORS[Number(o.status)]}`}>
+                            {STATUS_LABELS[Number(o.status)]}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right text-gray-500 text-xs">{timeAgo(o.timestamp)}</td>
                         <td className="py-2 px-3 text-center">
-                          {(o.status === OrderStatus.Open || o.status === OrderStatus.PartiallyFilled) && (
+                          {(Number(o.status) === OrderStatus.Open || Number(o.status) === OrderStatus.PartiallyFilled) && (
                             <button
                               onClick={() => handleCancel(o.id)}
                               disabled={cancelling === o.id}
