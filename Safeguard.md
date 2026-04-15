@@ -108,13 +108,32 @@ system so their balance is recorded as voting weight.
 #### Step 2 — Create a Proposal
 
 Any KYC-verified holder with voting power ≥ `proposalThreshold` (10,000
-tokens) submits a governance proposal encoding the `mint()` call.
+tokens) submits a governance proposal.
+
+The **Governance** page supports two proposal types:
+
+| Type | Purpose | On-chain Effect |
+|---|---|---|
+| **Signaling** | Advisory vote (e.g. policy change) | None — description only |
+| **Executable Action** | Token operation via Timelock | Encodes calldata, executed on approval |
+
+**Supported Executable Actions:**
+
+| Action | Function | Parameters |
+|---|---|---|
+| Mint tokens | `mint(address, uint256)` | Recipient address, amount |
+| Burn tokens | `burn(address, uint256)` | Target address, amount |
+| Set max supply cap | `setMaxSupply(uint256)` | New cap |
+| Set mint threshold | `setMintThreshold(uint256)` | New threshold |
+| Pause token transfers | `pause()` | — |
+| Unpause token transfers | `unpause()` | — |
 
 - **Frontend**: Navigate to **Governance** page → **Create Proposal** →
-  enter the target contract (Security Token address), the function
-  (`mint(address,uint256)`), the recipient, and the amount.
+  select **Executable Action** → choose an action from the dropdown →
+  fill in the required parameters and a description → click **Propose**.
+  The target contract is automatically set to the HKSTPSecurityToken address.
 
-- **Contract call**:
+- **Contract call** (example — large mint):
   ```solidity
   bytes memory mintCalldata = abi.encodeWithSignature(
       "mint(address,uint256)", recipientAddress, mintAmount
