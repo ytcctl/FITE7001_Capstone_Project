@@ -21,7 +21,7 @@ interface IIdentityRegistryDvP {
 
 /// @dev Minimal interface for compliance pre-flight checks.
 interface IComplianceDvP {
-    function lockUpEnd(address investor) external view returns (uint256);
+    function lockUpEnd(address token, address investor) external view returns (uint256);
 }
 
 /**
@@ -293,7 +293,7 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         // 4. Lock-up period — seller must not be locked
         if (complianceAddr != address(0)) {
             IComplianceDvP comp = IComplianceDvP(complianceAddr);
-            uint256 lockEnd = comp.lockUpEnd(s.seller);
+            uint256 lockEnd = comp.lockUpEnd(s.securityToken, s.seller);
             if (lockEnd != 0 && block.timestamp < lockEnd) {
                 s.status = SettlementStatus.Failed;
                 emit SettlementFailed(id, s.matchId, "Seller is under lock-up period");

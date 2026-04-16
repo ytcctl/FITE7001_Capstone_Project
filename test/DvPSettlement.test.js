@@ -283,6 +283,23 @@ describe("DvPSettlement", function () {
         dvp.connect(operator).executeSettlement(settlementId)
       ).to.be.revertedWith("DvPSettlement: creator cannot execute own settlement");
     });
+
+    it("should mark as Failed when seller is under lock-up period", async function () {
+      // Admin sets a lock-up period for the seller on the security token
+      const block = await ethers.provider.getBlock("latest");
+      const lockUpEndTime = block.timestamp + 86400; // 24 hours from now
+      await compliance.connect(admin).setLockUp(
+        await securityToken.getAddress(),
+        seller.address,
+        lockUpEndTime
+      );
+
+      await expect(
+        dvp.connect(admin).executeSettlement(settlementId)
+      ).to.emit(dvp, "SettlementFailed").withArgs(settlementId, MATCH_ID, "Seller is under lock-up period");
+      const s = await dvp.settlements(settlementId);
+      expect(s.status).to.equal(2); // Failed
+    });
   });
 
   // ---------------------------------------------------------------------------
