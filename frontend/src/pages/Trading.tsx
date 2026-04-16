@@ -447,15 +447,42 @@ const Trading: React.FC = () => {
       let msg = 'Transaction failed';
       if (err && typeof err === 'object') {
         const e = err as Record<string, unknown>;
-        // ethers v6: revert reason is in .reason or nested .error.reason
+        // ethers v6: string revert reason is in .reason or nested .error.reason
         if (typeof e.reason === 'string') {
           msg = e.reason;
         } else if (e.error && typeof (e.error as Record<string, unknown>).reason === 'string') {
           msg = (e.error as Record<string, unknown>).reason as string;
-        } else if (err instanceof Error) {
-          // Extract quoted revert string from verbose message
-          const match = err.message.match(/reverted with reason string '([^']+)'/);
-          msg = match ? match[1] : err.message;
+        } else {
+          // Try to decode custom errors or extract reason from data/message
+          const data = (typeof e.data === 'string' ? e.data : null)
+            || (e.error && typeof (e.error as Record<string, unknown>).data === 'string'
+                ? (e.error as Record<string, unknown>).data as string : null);
+          if (data && data.startsWith('0x')) {
+            const selector = data.slice(0, 10).toLowerCase();
+            // Known OpenZeppelin custom error selectors
+            const knownErrors: Record<string, string> = {
+              '0xe450d38c': 'Insufficient token balance for this order',
+              '0xfb8f41b2': 'Insufficient allowance — please approve tokens first',
+              '0x1a83e5fc': 'Token transfer failed',
+            };
+            if (knownErrors[selector]) {
+              msg = knownErrors[selector];
+            } else {
+              // Try to decode as string revert: 0x08c379a0 + abi-encoded string
+              if (selector === '0x08c379a0' && data.length >= 74) {
+                try {
+                  const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + data.slice(10));
+                  msg = decoded[0];
+                } catch { /* fall through */ }
+              }
+            }
+          }
+          // Last resort: extract from verbose error message
+          if (msg === 'Transaction failed' && err instanceof Error) {
+            const match = err.message.match(/reverted with reason string '([^']+)'/);
+            if (match) msg = match[1];
+            else if (err.message.length <= 200) msg = err.message;
+          }
         }
       }
       setFormError(msg.length > 200 ? msg.slice(0, 200) + '…' : msg);
