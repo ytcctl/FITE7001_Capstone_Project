@@ -1,0 +1,7 @@
+{
+  "name": "TokenHub - HKSTP Investor Portal",
+  "description": "A compliant blockchain investment platform for fractional equity in HKSTP startups.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
