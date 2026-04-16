@@ -179,6 +179,7 @@ ERC-3643 (T-REX) inspired security token — **one token per HKSTP portfolio sta
 | Feature | Description |
 |---------|-------------|
 | Transfer control | Every transfer checks Identity Registry + Compliance modules |
+| Minting enforcement | Mints (`from == address(0)`) pass through the full compliance pipeline — concentration caps, jurisdiction, KYC checks are enforced on the recipient. Only burns (`to == address(0)`) skip compliance. |
 | Safe-list | Operational addresses (treasury, escrow) bypass per-transfer attestation |
 | Minting / Burning | `AGENT_ROLE` for day-to-day mints; `TIMELOCK_MINTER_ROLE` required above `mintThreshold` |
 | Supply cap | `maxSupply` hard ceiling prevents unlimited inflation (0 = unlimited) |
@@ -201,7 +202,7 @@ Modular compliance contract — "**Policy off-chain, enforcement on-chain**".
 
 - **EIP-712 attestation** — Per-transfer signed approval from Compliance Oracle, bound to `(from, to, amount, expiry, nonce)`
 - **Replay protection** — Each attestation hash is one-time-use
-- **Modules** — Concentration caps, jurisdiction whitelist / blacklist, lock-up enforcement
+- **Per-token modules** — Concentration caps (per-investor and global), jurisdiction whitelist / blacklist, and lock-up periods are all stored **per token address**, allowing each security token deployed through the factory to have independent compliance rules. The token contract calls `checkModules()` during `_update()`, and `msg.sender` (the token contract) is used as the key — no interface change required.
 
 #### `DvPSettlement.sol`
 Atomic **Delivery-versus-Payment** settlement contract.
@@ -526,7 +527,8 @@ frontend/
 │       ├── KYCManagement.tsx     # Identity & KYC claim management
 │       ├── TokenManagement.tsx   # Token lifecycle management (V1 + V2 tabs)
 │       ├── TokenMinting.tsx      # Mint/burn security tokens
-│       ├── ComplianceRules.tsx   # Compliance module configuration
+│       ├── ComplianceRules.tsx   # Compliance module configuration (per-token caps, lock-ups, jurisdiction)
+│       ├── TokenComplianceDetail.tsx # Per-token compliance detail view (/compliance/:address) — caps, lock-ups, remove actions
 │       ├── Governance.tsx        # On-chain governance proposals
 │       ├── OracleCommittee.tsx   # Multi-oracle threshold management
 │       └── WalletCustody.tsx     # Hot/warm/cold wallet management
@@ -670,7 +672,7 @@ npm run test:besu
 
 ### Frontend Functional Test Cases
 
-The Investor Portal has **301 documented functional test cases** (147 positive + 154 negative) covering all 15 frontend modules. Full details are in [`frontend/FRONTEND-TEST-CASES.md`](frontend/FRONTEND-TEST-CASES.md) and [`frontend/FRONTEND-TEST-CASES-QMetry.csv`](frontend/FRONTEND-TEST-CASES-QMetry.csv) (QMetry import-ready).
+The Investor Portal has **321 documented functional test cases** (160 positive + 161 negative) covering all 15 frontend modules (plus the Token Compliance Detail sub-module). Full details are in [`frontend/FRONTEND-TEST-CASES.md`](frontend/FRONTEND-TEST-CASES.md) and [`frontend/FRONTEND-TEST-CASES-QMetry.csv`](frontend/FRONTEND-TEST-CASES-QMetry.csv) (QMetry import-ready).
 
 | Test Environment | Details |
 |------------------|---------|
@@ -687,18 +689,19 @@ The Investor Portal has **301 documented functional test cases** (147 positive +
 | 2 | Dashboard | 7 | 6 | 13 |
 | 3 | KYC Management | 8 | 10 | 18 |
 | 4 | Token Management (V1) | 7 | 7 | 14 |
-| 5 | Token Minting | 9 | 10 | 19 |
+| 5 | Token Minting | 9 | 11 | 20 |
 | 6 | Trading (Order Book) | 14 | 12 | 26 |
 | 7 | DvP Settlement | 10 | 13 | 23 |
-| 8 | Compliance Rules | 9 | 9 | 18 |
+| 8 | Compliance Rules | 12 | 11 | 23 |
+| 8a | Token Compliance Detail | 9 | 3 | 12 |
 | 9 | Governance | 12 | 10 | 22 |
 | 10 | Portfolio | 6 | 10 | 16 |
 | 11 | Market Management | 7 | 9 | 16 |
 | 12 | Wallet Custody (98/2) | 14 | 9 | 23 |
 | 13 | Oracle Committee | 10 | 10 | 20 |
 | 14 | Token Factory V2 | 10 | 9 | 19 |
-| 15 | Cross-Cutting / Integration | 11 | 8 | 19 |
-| | **Total** | **147** | **154** | **301** |
+| 15 | Cross-Cutting / Integration | 12 | 9 | 21 |
+| | **Total** | **160** | **161** | **321** |
 
 #### 1. Wallet Connection & Network
 

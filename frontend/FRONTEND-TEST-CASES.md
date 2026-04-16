@@ -177,6 +177,7 @@
 | M-N-08 | Set cap below current supply | Supply is 500 → try to set cap to 100 | Tx reverts, error about cap below supply | High | | |
 | M-N-09 | Mint to non-KYC address | Mint to unregistered address | Tx may revert depending on compliance module | High | | |
 | M-N-10 | No token selected | Don't select token → try mint | Button disabled or error message | Low | | |
+| M-N-11 | Mint exceeding concentration cap | Set per-investor cap to 100 on token → mint 200 to that investor | Tx reverts — minting now enforces concentration cap checks via compliance module | Critical | | |
 
 ---
 
@@ -270,13 +271,16 @@
 |----|-----------|-------|-----------------|----------|-------------|--------------|
 | C-P-01 | Allow jurisdiction | Enter "HK" → Allow → Update | Jurisdiction "HK" appears with ✓ in jurisdiction list | Critical | | |
 | C-P-02 | Block jurisdiction | Enter "US" → Block → Update | Jurisdiction "US" appears with ✗ in jurisdiction list | Critical | | |
-| C-P-03 | Set per-investor cap | Enter address + 10000 → "Set Per-Investor Cap" | Cap set, tx succeeds, green status | High | | |
-| C-P-04 | Set global cap | Enter 50000000 → "Set" | Global cap updated, card displays new value | High | | |
-| C-P-05 | Set lock-up period | Enter address + future date → "Set Lock-Up" | Lock-up registered on-chain | High | | |
+| C-P-03 | Set per-investor cap (per-token) | Select token from dropdown → enter investor address + 10000 → "Set Per-Investor Cap" | Cap set for the selected token, tx succeeds, green status | High | | |
+| C-P-04 | Set global cap (per-token) | Select token from dropdown → enter 50000000 → "Set" | Global cap updated for the selected token, card displays new value | High | | |
+| C-P-05 | Set lock-up period (per-token) | Select token from dropdown → enter address + future date → "Set Lock-Up" | Lock-up registered on-chain for the selected token | High | | |
 | C-P-06 | Country code uppercase | Enter "sg" → submit | Auto-uppercased to "SG" | Low | | |
-| C-P-07 | Display current state | Open Compliance page | Oracle address, global cap, jurisdiction list loaded from events | Medium | | |
+| C-P-07 | Display current state | Open Compliance page | Oracle address, jurisdiction list loaded from events, token dropdown populated from factories | Medium | | |
 | C-P-08 | Toggle jurisdiction | Allow "JP", then Block "JP" | "JP" status changes from ✓ to ✗ | High | | |
-| C-P-09 | Disable cap with zero | Set per-investor cap to 0 → submit | Cap disabled (interpreted as no cap) | Medium | | |
+| C-P-09 | Disable cap with zero | Select token → set per-investor cap to 0 → submit | Cap disabled for that token (interpreted as no cap) | Medium | | |
+| C-P-10 | Token dropdown populated | Open Compliance page with factory-created tokens | Token dropdown lists default HKSAT + all V1/V2 factory tokens (deduplicated) | High | | |
+| C-P-11 | View Compliance Detail link | Select a token from dropdown | "View Compliance Detail" link appears, navigates to `/compliance/:address` | Medium | | |
+| C-P-12 | Remove lock-up | Select token → enter investor address → click "Remove Lock-Up" | Lock-up removed (set to 0) for that token/investor, tx succeeds | High | | |
 
 ### 8.2 Negative Tests
 
@@ -291,6 +295,34 @@
 | C-N-07 | Non-admin access (agent) | Connect as agent → navigate to `/compliance` | Route guard redirects to Dashboard (Agent has no Compliance role) | Critical | | |
 | C-N-08 | Set cap for unregistered address | Enter address not in identity registry → Set Cap | Tx may revert depending on compliance logic | Medium | | |
 | C-N-09 | Empty cap amount | Leave amount empty → Set Cap | Validation error or button disabled | Low | | |
+| C-N-10 | No token selected for cap | Don't select token → try Set Cap | Token dropdown required, operation blocked | Medium | | |
+| C-N-11 | No token selected for lock-up | Don't select token → try Set Lock-Up | Token dropdown required, operation blocked | Medium | | |
+
+---
+
+## 8a. Token Compliance Detail (Admin)
+
+### 8a.1 Positive Tests
+
+| ID | Test Case | Steps | Expected Result | Priority | Test Result | Testing Date |
+|----|-----------|-------|-----------------|----------|-------------|--------------|
+| CD-P-01 | Navigate to detail page | From Compliance Rules, select token → click "View Compliance Detail" | Token Compliance Detail page loads at `/compliance/:address`, shows token name and symbol | High | | |
+| CD-P-02 | Display global concentration cap | Token has global cap set | Global cap card displays the current cap value | High | | |
+| CD-P-03 | Display per-investor caps table | Token has per-investor caps set via events | Table shows investor addresses with their current cap values | High | | |
+| CD-P-04 | Display lock-up periods table | Token has lock-up periods set via events | Table shows investor addresses with lock-up end dates and Locked/Unlocked status badges | High | | |
+| CD-P-05 | Remove global cap | Click "Remove" on global cap card | Global cap set to 0 (disabled), card updates | High | | |
+| CD-P-06 | Remove per-investor cap | Click trash icon on a per-investor cap row | Cap set to 0 for that investor, row updates or disappears | High | | |
+| CD-P-07 | Remove lock-up | Click trash icon on a lock-up row | Lock-up set to 0 for that investor, row updates or disappears | High | | |
+| CD-P-08 | Lock-up status badges | View lock-up table with mixed expired/active entries | Active lock-ups show red "Locked" badge, expired show green "Unlocked" badge | Medium | | |
+| CD-P-09 | Refresh after removal | Remove a cap → page refreshes | Updated data reflected in tables | Medium | | |
+
+### 8a.2 Negative Tests
+
+| ID | Test Case | Steps | Expected Result | Priority | Test Result | Testing Date |
+|----|-----------|-------|-----------------|----------|-------------|--------------|
+| CD-N-01 | Invalid token address in URL | Navigate to `/compliance/0xinvalid` | Graceful error or empty state, no crash | Medium | | |
+| CD-N-02 | Token with no compliance data | Navigate to detail for token with no caps/lock-ups set | Empty tables displayed with no errors | Medium | | |
+| CD-N-03 | Non-admin access | Connect as investor → navigate to `/compliance/:address` | Route guard redirects to Dashboard (AdminOnlyRoute) | Critical | | |
 
 ---
 
@@ -518,8 +550,9 @@
 |----|-----------|-------|-----------------|----------|-------------|--------------|
 | X-N-01 | Trade without KYC | Skip KYC registration → try to trade | Blocked at Trading page with KYC warning | Critical | | |
 | X-N-02 | Transfer to blocked jurisdiction | Register investor in "US" (blocked) → transfer | Compliance module blocks transfer | Critical | | |
-| X-N-03 | Transfer exceeding concentration cap | Set cap 100 → mint 50 → transfer 60 | Transfer reverts (recipient would exceed cap) | Critical | | |
-| X-N-04 | Transfer during lock-up | Set lock-up to future → investor tries to transfer | Transfer reverts due to lock-up period | Critical | | |
+| X-N-03 | Transfer exceeding per-token concentration cap | Select token → set cap 100 → mint 50 → transfer 60 | Transfer reverts (recipient would exceed cap for that token) | Critical | | |
+| X-N-04 | Transfer during per-token lock-up | Select token → set lock-up to future → investor tries to transfer | Transfer reverts due to lock-up period on that token | Critical | | |
+| X-N-04a | Mint exceeding per-token concentration cap | Select token → set per-investor cap 100 → mint 200 to investor | Mint reverts — minting enforces compliance checks (concentration caps, KYC, jurisdiction) | Critical | | |
 | X-N-05 | Account switching data isolation | Connect Account A (has tokens) → switch to Account B (empty) | Balances, KYC status, orders all refresh to Account B's data | High | | |
 | X-N-06 | Stale data after account switch | View Dashboard as admin → switch to investor | Admin health section disappears, role badge changes | Medium | | |
 | X-N-07 | Network disconnect mid-operation | Start tx → disconnect network | Error displayed, state recoverable on reconnect | High | | |
@@ -535,15 +568,16 @@
 | 2. Dashboard | 7 | 6 | 13 |
 | 3. KYC Management | 8 | 10 | 18 |
 | 4. Token Management (V1) | 7 | 7 | 14 |
-| 5. Token Minting | 9 | 10 | 19 |
+| 5. Token Minting | 9 | 11 | 20 |
 | 6. Trading | 14 | 12 | 26 |
 | 7. DvP Settlement | 10 | 13 | 23 |
-| 8. Compliance Rules | 9 | 9 | 18 |
+| 8. Compliance Rules | 12 | 11 | 23 |
+| 8a. Token Compliance Detail | 9 | 3 | 12 |
 | 9. Governance | 12 | 10 | 22 |
 | 10. Portfolio | 6 | 10 | 16 |
 | 11. Market Management | 7 | 9 | 16 |
-| 12. Wallet Custody | 14 | 9 | 23 |
+| 12. Wallet Custody (98/2) | 14 | 9 | 23 |
 | 13. Oracle Committee | 10 | 10 | 20 |
 | 14. Token Factory V2 | 10 | 9 | 19 |
-| 15. Cross-Cutting / Integration | 11 | 8 | 19 |
-| **Total** | **147** | **154** | **301** |
+| 15. Cross-Cutting / Integration | 12 | 9 | 21 |
+| **Total** | **160** | **161** | **321** |

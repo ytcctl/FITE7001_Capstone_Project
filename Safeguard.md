@@ -27,6 +27,18 @@ Regardless of tier, every mint also requires:
 - **Supply cap** — `totalSupply() + amount ≤ maxSupply` (if `maxSupply > 0`).
 - **KYC verification** — recipient must pass `identityRegistry.isVerified()`.
 - **Not frozen** — recipient must not be frozen.
+- **Compliance module enforcement** — the mint passes through the full
+  `HKSTPCompliance.checkModules()` pipeline (same as transfers). This means
+  **per-token concentration caps** (both per-investor and global),
+  **jurisdiction restrictions**, and **lock-up periods** are all enforced on
+  the recipient during minting. For example, minting 200 tokens to an
+  investor with a 100-token per-investor cap will revert.
+
+> **Implementation detail**: In `_update()`, only burns (`to == address(0)`)
+> skip compliance checks. Mints (`from == address(0)`) enter the compliance
+> pipeline with the sender treated as safe-listed (skipping sender
+> verification) while the recipient undergoes the full `checkModules()`
+> validation including concentration caps, jurisdiction, and lock-up checks.
 
 ---
 
@@ -285,7 +297,7 @@ feedback.
 | 2 | Buyer's cash token balance < required amount | `Buyer has insufficient cash tokens` | `IERC20.balanceOf()` |
 | 3 | Seller address is frozen | `Seller address is frozen (jurisdiction or sanction)` | `HKSTPSecurityToken.frozen()` |
 | 3 | Buyer address is frozen | `Buyer address is frozen (jurisdiction or sanction)` | `HKSTPSecurityToken.frozen()` |
-| 4 | Seller is under lock-up period | `Seller is under lock-up period` | `HKSTPCompliance.lockUpEnd()` |
+| 4 | Seller is under lock-up period | `Seller is under lock-up period` | `HKSTPCompliance.lockUpEnd(token, seller)` |
 | 5 | Seller is not registered / verified | `Seller is not registered or verified` | `HKSTPIdentityRegistry.isVerified()` |
 | 5 | Buyer is not registered / verified | `Buyer is not registered or verified` | `HKSTPIdentityRegistry.isVerified()` |
 
