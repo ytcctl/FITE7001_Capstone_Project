@@ -334,16 +334,28 @@
 |----|-----------|-------|-----------------|----------|-------------|--------------|
 | G-P-01 | Self-delegate | Click "Self" → "Delegate" | Voting power equals token balance, delegatee = self | High | | |
 | G-P-02 | Delegate to another | Enter address → "Delegate" | Voting power transferred to delegate, delegatee displays other address | High | | |
-| G-P-03 | Create proposal | Enter description → "Submit Proposal" | Proposal appears in list with "Pending" state | Critical | | |
+| G-P-03 | Create signaling proposal | Select "Signaling" type → enter description → "Submit Proposal" | Proposal appears in list with "Pending" state, target = Timelock address, calldata = 0x | Critical | | |
 | G-P-04 | Vote For | On active proposal → click "For" | Vote recorded, For bar increases, vote count updates | Critical | | |
 | G-P-05 | Vote Against | On active proposal → click "Against" | Vote recorded, Against bar increases | Critical | | |
 | G-P-06 | Vote Abstain | On active proposal → click "Abstain" | Abstain count increases | High | | |
 | G-P-07 | Queue succeeded proposal | Proposal state = Succeeded → click "Queue for Execution" | Proposal state changes to "Queued" | Critical | | |
-| G-P-08 | Execute queued proposal | Proposal state = Queued → click "Execute" | Proposal state changes to "Executed" | Critical | | |
+| G-P-08 | Execute queued proposal | Proposal state = Queued → "⏩ Skip Timelock" → click "Execute" | Proposal state changes to "Executed" | Critical | | |
 | G-P-09 | Expand proposal details | Click expand button on proposal | Shows proposer, snapshot block, deadline block, targets | Low | | |
 | G-P-10 | Governance info display | Open Governance page | Shows governor name, voting delay/period, quorum %, threshold, timelock delay | Medium | | |
 | G-P-11 | Vote percentage bars | Proposal with votes | For/Against/Abstain bars with percentage labels | Low | | |
 | G-P-12 | Proposal state badges | View multiple proposals | Correct color-coded badges: Pending/Active/Defeated/Succeeded/Queued/Executed | Medium | | |
+| G-P-13 | Executable proposal — Mint | Admin: select "Executable" → action "mint" → enter recipient + amount → Submit | Proposal created with mint calldata targeting the token contract | Critical | | |
+| G-P-14 | Executable proposal — Burn | Admin: select "Executable" → action "burn" → enter address + amount → Submit | Proposal created with burn calldata targeting the token contract | Critical | | |
+| G-P-15 | Executable proposal — Set Max Supply | Admin: select "Executable" → action "setMaxSupply" → enter cap → Submit | Proposal created with setMaxSupply calldata | High | | |
+| G-P-16 | Executable proposal — Set Mint Threshold | Admin: select "Executable" → action "setMintThreshold" → enter threshold → Submit | Proposal created with setMintThreshold calldata | High | | |
+| G-P-17 | Executable proposal — Pause | Admin: select "Executable" → action "pause" → Submit | Proposal created with pause calldata, no params required | High | | |
+| G-P-18 | Executable proposal — Unpause | Admin: select "Executable" → action "unpause" → Submit | Proposal created with unpause calldata, no params required | High | | |
+| G-P-19 | Execute mint proposal end-to-end | Create mint proposal → skip delay → vote For → skip period → queue → skip timelock → execute | Tokens minted to recipient, recipient balance increases | Critical | | |
+| G-P-20 | Fast-forward voting delay | Proposal state = Pending → click "⏩ Skip Voting Delay" | 14,401 blocks mined, proposal state changes to "Active" | High | | |
+| G-P-21 | Fast-forward voting period | Proposal state = Active → click "⏩ Skip Voting Period" | 50,401 blocks mined, proposal state changes to Succeeded/Defeated | High | | |
+| G-P-22 | Fast-forward timelock | Proposal state = Queued → click "⏩ Skip Timelock" | Time advanced by 60s + 1 block mined, Execute button becomes usable | High | | |
+| G-P-23 | Deploy Governor + Timelock | Admin: select token with no governance → click "Deploy Governor + Timelock" | Governor and Timelock deployed, registered in GovernorFactory, governance suite loads | Critical | | |
+| G-P-24 | KYC status display | Connect KYC-verified wallet → open Governance | KYC card shows "✓ KYC Verified" (green) | Medium | | |
 
 ### 9.2 Negative Tests
 
@@ -351,14 +363,21 @@
 |----|-----------|-------|-----------------|----------|-------------|--------------|
 | G-N-01 | Create proposal without description | Leave description empty → Submit | Button disabled or error | Medium | | |
 | G-N-02 | Vote on non-active proposal | Proposal state = Pending → try to vote | Vote buttons not shown or disabled | High | | |
-| G-N-03 | Vote twice on same proposal | Vote For, then try to vote Against | Second vote tx reverts, error: "already voted" | Critical | | |
-| G-N-04 | Create proposal without voting power | No tokens, no delegation → Submit Proposal | Tx reverts if below `proposalThreshold` | High | | |
+| G-N-03 | Vote twice on same proposal | Vote For, then try to vote Against | Error: "You have already voted on this proposal." | Critical | | |
+| G-N-04 | Create proposal without voting power | No tokens, no delegation → Submit Proposal | Error: "Insufficient voting power to propose. You have 0 votes but need at least 10,000." | High | | |
 | G-N-05 | Queue non-succeeded proposal | Proposal state = Active → try to Queue | Queue button not shown for active proposals | Medium | | |
 | G-N-06 | Execute non-queued proposal | Proposal state = Succeeded (not queued) → Execute | Execute button not shown | Medium | | |
 | G-N-07 | Delegate to invalid address | Enter "not-an-address" → Delegate | Error displayed, delegation not executed | Medium | | |
 | G-N-08 | Empty delegate address | Leave empty → Delegate | Uses self-delegation or error | Low | | |
 | G-N-09 | No voting power display | Wallet has tokens but not delegated | Voting power = 0, token balance shown separately | Medium | | |
-| G-N-10 | Execute before timelock | Queue proposal → immediately Execute | Tx reverts, must wait for timelock delay | Critical | | |
+| G-N-10 | Execute before timelock | Queue proposal → immediately Execute (without skip timelock) | Error: "Timelock operation is not ready. Click ⏩ Skip Timelock first." | Critical | | |
+| G-N-11 | Executable proposal — mint missing params | Select "Executable" → "mint" → leave recipient empty → Submit | Error: "Recipient address and amount are required" | High | | |
+| G-N-12 | Executable proposal — burn missing params | Select "Executable" → "burn" → leave address empty → Submit | Error: "Address and amount are required" | High | | |
+| G-N-13 | Executable proposal — setMaxSupply missing param | Select "Executable" → "setMaxSupply" → leave cap empty → Submit | Error: "Max supply value is required" | Medium | | |
+| G-N-14 | Executable proposal — setMintThreshold missing param | Select "Executable" → "setMintThreshold" → leave empty → Submit | Error: "Threshold value is required" | Medium | | |
+| G-N-15 | Executable proposal — non-admin/agent | Connect as investor → select "Executable" type | Executable action section hidden or submit blocked | Critical | | |
+| G-N-16 | Proposal below threshold | Wallet has 200 tokens (threshold = 10,000) → Submit | Error: "Insufficient voting power to propose. You have 200 votes but need at least 10,000." | Critical | | |
+| G-N-17 | KYC not verified | Connect non-KYC wallet → open Governance | KYC card shows "✗ KYC Required" (red) | Medium | | |
 
 ---
 
