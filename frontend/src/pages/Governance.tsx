@@ -9,13 +9,11 @@ function decodeGovernanceError(e: any): string {
   // ethers v6 sometimes populates e.reason
   if (e.reason && !e.reason.includes('unknown custom error')) return e.reason;
 
-  // Try to decode the revert data from the error
-  const data: string | undefined =
-    e.data ?? e.error?.data ?? e.transaction?.data ? undefined : undefined;
+  // Hunt for revert data in various places ethers v6 may stash it
   const revertData: string | undefined =
-    e.data ?? e.error?.data;
+    e.data ?? e.error?.data ?? e.info?.error?.data?.data ?? e.info?.error?.data ?? e.revert?.data;
 
-  if (revertData && revertData.startsWith('0x')) {
+  if (revertData && typeof revertData === 'string' && revertData.startsWith('0x') && revertData.length >= 10) {
     const sel = revertData.slice(0, 10);
     try {
       // GovernorInsufficientProposerVotes(address proposer, uint256 votes, uint256 threshold)
@@ -26,33 +24,39 @@ function decodeGovernanceError(e: any): string {
         const threshold = Number(ethers.formatUnits(decoded[2], 18));
         return `Insufficient voting power to propose. You have ${votes.toLocaleString()} votes but need at least ${threshold.toLocaleString()}.`;
       }
-      // GovernorUnexpectedProposalState
+      // GovernorUnexpectedProposalState(uint256 proposalId, ProposalState current, bytes32 expected)
       if (sel === '0x5765a514') {
-        return 'Proposal is not in the expected state for this action.';
+        const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+          ['uint256', 'uint8', 'bytes32'], '0x' + revertData.slice(10));
+        const STATES = ['Pending','Active','Canceled','Defeated','Succeeded','Queued','Expired','Executed'];
+        return `Proposal is currently "${STATES[Number(decoded[1])] || decoded[1]}" — cannot perform this action.`;
       }
-      // GovernorAlreadyCastVote
+      // GovernorAlreadyCastVote(address voter)
       if (sel === '0x45c4b9e6') {
         return 'You have already voted on this proposal.';
       }
-      // GovernorNonexistentProposal
+      // GovernorNonexistentProposal(uint256 proposalId)
       if (sel === '0xa8f42a59') {
         return 'This proposal does not exist.';
       }
-      // GovernorRestrictedProposer
+      // GovernorRestrictedProposer(address proposer)
       if (sel === '0x3d523170') {
         return 'You are not authorized to submit proposals.';
       }
-      // TimelockUnexpectedOperationState
+      // TimelockUnexpectedOperationState(bytes32 operationId, bytes32 expectedStates)
       if (sel === '0x7a3c4c17') {
-        return 'Timelock operation is not in the expected state.';
+        return 'Timelock operation is not ready. Click "⏩ Skip Timelock" first to advance time past the delay, then try Execute again.';
+      }
+      // TimelockInsufficientDelay(uint256 delay, uint256 minDelay)
+      if (sel === '0x547f2829') {
+        return 'Timelock delay has not been met. Click "⏩ Skip Timelock" to advance time.';
       }
     } catch { /* ignore decode failures */ }
   }
 
   // Fallback: clean up the message
   const msg: string = e.shortMessage || e.message || 'Transaction failed';
-  // Strip long hex data from the message
-  return msg.replace(/\(data="0x[0-9a-fA-F]+"/, '(data=…').replace(/transaction=\{[^}]+\}/, '').trim();
+  return msg.replace(/\(data="0x[0-9a-fA-F]+"/g, '(data=…').replace(/transaction=\{[^}]+\}/g, '').trim();
 }
 
 // Proposal state enum (matches GovernorCountingSimple)
@@ -466,9 +470,10 @@ const Governance: React.FC = () => {
             throw new Error('Unknown action');
         }
       } else {
-        // Signaling proposal: no on-chain action
-        target = proposalTarget || await activeGovernor!.getAddress();
+        // Signaling proposal: no on-chain action — target the Timelock (which can receive empty calls)
+        target = activeTimelock ? await activeTimelock.getAddress() : await activeGovernor!.getAddress();
         calldata = '0x';
+        value = 0n;
       }
 
       const tx = await activeGovernor!.propose(
@@ -516,9 +521,9 @@ const Governance: React.FC = () => {
     try {
       const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
       const tx = await activeGovernor.queue(
-        proposal.targets,
-        proposal.values,
-        proposal.calldatas,
+        [...proposal.targets],
+        [...proposal.values],
+        [...proposal.calldatas],
         descHash
       );
       await tx.wait();
@@ -536,9 +541,9 @@ const Governance: React.FC = () => {
     try {
       const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
       const tx = await activeGovernor.execute(
-        proposal.targets,
-        proposal.values,
-        proposal.calldatas,
+        [...proposal.targets],
+        [...proposal.values],
+        [...proposal.calldatas],
         descHash
       );
       await tx.wait();
@@ -551,22 +556,28 @@ const Governance: React.FC = () => {
 
   // ─── Fast-forward blocks (dev only – Hardhat) ─────────────
   const [fastForwarding, setFastForwarding] = useState(false);
-  const handleFastForward = async (blocks: number, label: string) => {
+  const rpcFetch = async (method: string, params: any[] = []) => {
+    const rpcUrl = window.location.hostname === 'localhost'
+      ? 'http://127.0.0.1:8545'
+      : `${window.location.protocol}//${window.location.hostname.replace(/^(\d+)-/, '8545-')}`;
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message);
+    return json.result;
+  };
+
+  const handleFastForward = async (blocks: number, label: string, alsoAdvanceTime?: number) => {
     setFastForwarding(true);
     setStatus(null);
     try {
-      // Send hardhat_mine directly via fetch (bypasses MetaMask).
-      // Use the same origin for Codespaces compatibility, fall back to localhost.
-      const rpcUrl = window.location.hostname === 'localhost'
-        ? 'http://127.0.0.1:8545'
-        : `${window.location.protocol}//${window.location.hostname.replace(/^(\d+)-/, '8545-')}`; // Codespaces port mapping
-      const res = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'hardhat_mine', params: ['0x' + blocks.toString(16)] }),
-      });
-      const json = await res.json();
-      if (json.error) throw new Error(json.error.message);
+      if (alsoAdvanceTime) {
+        await rpcFetch('evm_increaseTime', ['0x' + alsoAdvanceTime.toString(16)]);
+      }
+      await rpcFetch('hardhat_mine', ['0x' + blocks.toString(16)]);
       setStatus({ type: 'success', message: `⏩ Mined ${blocks.toLocaleString()} blocks (${label}). Refreshing…` });
       await loadProposals();
     } catch (e: any) {
@@ -1074,7 +1085,7 @@ const Governance: React.FC = () => {
                           Execute
                         </button>
                         <button
-                          onClick={() => handleFastForward(1, 'skip timelock delay')}
+                          onClick={() => handleFastForward(1, 'skip timelock delay', 60)}
                           disabled={fastForwarding}
                           className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                         >
