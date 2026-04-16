@@ -269,7 +269,52 @@ Token Holder
 
 ---
 
-## 8. KYC Verification Paths — Boolean vs ONCHAINID Claims
+## 8. DvP Settlement Pre-Flight Checks
+
+`DvPSettlement.executeSettlement()` performs **pre-flight compliance and
+balance checks** before attempting the atomic token swap. If any check fails,
+the settlement is marked as **Failed** (with a descriptive reason emitted via
+`SettlementFailed` event) instead of reverting, giving the counterparty clear
+feedback.
+
+### Pre-Flight Check Summary
+
+| # | Condition | Failure Reason | Source |
+|---|-----------|---------------|--------|
+| 1 | Seller's security token balance < required amount | `Seller has insufficient security tokens` | `IERC20.balanceOf()` |
+| 2 | Buyer's cash token balance < required amount | `Buyer has insufficient cash tokens` | `IERC20.balanceOf()` |
+| 3 | Seller address is frozen | `Seller address is frozen (jurisdiction or sanction)` | `HKSTPSecurityToken.frozen()` |
+| 3 | Buyer address is frozen | `Buyer address is frozen (jurisdiction or sanction)` | `HKSTPSecurityToken.frozen()` |
+| 4 | Seller is under lock-up period | `Seller is under lock-up period` | `HKSTPCompliance.lockUpEnd()` |
+| 5 | Seller is not registered / verified | `Seller is not registered or verified` | `HKSTPIdentityRegistry.isVerified()` |
+| 5 | Buyer is not registered / verified | `Buyer is not registered or verified` | `HKSTPIdentityRegistry.isVerified()` |
+
+### Behaviour
+
+- **Pre-flight failure**: Transaction succeeds but the settlement status is
+  set to `Failed`. The `SettlementFailed(id, matchId, reason)` event is
+  emitted. No tokens are moved.
+- **Pre-flight pass**: The atomic DvP swap executes (Leg 1: security tokens
+  seller → buyer, Leg 2: cash tokens buyer → seller). If either leg fails
+  during the actual transfer, the entire transaction reverts.
+
+### Why Graceful Failure?
+
+Previously, compliance or balance errors caused the entire transaction to
+revert with an opaque custom error (e.g. `ERC20InsufficientAllowance`),
+making it difficult for the counterparty to understand what went wrong.
+The pre-flight approach:
+
+1. **Clear feedback** — the failure reason is recorded on-chain and shown
+   in the frontend.
+2. **Status visibility** — the settlement moves to "Failed" status in the
+   UI, rather than remaining "Pending" indefinitely.
+3. **No stuck settlements** — counterparties don't need to wait for the
+   deadline to expire before the system reflects the failure.
+
+---
+
+## 9. KYC Verification Paths — Boolean vs ONCHAINID Claims
 
 `isVerified()` in the Identity Registry supports two verification paths.
 The path used is determined automatically per investor at call time:
@@ -383,7 +428,7 @@ production-grade compliance solution.
 
 ---
 
-## 9. Delegate Votes — Activating On-Chain Voting Power
+## 10. Delegate Votes — Activating On-Chain Voting Power
 
 HKSTPSecurityToken inherits OpenZeppelin's **ERC20Votes**, which tracks
 voting power through an explicit **delegation** mechanism rather than raw
@@ -417,7 +462,7 @@ counted **exactly once** at the proposal snapshot block.
 
 ---
 
-## 10. Signaling Proposals — Non-Executable Governance Votes
+## 11. Signaling Proposals — Non-Executable Governance Votes
 
 The Governance page supports two proposal types: **Executable** and
 **Signaling**. They serve fundamentally different purposes.

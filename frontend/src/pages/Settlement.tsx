@@ -244,8 +244,20 @@ const Settlement: React.FC = () => {
 
       setTxStatus(`Executing settlement #${id}…`);
       const tx = await contracts.dvpSettlement.executeSettlement(id);
-      await tx.wait();
-      setTxStatus(`✓ Settlement #${id} executed — DvP atomic swap complete`);
+      const receipt = await tx.wait();
+
+      // Pre-flight failures mark the settlement as Failed without reverting.
+      // Check the tx receipt for a SettlementFailed event.
+      const failedEvent = receipt.logs
+        .map((log: any) => { try { return contracts.dvpSettlement.interface.parseLog(log); } catch { return null; } })
+        .find((parsed: any) => parsed?.name === 'SettlementFailed');
+
+      if (failedEvent) {
+        const reason = failedEvent.args?.reason || 'Pre-flight check failed';
+        setTxStatus(`✗ Settlement #${id} failed: ${reason}`);
+      } else {
+        setTxStatus(`✓ Settlement #${id} executed — DvP atomic swap complete`);
+      }
       loadSettlements();
     } catch (e: any) {
       const msg = e?.reason || e?.message || '';

@@ -223,20 +223,24 @@ describe("DvPSettlement", function () {
       ).to.be.revertedWith("DvPSettlement: not pending");
     });
 
-    it("should revert when security token transfer fails (seller has no tokens)", async function () {
+    it("should mark as Failed when seller has insufficient security tokens", async function () {
       // Transfer seller's security tokens away to cause insufficient balance
       await securityToken.connect(seller).transfer(buyer.address, SECURITY_AMOUNT);
       await expect(
         dvp.connect(admin).executeSettlement(settlementId)
-      ).to.be.reverted;
+      ).to.emit(dvp, "SettlementFailed").withArgs(settlementId, MATCH_ID, "Seller has insufficient security tokens");
+      const s = await dvp.settlements(settlementId);
+      expect(s.status).to.equal(2); // Failed
     });
 
-    it("should revert when cash token transfer fails (buyer has no cash)", async function () {
+    it("should mark as Failed when buyer has insufficient cash tokens", async function () {
       // Transfer buyer's cash tokens away
       await cashToken.connect(buyer).transfer(seller.address, CASH_AMOUNT);
       await expect(
         dvp.connect(admin).executeSettlement(settlementId)
-      ).to.be.reverted;
+      ).to.emit(dvp, "SettlementFailed").withArgs(settlementId, MATCH_ID, "Buyer has insufficient cash tokens");
+      const s = await dvp.settlements(settlementId);
+      expect(s.status).to.equal(2); // Failed
     });
 
     it("should revert when past the settlement deadline", async function () {
@@ -260,15 +264,17 @@ describe("DvPSettlement", function () {
       ).to.be.revertedWith("DvPSettlement: deadline passed");
     });
 
-    it("should revert when compliance check blocks security token transfer", async function () {
-      // Remove buyer's KYC claim → security token transfer will fail compliance
+    it("should mark as Failed when compliance check blocks (buyer not verified)", async function () {
+      // Remove buyer's KYC claim → buyer is no longer verified
       const REGISTRY_AGENT = await registry.AGENT_ROLE();
       await registry.connect(admin).grantRole(REGISTRY_AGENT, admin.address);
       await registry.connect(admin).setClaim(buyer.address, 1, false);
 
       await expect(
         dvp.connect(admin).executeSettlement(settlementId)
-      ).to.be.reverted;
+      ).to.emit(dvp, "SettlementFailed").withArgs(settlementId, MATCH_ID, "Buyer is not registered or verified");
+      const s = await dvp.settlements(settlementId);
+      expect(s.status).to.equal(2); // Failed
     });
 
     it("should reject execution by the creator of the settlement", async function () {

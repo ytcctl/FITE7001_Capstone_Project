@@ -6,6 +6,24 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+/// @dev Minimal interface for pre-flight compliance checks on the security token.
+interface ISecurityTokenDvP {
+    function identityRegistry() external view returns (address);
+    function compliance() external view returns (address);
+    function frozen(address account) external view returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+/// @dev Minimal interface for identity registry pre-flight checks.
+interface IIdentityRegistryDvP {
+    function isVerified(address investor) external view returns (bool);
+}
+
+/// @dev Minimal interface for compliance pre-flight checks.
+interface IComplianceDvP {
+    function lockUpEnd(address investor) external view returns (uint256);
+}
+
 /**
  * @title DvPSettlement
  * @notice Atomic Delivery-versus-Payment (DvP) settlement contract.
@@ -195,10 +213,19 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @notice Execute an atomic DvP settlement.
-     *         Both legs succeed or both revert — zero settlement risk.
+     *         Pre-flight checks mark the settlement as Failed with a descriptive
+     *         reason instead of reverting, so the counterparty gets clear feedback.
      *
-     * Leg 1: seller → buyer (security tokens)
-     * Leg 2: buyer  → seller (cash tokens)
+     *         Pre-flight failure conditions:
+     *           1. Seller has insufficient security tokens
+     *           2. Buyer has insufficient cash tokens
+     *           3. Buyer or seller jurisdiction is blocked
+     *           4. Seller is under lock-up period
+     *           5. Buyer or seller is not registered / verified
+     *
+     *         If pre-flight passes, both legs execute atomically:
+     *           Leg 1: seller → buyer (security tokens)
+     *           Leg 2: buyer  → seller (cash tokens)
      *
      * @param id Settlement ID returned by createSettlement().
      */
@@ -212,6 +239,69 @@ contract DvPSettlement is ReentrancyGuard, Pausable, AccessControl {
         require(s.status == SettlementStatus.Pending, "DvPSettlement: not pending");
         require(block.timestamp <= s.settlementDeadline, "DvPSettlement: deadline passed");
         require(msg.sender != s.createdBy, "DvPSettlement: creator cannot execute own settlement");
+
+        // ── Pre-flight compliance checks (fail gracefully → Failed status) ──
+
+        // 1. Seller must have sufficient security tokens
+        if (IERC20(s.securityToken).balanceOf(s.seller) < s.tokenAmount) {
+            s.status = SettlementStatus.Failed;
+            emit SettlementFailed(id, s.matchId, "Seller has insufficient security tokens");
+            return;
+        }
+
+        // 2. Buyer must have sufficient cash tokens
+        if (IERC20(s.cashToken).balanceOf(s.buyer) < s.cashAmount) {
+            s.status = SettlementStatus.Failed;
+            emit SettlementFailed(id, s.matchId, "Buyer has insufficient cash tokens");
+            return;
+        }
+
+        // Fetch compliance infrastructure from the security token
+        ISecurityTokenDvP secTok = ISecurityTokenDvP(s.securityToken);
+        address registryAddr = secTok.identityRegistry();
+        address complianceAddr = secTok.compliance();
+
+        // 5. Buyer and seller must be registered / verified
+        if (registryAddr != address(0)) {
+            IIdentityRegistryDvP registry = IIdentityRegistryDvP(registryAddr);
+            if (!registry.isVerified(s.seller)) {
+                s.status = SettlementStatus.Failed;
+                emit SettlementFailed(id, s.matchId, "Seller is not registered or verified");
+                return;
+            }
+            if (!registry.isVerified(s.buyer)) {
+                s.status = SettlementStatus.Failed;
+                emit SettlementFailed(id, s.matchId, "Buyer is not registered or verified");
+                return;
+            }
+        }
+
+        // 3. Jurisdiction check — delegated to ICompliance.checkModules via
+        //    the token's _update hook. Frozen addresses (which include
+        //    jurisdiction-blocked accounts) are checked here explicitly.
+        if (secTok.frozen(s.seller)) {
+            s.status = SettlementStatus.Failed;
+            emit SettlementFailed(id, s.matchId, "Seller address is frozen (jurisdiction or sanction)");
+            return;
+        }
+        if (secTok.frozen(s.buyer)) {
+            s.status = SettlementStatus.Failed;
+            emit SettlementFailed(id, s.matchId, "Buyer address is frozen (jurisdiction or sanction)");
+            return;
+        }
+
+        // 4. Lock-up period — seller must not be locked
+        if (complianceAddr != address(0)) {
+            IComplianceDvP comp = IComplianceDvP(complianceAddr);
+            uint256 lockEnd = comp.lockUpEnd(s.seller);
+            if (lockEnd != 0 && block.timestamp < lockEnd) {
+                s.status = SettlementStatus.Failed;
+                emit SettlementFailed(id, s.matchId, "Seller is under lock-up period");
+                return;
+            }
+        }
+
+        // ── All pre-flight checks passed — execute atomic DvP ───────────
 
         // Mark settled BEFORE external calls (checks-effects-interactions)
         s.status = SettlementStatus.Settled;

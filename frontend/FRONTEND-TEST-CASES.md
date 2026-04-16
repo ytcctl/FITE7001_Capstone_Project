@@ -252,8 +252,13 @@
 | S-N-09 | Invalid seller address | Enter "invalid" → Create | Tx fails with address format error | Medium | | |
 | S-N-10 | Batch execute empty selection | Click "Batch Execute" with none selected | Button disabled when count = 0 | Low | | |
 | S-N-11 | Zero deadline | Enter 0 hours → Create | Validation error (deadline must be > 0) | Medium | | |
-| S-N-12 | Execute when seller has insufficient tokens | Seller sold tokens after creation → Execute | Tx reverts, error about insufficient balance | Critical | | |
+| S-N-12 | Execute when seller has insufficient tokens | Seller sold tokens after creation → Execute | Settlement marked as "Failed", status: "✗ Settlement #N failed: Seller has insufficient security tokens" | Critical | | |
 | S-N-13 | Investor creates settlement | Connect as investor → fill form → Create | Tx reverts on-chain (no OPERATOR_ROLE), error displayed | Critical | | |
+| S-N-14 | Execute when buyer has insufficient cash | Buyer spent cash after creation → Execute | Settlement marked as "Failed", status: "✗ Settlement #N failed: Buyer has insufficient cash tokens" | Critical | | |
+| S-N-15 | Execute when seller is frozen (jurisdiction blocked) | Admin freezes seller address → Execute | Settlement marked as "Failed", status: "✗ Settlement #N failed: Seller address is frozen (jurisdiction or sanction)" | Critical | | |
+| S-N-16 | Execute when buyer is frozen (jurisdiction blocked) | Admin freezes buyer address → Execute | Settlement marked as "Failed", status: "✗ Settlement #N failed: Buyer address is frozen (jurisdiction or sanction)" | Critical | | |
+| S-N-17 | Execute when seller is under lock-up | Admin sets lock-up on seller → Execute | Settlement marked as "Failed", status: "✗ Settlement #N failed: Seller is under lock-up period" | Critical | | |
+| S-N-18 | Execute when buyer is not verified | Revoke buyer's KYC claims → Execute | Settlement marked as "Failed", status: "✗ Settlement #N failed: Buyer is not registered or verified" | Critical | | |
 
 ---
 
