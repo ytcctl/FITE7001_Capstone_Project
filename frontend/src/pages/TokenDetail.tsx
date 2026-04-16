@@ -370,7 +370,7 @@ const TokenDetail: React.FC = () => {
                           <td className="py-3 px-3 text-gray-500">{d.id}</td>
                           <td className="py-3 px-3 font-mono text-xs text-gray-300">{d.seller.slice(0, 8)}…{d.seller.slice(-4)}</td>
                           <td className="py-3 px-3 font-mono text-xs text-gray-300">{d.buyer.slice(0, 8)}…{d.buyer.slice(-4)}</td>
-                          <td className="py-3 px-3 text-right text-white">{Number(d.tokenAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                          <td className="py-3 px-3 text-right text-white">{Number(d.tokenAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })} {tokenSymbol}</td>
                           <td className="py-3 px-3 text-right text-gray-300">{Number(d.cashAmount).toLocaleString()} {cashSymbol}</td>
                           <td className={`py-3 px-3 font-medium ${st.cls}`}>{st.text}</td>
                           <td className="py-3 px-3 text-right text-gray-500 text-xs">{d.timestamp > 0 ? new Date(d.timestamp * 1000).toLocaleString() : '—'}</td>
@@ -412,7 +412,7 @@ const TokenDetail: React.FC = () => {
                         <td className="py-3 px-3 font-mono text-xs text-gray-300">
                           {tr.to === ethers.ZeroAddress ? <span className="text-red-400">Burn</span> : `${tr.to.slice(0, 8)}…${tr.to.slice(-4)}`}
                         </td>
-                        <td className="py-3 px-3 text-right font-medium text-white">{Number(tr.value).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                        <td className="py-3 px-3 text-right font-medium text-white">{Number(tr.value).toLocaleString(undefined, { maximumFractionDigits: 4 })} {tokenSymbol}</td>
                         <td className="py-3 px-3 text-right text-gray-500">#{tr.blockNumber}</td>
                       </tr>
                     ))}
