@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
-import { Scale, Globe, Shield, Clock, Loader2, RefreshCw } from 'lucide-react';
+import { Scale, Globe, Shield, Clock, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
 import { ethers } from 'ethers';
 
 const ComplianceRules: React.FC = () => {
+  const navigate = useNavigate();
   const { account, contracts } = useWeb3();
 
   // Jurisdiction
@@ -311,6 +313,15 @@ const ComplianceRules: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {capToken && (
+                <button
+                  onClick={() => navigate(`/compliance/${capToken}`)}
+                  className="mt-2 w-full flex items-center justify-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  View Compliance Detail
+                </button>
+              )}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Investor Address</label>

@@ -538,15 +538,18 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
         address to,
         uint256 amount
     ) internal virtual override(ERC20, ERC20Votes) whenNotPaused {
-        // Mint/burn operations: skip investor checks for address(0)
-        if (from != address(0) && to != address(0)) {
-            require(!frozen[from], "HKSTPSecurityToken: sender is frozen");
-            require(!frozen[to],   "HKSTPSecurityToken: recipient is frozen");
+        // Burn operations (to == address(0)): skip all checks
+        // Mint operations (from == address(0)): still enforce concentration caps
+        if (to != address(0)) {
+            if (from != address(0)) {
+                require(!frozen[from], "HKSTPSecurityToken: sender is frozen");
+            }
+            require(!frozen[to], "HKSTPSecurityToken: recipient is frozen");
 
             // Safe-listed operational addresses (OrderBook escrow, treasury,
             // custody) bypass their OWN compliance attestation.  If BOTH sides
             // are safe-listed the entire compliance pipeline is skipped.
-            bool fromSafe = safeListed[from];
+            bool fromSafe = from == address(0) || safeListed[from];
             bool toSafe   = safeListed[to];
 
             if (!(fromSafe && toSafe)) {
@@ -569,6 +572,7 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
                 // Compliance module checks use the real addresses.
                 // For a safe-listed party we use a neutral country "XX" to
                 // ensure jurisdiction checks don't block escrow flows.
+                // For minting (from == address(0)), use "XX" for sender.
                 bytes2 fromCountry;
                 bytes2 toCountry;
                 if (!fromSafe) {
