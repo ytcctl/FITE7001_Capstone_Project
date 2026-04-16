@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
-import { Shield, Clock, ArrowLeft, RefreshCw, Loader2 } from 'lucide-react';
+import { Shield, Clock, ArrowLeft, RefreshCw, Loader2, Trash2 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { SECURITY_TOKEN_ABI } from '../config/contracts';
 
@@ -26,6 +26,7 @@ const TokenComplianceDetail: React.FC = () => {
   const [investorCaps, setInvestorCaps] = useState<CapEntry[]>([]);
   const [lockUps, setLockUps] = useState<LockUpEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState('');
 
   const loadDetails = useCallback(async () => {
     if (!contracts || !address) return;
@@ -103,6 +104,48 @@ const TokenComplianceDetail: React.FC = () => {
   };
   const now = BigInt(Math.floor(Date.now() / 1000));
 
+  const handleRemoveCap = async (investor: string) => {
+    if (!contracts || !address) return;
+    setRemoving(`cap-${investor}`);
+    try {
+      const tx = await contracts.compliance.setConcentrationCap(address, investor, 0);
+      await tx.wait();
+      setInvestorCaps(prev => prev.filter(e => e.investor !== investor));
+    } catch (e) {
+      console.error('Failed to remove cap:', e);
+    } finally {
+      setRemoving('');
+    }
+  };
+
+  const handleRemoveLockUp = async (investor: string) => {
+    if (!contracts || !address) return;
+    setRemoving(`lock-${investor}`);
+    try {
+      const tx = await contracts.compliance.setLockUp(address, investor, 0);
+      await tx.wait();
+      setLockUps(prev => prev.filter(e => e.investor !== investor));
+    } catch (e) {
+      console.error('Failed to remove lock-up:', e);
+    } finally {
+      setRemoving('');
+    }
+  };
+
+  const handleRemoveGlobalCap = async () => {
+    if (!contracts || !address) return;
+    setRemoving('global');
+    try {
+      const tx = await contracts.compliance.setGlobalConcentrationCap(address, 0);
+      await tx.wait();
+      setGlobalCap(0n);
+    } catch (e) {
+      console.error('Failed to remove global cap:', e);
+    } finally {
+      setRemoving('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -128,9 +171,21 @@ const TokenComplianceDetail: React.FC = () => {
           <Shield size={20} className="text-amber-400" />
           <h3 className="font-bold text-white">Global Concentration Cap</h3>
         </div>
-        <p className="text-2xl font-bold text-white">
-          {globalCap === 0n ? 'No cap set' : `${fmtTokens(globalCap)} tokens`}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-2xl font-bold text-white">
+            {globalCap === 0n ? 'No cap set' : `${fmtTokens(globalCap)} tokens`}
+          </p>
+          {globalCap > 0n && (
+            <button
+              onClick={handleRemoveGlobalCap}
+              disabled={removing === 'global'}
+              className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {removing === 'global' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Remove
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Per-Investor Concentration Caps */}
@@ -152,6 +207,7 @@ const TokenComplianceDetail: React.FC = () => {
                 <tr className="text-left text-gray-400 border-b border-white/10">
                   <th className="pb-2 pr-4">Investor</th>
                   <th className="pb-2 text-right">Max Balance</th>
+                  <th className="pb-2 text-right w-20">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +215,16 @@ const TokenComplianceDetail: React.FC = () => {
                   <tr key={entry.investor} className="border-b border-white/5 hover:bg-white/5">
                     <td className="py-2 pr-4 font-mono text-white text-xs">{entry.investor}</td>
                     <td className="py-2 text-right text-white">{fmtTokens(entry.cap)} tokens</td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => handleRemoveCap(entry.investor)}
+                        disabled={removing === `cap-${entry.investor}`}
+                        className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                        title="Remove cap"
+                      >
+                        {removing === `cap-${entry.investor}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -186,7 +252,8 @@ const TokenComplianceDetail: React.FC = () => {
                 <tr className="text-left text-gray-400 border-b border-white/10">
                   <th className="pb-2 pr-4">Investor</th>
                   <th className="pb-2">Lock-Up End</th>
-                  <th className="pb-2 text-right">Status</th>
+                  <th className="pb-2 text-center">Status</th>
+                  <th className="pb-2 text-right w-20">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -194,7 +261,7 @@ const TokenComplianceDetail: React.FC = () => {
                   <tr key={entry.investor} className="border-b border-white/5 hover:bg-white/5">
                     <td className="py-2 pr-4 font-mono text-white text-xs">{entry.investor}</td>
                     <td className="py-2 text-white">{fmtDate(entry.lockUpEnd)}</td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 text-center">
                       {entry.lockUpEnd > now ? (
                         <span className="text-xs font-medium px-2 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
                           Locked
@@ -204,6 +271,16 @@ const TokenComplianceDetail: React.FC = () => {
                           Unlocked
                         </span>
                       )}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => handleRemoveLockUp(entry.investor)}
+                        disabled={removing === `lock-${entry.investor}`}
+                        className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                        title="Remove lock-up"
+                      >
+                        {removing === `lock-${entry.investor}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
                     </td>
                   </tr>
                 ))}

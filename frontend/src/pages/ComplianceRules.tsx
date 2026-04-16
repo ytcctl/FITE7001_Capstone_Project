@@ -179,6 +179,21 @@ const ComplianceRules: React.FC = () => {
     }
   };
 
+  const handleRemoveLockUp = async () => {
+    if (!contracts || !lockToken || !lockAddress) return;
+    setIsSubmitting(true);
+    setTxStatus('Removing lock-up…');
+    try {
+      const tx = await contracts.compliance.setLockUp(lockToken, lockAddress, 0);
+      await tx.wait();
+      setTxStatus(`✓ Lock-up removed for ${lockAddress.slice(0, 10)}…`);
+    } catch (e: any) {
+      setTxStatus(`✗ ${e?.reason || e?.message || 'Failed'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!account) {
     return (
       <div className="glass-card p-12 text-center">
@@ -377,10 +392,13 @@ const ComplianceRules: React.FC = () => {
               <label className="block text-sm text-gray-400 mb-1">Lock-Up End Date</label>
               <input type="datetime-local" value={lockDate} onChange={(e) => setLockDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm" />
             </div>
-            <div className="flex items-end">
-              <button onClick={handleSetLockUp} disabled={isSubmitting || !lockToken || !lockAddress || !lockDate} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <div className="flex items-end gap-2">
+              <button onClick={handleSetLockUp} disabled={isSubmitting || !lockToken || !lockAddress || !lockDate} className="flex-1 bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                 Set Lock-Up
+              </button>
+              <button onClick={handleRemoveLockUp} disabled={isSubmitting || !lockToken || !lockAddress} className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 py-2.5 px-4 rounded-xl font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                Remove
               </button>
             </div>
           </div>
