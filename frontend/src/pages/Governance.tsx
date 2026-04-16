@@ -71,6 +71,9 @@ const Governance: React.FC = () => {
   const [proposalThresholdVal, setProposalThresholdVal] = useState<bigint>(0n);
   const [timelockDelay, setTimelockDelay] = useState<bigint>(0n);
 
+  // ─── KYC verification status ──────────────────────────────
+  const [kycVerified, setKycVerified] = useState<boolean | null>(null);
+
   // ─── Voting power ─────────────────────────────────────────
   const [votingPower, setVotingPower] = useState<bigint>(0n);
   const [delegatee, setDelegatee] = useState('');
@@ -255,10 +258,15 @@ const Governance: React.FC = () => {
       setVotingPower(power);
       setDelegatee(del);
       setTokenBalance(bal);
+      // Check KYC status
+      try {
+        const verified = await contracts!.identityRegistry.isVerified(account);
+        setKycVerified(verified);
+      } catch { setKycVerified(null); }
     } catch (e) {
       console.error('Failed to load voting info:', e);
     }
-  }, [activeToken, account]);
+  }, [activeToken, account, contracts]);
 
   // ─── Load proposals from events ───────────────────────────
   const loadProposals = useCallback(async () => {
@@ -558,10 +566,10 @@ const Governance: React.FC = () => {
         tokenAddr,                          // token (IVotes) — checksummed
         timelockAddr,                       // timelock
         identityRegistryAddr,               // identityRegistry
-        1,                                  // votingDelay = 1 block (dev)
-        50,                                 // votingPeriod = 50 blocks (dev)
-        0,                                  // proposalThreshold = 0 (dev)
-        4,                                  // quorum = 4%
+        14400,                              // votingDelay = ~2 days at 12s/block
+        50400,                              // votingPeriod = ~7 days at 12s/block
+        ethers.parseEther('10000'),         // proposalThreshold = 1% of 1M supply
+        10,                                 // quorum = 10% of supply
         { nonce: nonce++ }
       );
       await governor.waitForDeployment();
@@ -682,7 +690,7 @@ const Governance: React.FC = () => {
         <StatCard icon={<Timer size={20} />} label="Voting Period" value={`${votingPeriod.toString()} blocks`} accent="amber" />
         <StatCard icon={<Users size={20} />} label="Quorum" value={`${quorumPct.toString()}% of supply`} accent="emerald" />
         <StatCard icon={<Vote size={20} />} label="Proposal Threshold" value={`${ethers.formatEther(proposalThresholdVal)} tokens`} accent="purple" />
-        <StatCard icon={<Shield size={20} />} label="Identity-Locked" value="KYC Required" accent="red" />
+        <StatCard icon={<Shield size={20} />} label="Identity-Locked" value={kycVerified === null ? 'Checking…' : kycVerified ? '✓ KYC Verified' : '✗ KYC Required'} accent={kycVerified ? 'emerald' : 'red'} />
       </div>
 
       {/* Voting Power + Delegation */}
