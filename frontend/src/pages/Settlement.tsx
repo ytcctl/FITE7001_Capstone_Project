@@ -155,15 +155,44 @@ const Settlement: React.FC = () => {
     setIsSubmitting(true);
     setTxStatus('Creating settlement…');
     try {
+      const signer = (contracts.dvpSettlement as any).runner as ethers.Signer;
+      const me = (await signer.getAddress()).toLowerCase();
+      const dvpAddr = await contracts.dvpSettlement.getAddress();
+      const tokenAmountBN = ethers.parseUnits(tokenAmount, 18);
+      const cashAmountBN = ethers.parseUnits(cashAmount, 6);
+
+      // Pre-approve tokens so executeSettlement can transferFrom later.
+      // The seller must approve security tokens; the buyer must approve cash tokens.
+      // Only the connected wallet can approve its own tokens.
+      if (me === seller.toLowerCase()) {
+        setTxStatus('Approving security token for DvP…');
+        const secToken = new ethers.Contract(selectedSecurityToken, SECURITY_TOKEN_ABI, signer);
+        const allowance: bigint = await secToken.allowance(me, dvpAddr);
+        if (allowance < tokenAmountBN) {
+          const appTx = await secToken.approve(dvpAddr, tokenAmountBN);
+          await appTx.wait();
+        }
+      }
+      if (me === buyer.toLowerCase()) {
+        setTxStatus('Approving cash token for DvP…');
+        const cashToken = new ethers.Contract(CONTRACT_ADDRESSES.cashToken, CASH_TOKEN_ABI, signer);
+        const allowance: bigint = await cashToken.allowance(me, dvpAddr);
+        if (allowance < cashAmountBN) {
+          const appTx = await cashToken.approve(dvpAddr, cashAmountBN);
+          await appTx.wait();
+        }
+      }
+
+      setTxStatus('Creating settlement…');
       const deadline = Math.floor(Date.now() / 1000) + Number(deadlineHours) * 3600;
       const matchId = ethers.keccak256(ethers.toUtf8Bytes(`match-${Date.now()}`));
       const tx = await contracts.dvpSettlement.createSettlement(
         seller,
         buyer,
         selectedSecurityToken,
-        ethers.parseUnits(tokenAmount, 18),
+        tokenAmountBN,
         CONTRACT_ADDRESSES.cashToken,
-        ethers.parseUnits(cashAmount, 6),
+        cashAmountBN,
         deadline,
         matchId
       );
