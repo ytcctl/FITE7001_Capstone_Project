@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI } from '../config/contracts';
-import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer } from 'lucide-react';
+import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer, Rocket } from 'lucide-react';
 
 // Proposal state enum (matches GovernorCountingSimple)
 const PROPOSAL_STATES = [
@@ -100,25 +100,81 @@ const Governance: React.FC = () => {
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ─── Load governed tokens from GovernorFactory ────────────
+  // ─── Track which tokens have no governance yet ─────────
+  const [noGovTokens, setNoGovTokens] = useState<Set<string>>(new Set());
+  const [deployingGov, setDeployingGov] = useState(false);
+
+  // ─── Load governed tokens from GovernorFactory + both TokenFactories ──
   const loadGovernanceSuites = useCallback(async () => {
     if (!contracts) return;
     try {
-      const suites: GovernanceSuite[] = await contracts.governorFactory.allGovernanceSuites();
-      setGovernanceSuites(suites);
-
-      // Also include the legacy single governor if not in factory
-      const legacyGovAddr = await contracts.governor.getAddress();
-      const legacyToken = await contracts.governor.token();
-      const legacyTimelock = await contracts.timelock.getAddress();
-      const hasLegacy = !suites.some(
-        (s: GovernanceSuite) => s.governor.toLowerCase() === legacyGovAddr.toLowerCase()
-      );
+      // 1. Fetch tokens that already have governance
+      let suites: GovernanceSuite[] = [];
+      try {
+        suites = await contracts.governorFactory.allGovernanceSuites();
+      } catch { /* factory may be empty */ }
 
       let allSuites = [...suites];
-      if (hasLegacy && legacyGovAddr !== ethers.ZeroAddress) {
-        allSuites = [{ token: legacyToken, governor: legacyGovAddr, timelock: legacyTimelock, deployedAt: 0n }, ...allSuites];
+
+      // 2. Also include legacy single governor if not already in factory
+      try {
+        const legacyGovAddr = await contracts.governor.getAddress();
+        const legacyToken = await contracts.governor.token();
+        const legacyTimelock = await contracts.timelock.getAddress();
+        const hasLegacy = !suites.some(
+          (s: GovernanceSuite) => s.governor.toLowerCase() === legacyGovAddr.toLowerCase()
+        );
+        if (hasLegacy && legacyGovAddr !== ethers.ZeroAddress) {
+          allSuites = [{ token: legacyToken, governor: legacyGovAddr, timelock: legacyTimelock, deployedAt: 0n }, ...allSuites];
+        }
+      } catch (e) { console.warn('Legacy governor lookup:', e); }
+
+      // 3. Discover tokens from TokenFactory (EIP-1167) and TokenFactoryV2 (ERC-1967)
+      const governedAddrs = new Set(allSuites.map((s) => s.token.toLowerCase()));
+      const ungoverned = new Set<string>();
+
+      // EIP-1167 factory
+      try {
+        const v1Tokens = await contracts.tokenFactory.allTokens();
+        for (const t of v1Tokens) {
+          const addr = (t.tokenAddress || t[2]).toLowerCase();
+          if (t.active !== false && !governedAddrs.has(addr)) {
+            allSuites.push({ token: addr, governor: ethers.ZeroAddress, timelock: ethers.ZeroAddress, deployedAt: 0n });
+            governedAddrs.add(addr);
+            ungoverned.add(addr);
+          }
+        }
+      } catch (e) { console.warn('TokenFactory v1 allTokens:', e); }
+
+      // ERC-1967 factory
+      try {
+        const v2Tokens = await contracts.tokenFactoryV2.allTokens();
+        for (const t of v2Tokens) {
+          const addr = (t.proxyAddress || t[2]).toLowerCase();
+          if (t.active !== false && !governedAddrs.has(addr) && !ungoverned.has(addr)) {
+            allSuites.push({ token: addr, governor: ethers.ZeroAddress, timelock: ethers.ZeroAddress, deployedAt: 0n });
+            ungoverned.add(addr);
+          }
+        }
+      } catch (e) { console.warn('TokenFactory v2 allTokens:', e); }
+
+      // 4. Also detect tokens the connected user holds (by balance)
+      //    This catches tokens not from any factory but held by this investor
+      if (account && allSuites.length === 0) {
+        // Last resort — check the default securityToken
+        try {
+          const bal = await contracts.securityToken.balanceOf(account);
+          if (bal > 0n) {
+            const tokenAddr = await contracts.securityToken.getAddress();
+            if (!governedAddrs.has(tokenAddr.toLowerCase())) {
+              allSuites.push({ token: tokenAddr, governor: ethers.ZeroAddress, timelock: ethers.ZeroAddress, deployedAt: 0n });
+              ungoverned.add(tokenAddr.toLowerCase());
+            }
+          }
+        } catch { /* ignore */ }
       }
+
+      setNoGovTokens(ungoverned);
       setGovernanceSuites(allSuites);
 
       // Load token names for display
@@ -127,6 +183,7 @@ const Governance: React.FC = () => {
         try {
           const tokenContract = new ethers.Contract(suite.token, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
           const [name, symbol] = await Promise.all([tokenContract.name(), tokenContract.symbol()]);
+          names[suite.token.toLowerCase()] = `${name} (${symbol})`;
           names[suite.token] = `${name} (${symbol})`;
         } catch {
           names[suite.token] = suite.token.slice(0, 10) + '…';
@@ -140,28 +197,22 @@ const Governance: React.FC = () => {
       }
     } catch (e) {
       console.error('Failed to load governance suites:', e);
-      // Fallback: use legacy single governor
-      try {
-        const legacyToken = await contracts.governor.token();
-        const legacyGovAddr = await contracts.governor.getAddress();
-        const legacyTimelock = await contracts.timelock.getAddress();
-        const suite = { token: legacyToken, governor: legacyGovAddr, timelock: legacyTimelock, deployedAt: 0n };
-        setGovernanceSuites([suite]);
-        const tokenContract = new ethers.Contract(legacyToken, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
-        const [name, symbol] = await Promise.all([tokenContract.name(), tokenContract.symbol()]);
-        setTokenNames({ [legacyToken]: `${name} (${symbol})` });
-        if (!selectedToken) setSelectedToken(legacyToken);
-      } catch {
-        // No governance available
-      }
     }
-  }, [contracts, selectedToken]);
+  }, [contracts, account]);
 
   // ─── Build dynamic contract instances when token selection changes ──
   useEffect(() => {
     if (!contracts || !selectedToken || governanceSuites.length === 0) return;
     const suite = governanceSuites.find((s) => s.token.toLowerCase() === selectedToken.toLowerCase());
     if (!suite) return;
+
+    // Token without governance yet — clear governor/timelock
+    if (suite.governor === ethers.ZeroAddress) {
+      setActiveGovernor(null);
+      setActiveTimelock(null);
+      setActiveToken(new ethers.Contract(suite.token, SECURITY_TOKEN_ABI, contracts.securityToken.runner));
+      return;
+    }
 
     const runner = contracts.securityToken.runner;
     setActiveGovernor(new ethers.Contract(suite.governor, GOVERNOR_ABI, runner));
@@ -263,7 +314,9 @@ const Governance: React.FC = () => {
 
   // ─── Load governance suites on mount ──────────────────────
   useEffect(() => {
-    if (contracts) loadGovernanceSuites();
+    if (contracts) {
+      loadGovernanceSuites().finally(() => setLoading(false));
+    }
   }, [contracts, loadGovernanceSuites]);
 
   // ─── Reload governor data when active contracts change ────
@@ -273,7 +326,12 @@ const Governance: React.FC = () => {
       await Promise.all([loadGovernorInfo(), loadVotingInfo(), loadProposals()]);
       setLoading(false);
     };
-    if (activeGovernor) load();
+    if (activeGovernor) {
+      load();
+    } else {
+      // No governor for this token — stop loading
+      setLoading(false);
+    }
   }, [activeGovernor, activeTimelock, activeToken, loadGovernorInfo, loadVotingInfo, loadProposals]);
 
   // ─── Delegate ─────────────────────────────────────────────
@@ -452,6 +510,96 @@ const Governance: React.FC = () => {
     );
   }
 
+  // ─── Deploy Governor + Timelock for a token without governance ──
+  const handleDeployGovernance = async () => {
+    if (!contracts || !selectedToken || !roles.isAdmin) return;
+    setDeployingGov(true);
+    setStatus(null);
+    try {
+      const signer = contracts.securityToken.runner as ethers.Signer;
+      const adminAddr = await signer.getAddress();
+      const tokenAddr = ethers.getAddress(selectedToken); // checksummed
+
+      // Fetch compiled artifacts from Vite dev server
+      const [timelockArtifact, governorArtifact] = await Promise.all([
+        fetch('/artifacts/HKSTPTimelock.json').then((r) => r.json()),
+        fetch('/artifacts/HKSTPGovernor.json').then((r) => r.json()),
+      ]);
+
+      // Get current nonce to manage sequential deploys
+      let nonce = await signer.getNonce();
+
+      // 1. Deploy HKSTPTimelock(minDelay, proposers[], executors[], admin)
+      const timelockFactory = new ethers.ContractFactory(
+        timelockArtifact.abi,
+        timelockArtifact.bytecode,
+        signer
+      );
+      setStatus({ type: 'info', message: 'Deploying Timelock… (1/4)' });
+      const timelock = await timelockFactory.deploy(
+        1,                                  // minDelay = 1s (dev mode)
+        [],                                 // proposers — will be granted to Governor after
+        [ethers.ZeroAddress],               // executors — anyone can execute
+        adminAddr,                          // admin for bootstrapping
+        { nonce: nonce++ }
+      );
+      await timelock.waitForDeployment();
+      const timelockAddr = await timelock.getAddress();
+
+      // 2. Deploy HKSTPGovernor(token, timelock, identityRegistry, votingDelay, votingPeriod, proposalThreshold, quorumPercent)
+      const identityRegistryAddr = CONTRACT_ADDRESSES.identityRegistry;
+      const governorFactory = new ethers.ContractFactory(
+        governorArtifact.abi,
+        governorArtifact.bytecode,
+        signer
+      );
+      setStatus({ type: 'info', message: 'Deploying Governor… (2/4)' });
+      const governor = await governorFactory.deploy(
+        tokenAddr,                          // token (IVotes) — checksummed
+        timelockAddr,                       // timelock
+        identityRegistryAddr,               // identityRegistry
+        1,                                  // votingDelay = 1 block (dev)
+        50,                                 // votingPeriod = 50 blocks (dev)
+        0,                                  // proposalThreshold = 0 (dev)
+        4,                                  // quorum = 4%
+        { nonce: nonce++ }
+      );
+      await governor.waitForDeployment();
+      const governorAddr = await governor.getAddress();
+
+      // 3. Grant PROPOSER_ROLE + CANCELLER_ROLE to the Governor on the Timelock
+      const timelockContract = new ethers.Contract(timelockAddr, timelockArtifact.abi, signer);
+      const PROPOSER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('PROPOSER_ROLE'));
+      const CANCELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('CANCELLER_ROLE'));
+      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/4)' });
+      await (await timelockContract.grantRole(PROPOSER_ROLE, governorAddr, { nonce: nonce++ })).wait();
+      await (await timelockContract.grantRole(CANCELLER_ROLE, governorAddr, { nonce: nonce++ })).wait();
+
+      // 4. Register in GovernorFactory
+      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (4/4)' });
+      const tx = await contracts.governorFactory.registerGovernance(
+        tokenAddr,
+        governorAddr,
+        timelockAddr,
+        { nonce: nonce++ }
+      );
+      await tx.wait();
+
+      setStatus({ type: 'success', message: `✓ Governance deployed! Governor: ${governorAddr.slice(0, 10)}… Timelock: ${timelockAddr.slice(0, 10)}…` });
+      setNoGovTokens((prev) => {
+        const next = new Set(prev);
+        next.delete(selectedToken.toLowerCase());
+        return next;
+      });
+      await loadGovernanceSuites();
+    } catch (e: any) {
+      console.error('Deploy governance failed:', e);
+      setStatus({ type: 'error', message: e.reason || e.message || 'Failed to deploy governance' });
+    } finally {
+      setDeployingGov(false);
+    }
+  };
+
   const refreshAll = async () => {
     setLoading(true);
     await Promise.all([loadGovernorInfo(), loadVotingInfo(), loadProposals()]);
@@ -471,7 +619,7 @@ const Governance: React.FC = () => {
         </button>
       </header>
 
-      {/* Token Selector */}
+      {/* Token Selector — show even if only ungoverned tokens */}
       {governanceSuites.length >= 1 && (
         <div className="glass-card p-4">
           <label className="block text-sm text-gray-400 mb-2 font-medium">Select Token for Governance</label>
@@ -482,10 +630,37 @@ const Governance: React.FC = () => {
           >
             {governanceSuites.map((suite) => (
               <option key={suite.token} value={suite.token} className="bg-gray-900">
-                {tokenNames[suite.token] || suite.token.slice(0, 10) + '…'}
+                {tokenNames[suite.token] || tokenNames[suite.token.toLowerCase()] || suite.token.slice(0, 10) + '…'}
+                {noGovTokens.has(suite.token.toLowerCase()) ? ' ⚠ No governance' : ''}
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* Deploy Governance banner for tokens without governor */}
+      {selectedToken && noGovTokens.has(selectedToken.toLowerCase()) && (
+        <div className="glass-card p-6 border border-amber-500/30 bg-amber-500/5">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertTriangle size={24} className="text-amber-400" />
+            <h3 className="font-bold text-white text-lg">No Governance Suite</h3>
+          </div>
+          <p className="text-gray-400 text-sm mb-4">
+            This token (<span className="font-mono text-amber-300">{selectedToken.slice(0, 10)}…{selectedToken.slice(-4)}</span>)
+            does not have a Governor + Timelock deployed yet. Deploy one to enable on-chain voting.
+          </p>
+          {roles.isAdmin ? (
+            <button
+              onClick={handleDeployGovernance}
+              disabled={deployingGov}
+              className="bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2.5 px-6 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-amber-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {deployingGov ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
+              {deployingGov ? 'Deploying…' : 'Deploy Governor + Timelock'}
+            </button>
+          ) : (
+            <p className="text-xs text-gray-500">Only the platform admin can deploy governance.</p>
+          )}
         </div>
       )}
 
