@@ -444,8 +444,21 @@ const Trading: React.FC = () => {
       setQuantity('');
       fetchData();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Transaction failed';
-      setFormError(msg.length > 120 ? msg.slice(0, 120) + '…' : msg);
+      let msg = 'Transaction failed';
+      if (err && typeof err === 'object') {
+        const e = err as Record<string, unknown>;
+        // ethers v6: revert reason is in .reason or nested .error.reason
+        if (typeof e.reason === 'string') {
+          msg = e.reason;
+        } else if (e.error && typeof (e.error as Record<string, unknown>).reason === 'string') {
+          msg = (e.error as Record<string, unknown>).reason as string;
+        } else if (err instanceof Error) {
+          // Extract quoted revert string from verbose message
+          const match = err.message.match(/reverted with reason string '([^']+)'/);
+          msg = match ? match[1] : err.message;
+        }
+      }
+      setFormError(msg.length > 200 ? msg.slice(0, 200) + '…' : msg);
     } finally {
       setSubmitting(false);
     }
