@@ -1,0 +1,41 @@
+{
+  "config": {
+    "chainId": 31337,
+    "berlinBlock": 0,
+    "londonBlock": 0,
+    "ethash": {
+      "fixeddifficulty": 65536
+    },
+    "contractSizeLimit": 2147483647
+  },
+  "nonce": "0x42",
+  "timestamp": "0x0",
+  "gasLimit": "0x1fffffffffffff",
+  "difficulty": "0x10000",
+  "baseFeePerGas": "0x0",
+  "extraData": "0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "alloc": {
+    "fe3b557e8fb62b89f4916b721be55ceb828dbd73": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 0 — deployer / admin"
+    },
+    "627306090abaB3A6e1400e9345bC60c78a8BEf57": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 1 — operator"
+    },
+    "f17f52151EbEF6C7334FAD080c5704D77216b732": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 2 — agent / custodian"
+    },
+    "C5fdf4076b8F3A5357c5E395ab970B5B54098Fef": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 3 — seller"
+    },
+    "821aEa9a577a9b44299B9c15c88cf3087F3b5544": {
+      "balance": "0x200000000000000000000000000000000000000000000000000000000000000",
+      "comment": "Dev account 4 — buyer"
+    }
+  }
+}

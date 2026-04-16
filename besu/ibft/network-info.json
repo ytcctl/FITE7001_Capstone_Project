@@ -1,0 +1,30 @@
+{
+  "generated": "2026-04-11T18:01:17.745Z",
+  "chainId": 7001,
+  "consensus": "IBFT 2.0",
+  "blockPeriod": "2s",
+  "bftTolerance": "1 faulty node (f=1, n=3f+1=4)",
+  "validators": [
+    {
+      "index": 1,
+      "address": "0x1b37f3fd6f98096aafe0d27ecc8816fefdcd3d4b",
+      "rpcPort": 8545
+    },
+    {
+      "index": 2,
+      "address": "0xac72ba1b6720c7cc15966ed25c6f9240ef33c177",
+      "rpcPort": 8645
+    },
+    {
+      "index": 3,
+      "address": "0x98c554fa21995a72b4dc50dfb7070d6a02ff1a34",
+      "rpcPort": 8745
+    },
+    {
+      "index": 4,
+      "address": "0xb1f4c778c301fe1c02a703ee754c85b3261d9a22",
+      "rpcPort": 8845
+    }
+  ],
+  "bootnode": "enode://1a4c8b66139fa58ff5744ee85f4c2ee15112d66501527870355c2dd539bc9ebe@172.20.0.11:30303"
+}
