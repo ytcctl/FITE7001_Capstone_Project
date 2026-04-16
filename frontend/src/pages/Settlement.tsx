@@ -278,6 +278,12 @@ const Settlement: React.FC = () => {
       // Approve all tokens the connected user owes across selected settlements
       for (const id of ids) {
         const s = await contracts.dvpSettlement.settlements(id);
+        // Creator cannot execute their own settlement — must be counterparty
+        if (me === s.createdBy.toLowerCase()) {
+          setTxStatus('✗ Only Counterparty can execute the DvP settlement.');
+          setIsSubmitting(false);
+          return;
+        }
         if (me === s.seller.toLowerCase()) {
           const secToken = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, signer);
           const allowance: bigint = await secToken.allowance(await signer.getAddress(), dvpAddr);

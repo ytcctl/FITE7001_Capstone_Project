@@ -1,0 +1,10 @@
+
+  VITE v5.4.21  ready in 250 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://10.0.0.29:3000/
+Error: spawn xdg-open ENOENT
+    at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+3:43:09 AM [vite] hmr update /src/App.tsx, /src/index.css, /src/context/Web3Context.tsx, /src/pages/Dashboard.tsx, /src/pages/KYCManagement.tsx, /src/pages/MarketManagement.tsx, /src/pages/WalletCustody.tsx, /src/pages/Settlement.tsx, /src/pages/TokenMinting.tsx, /src/pages/TokenDetail.tsx, /src/pages/TokenManagement.tsx, /src/pages/Governance.tsx, /src/pages/Portfolio.tsx, /src/pages/Trading.tsx
