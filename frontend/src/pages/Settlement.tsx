@@ -219,7 +219,12 @@ const Settlement: React.FC = () => {
       setTxStatus(`✓ Settlement #${id} executed — DvP atomic swap complete`);
       loadSettlements();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Execute failed'}`);
+      const msg = e?.reason || e?.message || '';
+      if (msg.includes('creator cannot execute') || msg.includes('createdBy')) {
+        setTxStatus('✗ Only Counterparty can execute the DvP settlement.');
+      } else {
+        setTxStatus(`✗ ${msg || 'Execute failed'}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -298,7 +303,12 @@ const Settlement: React.FC = () => {
       setSelectedIds(new Set());
       loadSettlements();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Batch execute failed'}`);
+      const msg = e?.reason || e?.message || '';
+      if (msg.includes('creator cannot execute') || msg.includes('createdBy')) {
+        setTxStatus('✗ Only Counterparty can execute the DvP settlement.');
+      } else {
+        setTxStatus(`✗ ${msg || 'Batch execute failed'}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
