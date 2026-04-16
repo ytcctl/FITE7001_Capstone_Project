@@ -45,11 +45,11 @@ contract HKSTPCompliance is AccessControl, EIP712 {
     /// @dev Tracks consumed attestation hashes (replay protection).
     mapping(bytes32 => bool) public usedAttestations;
 
-    /// @dev Per-investor concentration cap (max token balance).  0 = no cap.
-    mapping(address => uint256) public concentrationCap;
+    /// @dev Per-token, per-investor concentration cap: token => investor => cap.  0 = no cap.
+    mapping(address => mapping(address => uint256)) public concentrationCap;
 
-    /// @dev Global concentration cap applied to all investors.  0 = no cap.
-    uint256 public globalConcentrationCap;
+    /// @dev Per-token global concentration cap: token => cap.  0 = no cap.
+    mapping(address => uint256) public globalConcentrationCap;
 
     /// @dev Approved jurisdiction codes (ISO-3166 two-letter, e.g. "HK").
     mapping(bytes2 => bool) public allowedJurisdictions;
@@ -62,8 +62,8 @@ contract HKSTPCompliance is AccessControl, EIP712 {
     // -------------------------------------------------------------------------
     event OracleUpdated(address indexed previous, address indexed current);
     event AttestationConsumed(bytes32 indexed hash, address indexed from, address indexed to);
-    event ConcentrationCapSet(address indexed investor, uint256 cap);
-    event GlobalConcentrationCapSet(uint256 cap);
+    event ConcentrationCapSet(address indexed token, address indexed investor, uint256 cap);
+    event GlobalConcentrationCapSet(address indexed token, uint256 cap);
     event JurisdictionSet(bytes2 indexed jurisdiction, bool allowed);
     event LockUpSet(address indexed investor, uint256 lockUpEnd);
 
@@ -106,22 +106,24 @@ contract HKSTPCompliance is AccessControl, EIP712 {
     // -------------------------------------------------------------------------
 
     /**
-     * @notice Set a per-investor concentration cap (max holdings).
+     * @notice Set a per-investor concentration cap (max holdings) for a specific token.
+     * @param token    Token contract address.
      * @param investor Target investor.
      * @param cap      Maximum token balance allowed (0 = no individual cap).
      */
-    function setConcentrationCap(address investor, uint256 cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        concentrationCap[investor] = cap;
-        emit ConcentrationCapSet(investor, cap);
+    function setConcentrationCap(address token, address investor, uint256 cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        concentrationCap[token][investor] = cap;
+        emit ConcentrationCapSet(token, investor, cap);
     }
 
     /**
-     * @notice Set the global concentration cap for all investors.
-     * @param cap Global maximum token balance (0 = disabled).
+     * @notice Set the global concentration cap for a specific token.
+     * @param token Token contract address.
+     * @param cap   Global maximum token balance (0 = disabled).
      */
-    function setGlobalConcentrationCap(uint256 cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        globalConcentrationCap = cap;
-        emit GlobalConcentrationCapSet(cap);
+    function setGlobalConcentrationCap(address token, uint256 cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        globalConcentrationCap[token] = cap;
+        emit GlobalConcentrationCapSet(token, cap);
     }
 
     /**
@@ -242,13 +244,14 @@ contract HKSTPCompliance is AccessControl, EIP712 {
             return (false, "HKSTPCompliance: recipient jurisdiction blocked");
         }
 
-        // Global concentration cap
-        if (globalConcentrationCap != 0 && toBalance > globalConcentrationCap) {
+        // Global concentration cap (keyed by calling token = msg.sender)
+        uint256 gCap = globalConcentrationCap[msg.sender];
+        if (gCap != 0 && toBalance > gCap) {
             return (false, "HKSTPCompliance: global concentration cap exceeded");
         }
 
-        // Per-investor concentration cap
-        uint256 cap = concentrationCap[to];
+        // Per-investor concentration cap (keyed by calling token = msg.sender)
+        uint256 cap = concentrationCap[msg.sender][to];
         if (cap != 0 && toBalance > cap) {
             return (false, "HKSTPCompliance: investor concentration cap exceeded");
         }

@@ -259,9 +259,11 @@ describe("HKSTPCompliance", function () {
     });
 
     it("should block when global concentration cap is exceeded", async function () {
-      await compliance.connect(admin).setGlobalConcentrationCap(500n);
+      // Set global cap keyed to tokenRole (simulates the calling token)
+      await compliance.connect(admin).setGlobalConcentrationCap(tokenRole.address, 500n);
 
-      const [ok, reason] = await compliance.checkModules(
+      // Call checkModules from tokenRole so msg.sender = token address
+      const [ok, reason] = await compliance.connect(tokenRole).checkModules(
         alice.address, bob.address,
         100n, 600n, // toBalance = 600 > cap 500
         toBytes2Hex("HK"), toBytes2Hex("HK")
@@ -271,9 +273,11 @@ describe("HKSTPCompliance", function () {
     });
 
     it("should block when per-investor concentration cap is exceeded", async function () {
-      await compliance.connect(admin).setConcentrationCap(bob.address, 300n);
+      // Set per-investor cap keyed to tokenRole (simulates the calling token)
+      await compliance.connect(admin).setConcentrationCap(tokenRole.address, bob.address, 300n);
 
-      const [ok, reason] = await compliance.checkModules(
+      // Call checkModules from tokenRole so msg.sender = token address
+      const [ok, reason] = await compliance.connect(tokenRole).checkModules(
         alice.address, bob.address,
         100n, 400n, // toBalance = 400 > cap 300
         toBytes2Hex("HK"), toBytes2Hex("HK")

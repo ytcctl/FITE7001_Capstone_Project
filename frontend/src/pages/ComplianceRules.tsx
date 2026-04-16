@@ -10,9 +10,12 @@ const ComplianceRules: React.FC = () => {
   const [jurCode, setJurCode] = useState('');
   const [jurAllowed, setJurAllowed] = useState(true);
   // Concentration cap
+  const [capToken, setCapToken] = useState('');
   const [capAddress, setCapAddress] = useState('');
   const [capAmount, setCapAmount] = useState('');
   const [globalCap, setGlobalCap] = useState('');
+  // Token list for dropdown
+  const [tokenList, setTokenList] = useState<{name: string; symbol: string; address: string}[]>([]);
   // Lock-up
   const [lockAddress, setLockAddress] = useState('');
   const [lockDate, setLockDate] = useState('');
@@ -30,12 +33,46 @@ const ComplianceRules: React.FC = () => {
   const loadState = async () => {
     if (!contracts) return;
     try {
-      const [gCap, orc] = await Promise.all([
-        contracts.compliance.globalConcentrationCap(),
-        contracts.compliance.complianceOracle(),
-      ]);
-      setCurrentGlobalCap(ethers.formatUnits(gCap, 18));
+      const orc = await contracts.compliance.complianceOracle();
       setOracle(orc);
+
+      // Load token list: start with the default security token, then add factory tokens
+      const tokens: {name: string; symbol: string; address: string}[] = [];
+      try {
+        const defaultAddr = await contracts.securityToken.getAddress();
+        const [name, symbol] = await Promise.all([
+          contracts.securityToken.name(),
+          contracts.securityToken.symbol(),
+        ]);
+        tokens.push({ name, symbol, address: defaultAddr });
+      } catch { /* default token not available */ }
+      try {
+        const v1All = await contracts.tokenFactory.allTokens();
+        for (const t of v1All) {
+          if (!tokens.some(x => x.address.toLowerCase() === t.tokenAddress.toLowerCase())) {
+            tokens.push({ name: t.name, symbol: t.symbol, address: t.tokenAddress });
+          }
+        }
+      } catch { /* V1 factory not available */ }
+      try {
+        const v2All = await contracts.tokenFactoryV2.allTokens();
+        for (const t of v2All) {
+          if (!tokens.some(x => x.address.toLowerCase() === t.proxyAddress.toLowerCase())) {
+            tokens.push({ name: t.name, symbol: t.symbol, address: t.proxyAddress });
+          }
+        }
+      } catch { /* V2 factory not available */ }
+      setTokenList(tokens);
+
+      // Load global cap for selected token (or first token)
+      const selectedToken = capToken || (tokens.length > 0 ? tokens[0].address : '');
+      if (selectedToken && !capToken && tokens.length > 0) setCapToken(selectedToken);
+      if (selectedToken) {
+        const gCap = await contracts.compliance.globalConcentrationCap(selectedToken);
+        setCurrentGlobalCap(ethers.formatUnits(gCap, 18));
+      } else {
+        setCurrentGlobalCap('0');
+      }
 
       // Discover additional jurisdictions from on-chain events
       const discoveredCodes = new Set<string>(DEFAULT_JURISDICTIONS);
@@ -93,11 +130,11 @@ const ComplianceRules: React.FC = () => {
   };
 
   const handleSetConcentrationCap = async () => {
-    if (!contracts || !capAddress || !capAmount) return;
+    if (!contracts || !capToken || !capAddress || !capAmount) return;
     setIsSubmitting(true);
     setTxStatus('Setting concentration cap…');
     try {
-      const tx = await contracts.compliance.setConcentrationCap(capAddress, ethers.parseUnits(capAmount, 18));
+      const tx = await contracts.compliance.setConcentrationCap(capToken, capAddress, ethers.parseUnits(capAmount, 18));
       await tx.wait();
       setTxStatus(`✓ Concentration cap set to ${capAmount} for ${capAddress.slice(0, 10)}…`);
     } catch (e: any) {
@@ -108,11 +145,11 @@ const ComplianceRules: React.FC = () => {
   };
 
   const handleSetGlobalCap = async () => {
-    if (!contracts || !globalCap) return;
+    if (!contracts || !capToken || !globalCap) return;
     setIsSubmitting(true);
     setTxStatus('Setting global concentration cap…');
     try {
-      const tx = await contracts.compliance.setGlobalConcentrationCap(ethers.parseUnits(globalCap, 18));
+      const tx = await contracts.compliance.setGlobalConcentrationCap(capToken, ethers.parseUnits(globalCap, 18));
       await tx.wait();
       setTxStatus(`✓ Global concentration cap set to ${globalCap}`);
       loadState();
@@ -178,7 +215,7 @@ const ComplianceRules: React.FC = () => {
           <p className="text-sm font-mono text-white truncate">{oracle || '—'}</p>
         </div>
         <div className="glass-card p-6">
-          <p className="text-sm text-gray-400 mb-1">Global Cap</p>
+          <p className="text-sm text-gray-400 mb-1">Global Cap {capToken ? `(${tokenList.find(t => t.address === capToken)?.symbol || 'selected token'})` : ''}</p>
           <p className="text-xl font-bold text-white">
             {Number(currentGlobalCap) === 0 ? 'No cap' : `${Number(currentGlobalCap).toLocaleString()} tokens`}
           </p>
@@ -252,6 +289,29 @@ const ComplianceRules: React.FC = () => {
           </div>
           <div className="space-y-3">
             <div>
+              <label className="block text-sm text-gray-400 mb-1">Token</label>
+              <select
+                value={capToken}
+                onChange={async (e) => {
+                  setCapToken(e.target.value);
+                  if (contracts && e.target.value) {
+                    try {
+                      const gCap = await contracts.compliance.globalConcentrationCap(e.target.value);
+                      setCurrentGlobalCap(ethers.formatUnits(gCap, 18));
+                    } catch { setCurrentGlobalCap('0'); }
+                  }
+                }}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
+              >
+                <option value="" className="bg-gray-900">Select a token…</option>
+                {tokenList.map((t) => (
+                  <option key={t.address} value={t.address} className="bg-gray-900">
+                    {t.symbol} — {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm text-gray-400 mb-1">Investor Address</label>
               <input type="text" value={capAddress} onChange={(e) => setCapAddress(e.target.value)} placeholder="0x…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm" />
             </div>
@@ -259,7 +319,7 @@ const ComplianceRules: React.FC = () => {
               <label className="block text-sm text-gray-400 mb-1">Max Balance (tokens)</label>
               <input type="text" value={capAmount} onChange={(e) => setCapAmount(e.target.value)} placeholder="10000" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm" />
             </div>
-            <button onClick={handleSetConcentrationCap} disabled={isSubmitting || !capAddress || !capAmount} className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button onClick={handleSetConcentrationCap} disabled={isSubmitting || !capToken || !capAddress || !capAmount} className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {isSubmitting && <Loader2 size={16} className="animate-spin" />}
               Set Per-Investor Cap
             </button>
@@ -267,7 +327,7 @@ const ComplianceRules: React.FC = () => {
               <label className="block text-sm text-gray-400 mb-1">Global Cap (tokens)</label>
               <div className="flex gap-2">
                 <input type="text" value={globalCap} onChange={(e) => setGlobalCap(e.target.value)} placeholder="100000" className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm" />
-                <button onClick={handleSetGlobalCap} disabled={isSubmitting || !globalCap} className="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-50">
+                <button onClick={handleSetGlobalCap} disabled={isSubmitting || !capToken || !globalCap} className="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-50">
                   Set
                 </button>
               </div>

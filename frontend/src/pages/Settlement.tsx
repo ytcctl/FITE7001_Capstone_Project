@@ -33,6 +33,10 @@ const STATUS_COLORS = [
   'bg-red-500/20 text-red-400 border-red-500/30',
   'bg-gray-500/20 text-gray-400 border-gray-500/30',
 ];
+const EXPIRED_COLOR = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+
+/** Returns true if a pending settlement's deadline has passed */
+const isExpired = (s: SettlementData) => s.status === 0 && s.deadline > 0 && Date.now() / 1000 > s.deadline;
 
 const Settlement: React.FC = () => {
   const { account, contracts } = useWeb3();
@@ -287,6 +291,22 @@ const Settlement: React.FC = () => {
     }
   };
 
+  const handleMarkFailed = async (id: number) => {
+    if (!contracts) return;
+    setIsSubmitting(true);
+    setTxStatus(`Marking settlement #${id} as failed (deadline passed)…`);
+    try {
+      const tx = await contracts.dvpSettlement.markFailed(id);
+      await tx.wait();
+      setTxStatus(`✓ Settlement #${id} marked as Failed (deadline expired)`);
+      loadSettlements();
+    } catch (e: any) {
+      setTxStatus(`✗ ${e?.reason || e?.message || 'Mark failed error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -296,7 +316,7 @@ const Settlement: React.FC = () => {
     });
   };
 
-  const pendingIds = settlements.filter((s) => s.status === 0).map((s) => s.id);
+  const pendingIds = settlements.filter((s) => s.status === 0 && !isExpired(s)).map((s) => s.id);
 
   const toggleSelectAll = () => {
     if (pendingIds.every((id) => selectedIds.has(id))) {
@@ -537,7 +557,7 @@ const Settlement: React.FC = () => {
                 {settlements.map((s) => (
                   <tr key={s.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-4">
-                      {s.status === 0 && (
+                      {s.status === 0 && !isExpired(s) && (
                         <input
                           type="checkbox"
                           checked={selectedIds.has(s.id)}
@@ -560,8 +580,8 @@ const Settlement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-white">{Number(s.cashAmount).toLocaleString()}</td>
                     <td className="px-6 py-4">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[s.status]}`}>
-                        {STATUS_LABELS[s.status]}
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${isExpired(s) ? EXPIRED_COLOR : STATUS_COLORS[s.status]}`}>
+                        {isExpired(s) ? 'Expired' : STATUS_LABELS[s.status]}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300" title={s.createdBy}>
@@ -573,24 +593,34 @@ const Settlement: React.FC = () => {
                     <td className="px-6 py-4">
                       {s.status === 0 && (
                         <div className="flex gap-2">
-                          {account && s.createdBy.toLowerCase() === account.toLowerCase() ? (
+                          {isExpired(s) ? (
+                            <button
+                              onClick={() => handleMarkFailed(s.id)}
+                              className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20"
+                            >
+                              <XCircle size={12} className="inline mr-1" />
+                              Mark Failed
+                            </button>
+                          ) : account && s.createdBy.toLowerCase() === account.toLowerCase() ? (
                             <span className="text-xs text-gray-500 italic">Awaiting counterparty</span>
                           ) : (
-                            <button
-                              onClick={() => handleExecute(s.id)}
-                              className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20"
-                            >
-                              <Play size={12} className="inline mr-1" />
-                              Execute
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleExecute(s.id)}
+                                className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20"
+                              >
+                                <Play size={12} className="inline mr-1" />
+                                Execute
+                              </button>
+                              <button
+                                onClick={() => handleCancel(s.id)}
+                                className="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/20"
+                              >
+                                <XCircle size={12} className="inline mr-1" />
+                                Cancel
+                              </button>
+                            </>
                           )}
-                          <button
-                            onClick={() => handleCancel(s.id)}
-                            className="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/20"
-                          >
-                            <XCircle size={12} className="inline mr-1" />
-                            Cancel
-                          </button>
                         </div>
                       )}
                     </td>

@@ -137,13 +137,13 @@ export const COMPLIANCE_ABI = [
   'function complianceOracle() view returns (address)',
   'function setComplianceOracle(address oracle) external',
   // Module config
-  'function setConcentrationCap(address investor, uint256 cap) external',
-  'function setGlobalConcentrationCap(uint256 cap) external',
+  'function setConcentrationCap(address token, address investor, uint256 cap) external',
+  'function setGlobalConcentrationCap(address token, uint256 cap) external',
   'function setJurisdiction(bytes2 jurisdiction, bool allowed) external',
   'function setLockUp(address investor, uint256 endTime) external',
   // Views
-  'function concentrationCap(address investor) view returns (uint256)',
-  'function globalConcentrationCap() view returns (uint256)',
+  'function concentrationCap(address token, address investor) view returns (uint256)',
+  'function globalConcentrationCap(address token) view returns (uint256)',
   'function allowedJurisdictions(bytes2 jurisdiction) view returns (bool)',
   'function lockUpEnd(address investor) view returns (uint256)',
   'function domainSeparator() view returns (bytes32)',
@@ -158,8 +158,8 @@ export const COMPLIANCE_ABI = [
   'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
   // Events
   'event JurisdictionSet(bytes2 indexed jurisdiction, bool allowed)',
-  'event GlobalConcentrationCapSet(uint256 cap)',
-  'event ConcentrationCapSet(address indexed investor, uint256 cap)',
+  'event GlobalConcentrationCapSet(address indexed token, uint256 cap)',
+  'event ConcentrationCapSet(address indexed token, address indexed investor, uint256 cap)',
   'event LockUpSet(address indexed investor, uint256 lockUpEnd)',
 ];
 
