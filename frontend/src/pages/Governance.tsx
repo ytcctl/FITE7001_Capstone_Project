@@ -549,6 +549,33 @@ const Governance: React.FC = () => {
     }
   };
 
+  // ─── Fast-forward blocks (dev only – Hardhat) ─────────────
+  const [fastForwarding, setFastForwarding] = useState(false);
+  const handleFastForward = async (blocks: number, label: string) => {
+    setFastForwarding(true);
+    setStatus(null);
+    try {
+      // Send hardhat_mine directly via fetch (bypasses MetaMask).
+      // Use the same origin for Codespaces compatibility, fall back to localhost.
+      const rpcUrl = window.location.hostname === 'localhost'
+        ? 'http://127.0.0.1:8545'
+        : `${window.location.protocol}//${window.location.hostname.replace(/^(\d+)-/, '8545-')}`; // Codespaces port mapping
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'hardhat_mine', params: ['0x' + blocks.toString(16)] }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      setStatus({ type: 'success', message: `⏩ Mined ${blocks.toLocaleString()} blocks (${label}). Refreshing…` });
+      await loadProposals();
+    } catch (e: any) {
+      setStatus({ type: 'error', message: 'Fast-forward failed: ' + (e.message || e) });
+    } finally {
+      setFastForwarding(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="glass-card p-12 text-center">
@@ -1038,12 +1065,43 @@ const Governance: React.FC = () => {
                       </button>
                     )}
                     {p.state === 5 && ( /* Queued */
+                      <>
+                        <button
+                          onClick={() => handleExecute(p)}
+                          className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20 flex items-center gap-1"
+                        >
+                          <Play size={12} />
+                          Execute
+                        </button>
+                        <button
+                          onClick={() => handleFastForward(1, 'skip timelock delay')}
+                          disabled={fastForwarding}
+                          className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
+                        >
+                          {fastForwarding ? <Loader2 size={12} className="animate-spin" /> : <Timer size={12} />}
+                          ⏩ Skip Timelock
+                        </button>
+                      </>
+                    )}
+                    {/* Dev: fast-forward blocks for Pending / Active proposals */}
+                    {p.state === 0 && ( /* Pending — skip voting delay */
                       <button
-                        onClick={() => handleExecute(p)}
-                        className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-colors border border-emerald-500/20 flex items-center gap-1"
+                        onClick={() => handleFastForward(14401, 'skip voting delay')}
+                        disabled={fastForwarding}
+                        className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                       >
-                        <Play size={12} />
-                        Execute
+                        {fastForwarding ? <Loader2 size={12} className="animate-spin" /> : <Timer size={12} />}
+                        ⏩ Skip Voting Delay
+                      </button>
+                    )}
+                    {p.state === 1 && ( /* Active — skip to deadline */
+                      <button
+                        onClick={() => handleFastForward(50401, 'skip voting period')}
+                        disabled={fastForwarding}
+                        className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
+                      >
+                        {fastForwarding ? <Loader2 size={12} className="animate-spin" /> : <Timer size={12} />}
+                        ⏩ Skip Voting Period
                       </button>
                     )}
                   </div>
