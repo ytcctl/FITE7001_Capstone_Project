@@ -21,6 +21,7 @@ import {
   ORDER_BOOK_FACTORY_ABI,
   ORACLE_COMMITTEE_ABI,
   TOKEN_FACTORY_V2_ABI,
+  GOVERNOR_FACTORY_ABI,
 } from '../config/contracts';
 
 // -----------------------------------------------------------------
@@ -44,6 +45,7 @@ export interface Contracts {
   orderBookFactory: ethers.Contract;
   oracleCommittee: ethers.Contract;
   tokenFactoryV2: ethers.Contract;
+  governorFactory: ethers.Contract;
 }
 
 export interface UserRoles {
@@ -207,6 +209,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       orderBookFactory: new ethers.Contract(addr('orderBookFactory'), ORDER_BOOK_FACTORY_ABI, s),
       oracleCommittee: new ethers.Contract(addr('oracleCommittee'), ORACLE_COMMITTEE_ABI, s),
       tokenFactoryV2: new ethers.Contract(addr('tokenFactoryV2'), TOKEN_FACTORY_V2_ABI, s),
+      governorFactory: new ethers.Contract(addr('governorFactory'), GOVERNOR_FACTORY_ABI, s),
     };
     setContracts(c);
     return c;

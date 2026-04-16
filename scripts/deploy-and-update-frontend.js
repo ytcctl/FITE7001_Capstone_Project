@@ -377,6 +377,14 @@ async function main() {
     console.log("     ⚠ SystemHealthCheck skipped (contract not found or error)");
   }
 
+  // 18/18. GovernorFactory (per-token governance registry)
+  console.log("18/18 Deploying GovernorFactory...");
+  const GovernorFactory = await ethers.getContractFactory("GovernorFactory");
+  const governorFactory = await GovernorFactory.deploy(deployer.address);
+  await governorFactory.waitForDeployment();
+  const governorFactoryAddress = await governorFactory.getAddress();
+  console.log("     GovernorFactory:", governorFactoryAddress);
+
   // Post-deployment configuration
   console.log("\nConfiguring roles and safe-list...");
   const TOKEN_ROLE = await compliance.TOKEN_ROLE();
@@ -454,6 +462,11 @@ async function main() {
   const TOKEN_ADMIN_ROLE = await token.DEFAULT_ADMIN_ROLE();
   await (await token.grantRole(TOKEN_ADMIN_ROLE, timelockAddress)).wait();
   console.log("     DEFAULT_ADMIN_ROLE granted to Timelock on SecurityToken");
+
+  // GovernorFactory: register the initial securityToken's governance
+  console.log("\nRegistering initial token governance via GovernorFactory...");
+  await (await governorFactory.registerGovernance(tokenAddress, governorAddress, timelockAddress)).wait();
+  console.log("     Registered HKSAT governance (governor:", governorAddress, "timelock:", timelockAddress, ")");
 
   // Custody: WalletRegistry + MultiSigWarm wiring
   console.log("\nConfiguring Custody (WalletRegistry + MultiSigWarm)...");
@@ -640,6 +653,7 @@ async function main() {
   orderBook: '${orderBookAddress}',
   tokenFactoryV2: '${tokenFactoryV2Address}',
   systemHealthCheck: '${systemHealthCheckAddress}',
+  governorFactory: '${governorFactoryAddress}',
 };`;
 
     if (oldBlock.test(content)) {
@@ -723,6 +737,9 @@ async function main() {
   );
   console.log(
     `║ SystemHealthCheck     : ${systemHealthCheckAddress}  ║`
+  );
+  console.log(
+    `║ GovernorFactory       : ${governorFactoryAddress}  ║`
   );
   console.log(
     "╠══════════════════════════════════════════════════════════════╣"

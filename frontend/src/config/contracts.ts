@@ -40,23 +40,24 @@ export function rpcUrlForBrowser(): string {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x8090CbD6Bb3B28BdA98f90ff0065066b6470C910',
-  compliance: '0xFc872861A0a957bA50bb34e90266550A12A14fA2',
-  securityToken: '0x93800b5BCAfc5984f3f1be3528809c14DD4A039a',
-  cashToken: '0x4092C6ca5c91b90B792D2C3595964FAD4Ee77110',
-  dvpSettlement: '0x2061B54dDe995157D068587Ea336FCDF9DdcE7dB',
-  tokenFactory: '0x5Bd911072FB6713255d1D8E0AE9e6B66e807e521',
-  claimIssuer: '0x3Caaef9e5EB725E32bF33927DE998497Da899078',
-  identityFactory: '0xb18F308208351e75BaCb25802269D11203612DF0',
-  timelock: '0xBab236bCC68560FEB3EAF3Dafef00175764B0d62',
-  governor: '0x4c34C2834089A334898dFeF3746F588F9cE6A071',
-  walletRegistry: '0xc9d9D780B94fF7a79Eb943DBeE8260476EeC705E',
-  multiSigWarm: '0xB692D76C3AAEBcB0931C3cac64A4400B827f24d4',
-  oracleCommittee: '0xc8E6bF9F773aF0841c03DB1e98b6A17F7B672b01',
-  orderBookFactory: '0xc2B6504023ECec8a7Df177FC4791840318e617D6',
-  orderBook: '0x3E79F0b113ea833262644A5c04c34A686330F001',
-  tokenFactoryV2: '0x68BFD312EEE94c8b3284067e63fD1ea43251ccAd',
-  systemHealthCheck: '0x680FC2f0217Cb0046652b6d10c5Db003C07BFb0D',
+  identityRegistry: '0xBF921f94Fd9eF1738bE25D8CeCFDFE2C822c81B0',
+  compliance: '0xBeC8a9e485a4B75d3b14249de7CA6D124fE94795',
+  securityToken: '0x3Ace09BBA3b8507681146252d3Dd33cD4E2d4F63',
+  cashToken: '0x3484B20600854091C166C062FacAd700123f5f71',
+  dvpSettlement: '0x7cA5543f9B2C35F0E972f1B45b61A2FE53fF1ed9',
+  tokenFactory: '0x63491c5363329afb6f370E9D297025481E0277e6',
+  claimIssuer: '0x338F940F4231662Dd9a689DdC4691450de932Be5',
+  identityFactory: '0xa9ECbe3F9600f9bF3ec88a428387316714ac95a0',
+  timelock: '0x2114De86c8Ea1FD8144C2f1e1e94C74E498afB1b',
+  governor: '0xdB6371a89E3C840a14DE470Dd0247cC7459Fa2A2',
+  walletRegistry: '0x6023FF0A8203ea32E737819B301D1672Dd2ECBE0',
+  multiSigWarm: '0xE03Ef2490316bfF9808d936eEe70f23896F07548',
+  oracleCommittee: '0x834aDe89F14B5A724cD4beE5c5B5883c65ae46ba',
+  orderBookFactory: '0xfE0B7EE21e8298fC68b9Bf5f404e7df7B6671EC2',
+  orderBook: '0xdD2777Be7749DE8cD44b67575557f6D3c2c0cF51',
+  tokenFactoryV2: '0xA86EB77c09aE0F2164065aB14094565011b0BfcA',
+  systemHealthCheck: '0xa775Fd3eb96956b2284e96298Bd12624A9C952D2',
+  governorFactory: '0xbBCeB59101A8399DB5e1dB03323BE7b00fEEF004',
 };
 
 // -----------------------------------------------------------------
@@ -667,4 +668,25 @@ export const TOKEN_FACTORY_V2_ABI = [
   'event TokenReactivated(uint256 indexed index, address proxyAddress)',
   'event ImplementationUpgraded(address indexed previousImpl, address indexed newImpl, uint256 tokensUpgraded)',
   'event InfrastructureUpdated(address identityRegistry, address compliance)',
+];
+
+// -----------------------------------------------------------------
+// GovernorFactory ABI (per-token governance)
+// -----------------------------------------------------------------
+
+export const GOVERNOR_FACTORY_ABI = [
+  // Register governance for a token
+  'function registerGovernance(address token, address governor, address timelock) external',
+  // Views
+  'function getGovernance(address token) view returns (tuple(address token, address governor, address timelock, uint256 deployedAt))',
+  'function hasGovernance(address token) view returns (bool)',
+  'function governedTokenCount() view returns (uint256)',
+  'function governedTokenAt(uint256 index) view returns (address)',
+  'function allGovernedTokens() view returns (address[])',
+  'function allGovernanceSuites() view returns (tuple(address token, address governor, address timelock, uint256 deployedAt)[])',
+  // Access Control
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  // Events
+  'event GovernanceRegistered(address indexed token, address indexed governor, address indexed timelock, address registeredBy)',
 ];

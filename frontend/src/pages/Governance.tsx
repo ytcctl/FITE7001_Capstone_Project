@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
-import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI } from '../config/contracts';
+import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI } from '../config/contracts';
 import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer } from 'lucide-react';
 
 // Proposal state enum (matches GovernorCountingSimple)
@@ -43,8 +43,25 @@ interface ProposalInfo {
   calldatas: string[];
 }
 
+interface GovernanceSuite {
+  token: string;
+  governor: string;
+  timelock: string;
+  deployedAt: bigint;
+}
+
 const Governance: React.FC = () => {
   const { contracts, account, roles } = useWeb3();
+
+  // ─── Token selector ───────────────────────────────────────
+  const [governanceSuites, setGovernanceSuites] = useState<GovernanceSuite[]>([]);
+  const [selectedToken, setSelectedToken] = useState<string>('');
+  const [tokenNames, setTokenNames] = useState<Record<string, string>>({});
+
+  // ─── Dynamic governor / timelock / token contracts ────────
+  const [activeGovernor, setActiveGovernor] = useState<ethers.Contract | null>(null);
+  const [activeTimelock, setActiveTimelock] = useState<ethers.Contract | null>(null);
+  const [activeToken, setActiveToken] = useState<ethers.Contract | null>(null);
 
   // ─── Governor info ────────────────────────────────────────
   const [govName, setGovName] = useState('');
@@ -83,17 +100,86 @@ const Governance: React.FC = () => {
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ─── Load governor configuration ─────────────────────────
-  const loadGovernorInfo = useCallback(async () => {
+  // ─── Load governed tokens from GovernorFactory ────────────
+  const loadGovernanceSuites = useCallback(async () => {
     if (!contracts) return;
     try {
+      const suites: GovernanceSuite[] = await contracts.governorFactory.allGovernanceSuites();
+      setGovernanceSuites(suites);
+
+      // Also include the legacy single governor if not in factory
+      const legacyGovAddr = await contracts.governor.getAddress();
+      const legacyToken = await contracts.governor.token();
+      const legacyTimelock = await contracts.timelock.getAddress();
+      const hasLegacy = !suites.some(
+        (s: GovernanceSuite) => s.governor.toLowerCase() === legacyGovAddr.toLowerCase()
+      );
+
+      let allSuites = [...suites];
+      if (hasLegacy && legacyGovAddr !== ethers.ZeroAddress) {
+        allSuites = [{ token: legacyToken, governor: legacyGovAddr, timelock: legacyTimelock, deployedAt: 0n }, ...allSuites];
+      }
+      setGovernanceSuites(allSuites);
+
+      // Load token names for display
+      const names: Record<string, string> = {};
+      for (const suite of allSuites) {
+        try {
+          const tokenContract = new ethers.Contract(suite.token, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
+          const [name, symbol] = await Promise.all([tokenContract.name(), tokenContract.symbol()]);
+          names[suite.token] = `${name} (${symbol})`;
+        } catch {
+          names[suite.token] = suite.token.slice(0, 10) + '…';
+        }
+      }
+      setTokenNames(names);
+
+      // Auto-select first token if none selected
+      if (!selectedToken && allSuites.length > 0) {
+        setSelectedToken(allSuites[0].token);
+      }
+    } catch (e) {
+      console.error('Failed to load governance suites:', e);
+      // Fallback: use legacy single governor
+      try {
+        const legacyToken = await contracts.governor.token();
+        const legacyGovAddr = await contracts.governor.getAddress();
+        const legacyTimelock = await contracts.timelock.getAddress();
+        const suite = { token: legacyToken, governor: legacyGovAddr, timelock: legacyTimelock, deployedAt: 0n };
+        setGovernanceSuites([suite]);
+        const tokenContract = new ethers.Contract(legacyToken, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
+        const [name, symbol] = await Promise.all([tokenContract.name(), tokenContract.symbol()]);
+        setTokenNames({ [legacyToken]: `${name} (${symbol})` });
+        if (!selectedToken) setSelectedToken(legacyToken);
+      } catch {
+        // No governance available
+      }
+    }
+  }, [contracts, selectedToken]);
+
+  // ─── Build dynamic contract instances when token selection changes ──
+  useEffect(() => {
+    if (!contracts || !selectedToken || governanceSuites.length === 0) return;
+    const suite = governanceSuites.find((s) => s.token.toLowerCase() === selectedToken.toLowerCase());
+    if (!suite) return;
+
+    const runner = contracts.securityToken.runner;
+    setActiveGovernor(new ethers.Contract(suite.governor, GOVERNOR_ABI, runner));
+    setActiveTimelock(new ethers.Contract(suite.timelock, TIMELOCK_ABI, runner));
+    setActiveToken(new ethers.Contract(suite.token, SECURITY_TOKEN_ABI, runner));
+  }, [contracts, selectedToken, governanceSuites]);
+
+  // ─── Load governor configuration ─────────────────────────
+  const loadGovernorInfo = useCallback(async () => {
+    if (!activeGovernor || !activeTimelock) return;
+    try {
       const [name, delay, period, qNum, pThresh, tlDelay] = await Promise.all([
-        contracts.governor.name(),
-        contracts.governor.votingDelay(),
-        contracts.governor.votingPeriod(),
-        contracts.governor.quorumNumerator(),
-        contracts.governor.proposalThreshold(),
-        contracts.timelock.getMinDelay(),
+        activeGovernor.name(),
+        activeGovernor.votingDelay(),
+        activeGovernor.votingPeriod(),
+        activeGovernor.quorumNumerator(),
+        activeGovernor.proposalThreshold(),
+        activeTimelock.getMinDelay(),
       ]);
       setGovName(name);
       setVotingDelay(delay);
@@ -104,16 +190,16 @@ const Governance: React.FC = () => {
     } catch (e) {
       console.error('Failed to load governor info:', e);
     }
-  }, [contracts]);
+  }, [activeGovernor, activeTimelock]);
 
   // ─── Load user voting info ────────────────────────────────
   const loadVotingInfo = useCallback(async () => {
-    if (!contracts || !account) return;
+    if (!activeToken || !account) return;
     try {
       const [power, del, bal] = await Promise.all([
-        contracts.securityToken.getVotes(account),
-        contracts.securityToken.delegates(account),
-        contracts.securityToken.balanceOf(account),
+        activeToken.getVotes(account),
+        activeToken.delegates(account),
+        activeToken.balanceOf(account),
       ]);
       setVotingPower(power);
       setDelegatee(del);
@@ -121,14 +207,14 @@ const Governance: React.FC = () => {
     } catch (e) {
       console.error('Failed to load voting info:', e);
     }
-  }, [contracts, account]);
+  }, [activeToken, account]);
 
   // ─── Load proposals from events ───────────────────────────
   const loadProposals = useCallback(async () => {
-    if (!contracts) return;
+    if (!activeGovernor) return;
     try {
-      const filter = contracts.governor.filters.ProposalCreated();
-      const events = await contracts.governor.queryFilter(filter, 0, 'latest');
+      const filter = activeGovernor.filters.ProposalCreated();
+      const events = await activeGovernor.queryFilter(filter, 0, 'latest');
       const proposalInfos: ProposalInfo[] = [];
 
       for (const event of events) {
@@ -143,10 +229,10 @@ const Governance: React.FC = () => {
 
         try {
           const [stateNum, snapshot, deadline, votes] = await Promise.all([
-            contracts.governor.state(proposalId),
-            contracts.governor.proposalSnapshot(proposalId),
-            contracts.governor.proposalDeadline(proposalId),
-            contracts.governor.proposalVotes(proposalId),
+            activeGovernor.state(proposalId),
+            activeGovernor.proposalSnapshot(proposalId),
+            activeGovernor.proposalDeadline(proposalId),
+            activeGovernor.proposalVotes(proposalId),
           ]);
 
           proposalInfos.push({
@@ -173,26 +259,31 @@ const Governance: React.FC = () => {
     } catch (e) {
       console.error('Failed to load proposals:', e);
     }
-  }, [contracts]);
+  }, [activeGovernor]);
 
-  // ─── Initial load ─────────────────────────────────────────
+  // ─── Load governance suites on mount ──────────────────────
+  useEffect(() => {
+    if (contracts) loadGovernanceSuites();
+  }, [contracts, loadGovernanceSuites]);
+
+  // ─── Reload governor data when active contracts change ────
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       await Promise.all([loadGovernorInfo(), loadVotingInfo(), loadProposals()]);
       setLoading(false);
     };
-    load();
-  }, [loadGovernorInfo, loadVotingInfo, loadProposals]);
+    if (activeGovernor) load();
+  }, [activeGovernor, activeTimelock, activeToken, loadGovernorInfo, loadVotingInfo, loadProposals]);
 
   // ─── Delegate ─────────────────────────────────────────────
   const handleDelegate = async () => {
-    if (!contracts || !delegateAddr) return;
+    if (!activeToken || !delegateAddr) return;
     setDelegating(true);
     setStatus(null);
     try {
       const addr = delegateAddr === 'self' ? account! : delegateAddr;
-      const tx = await contracts.securityToken.delegate(addr);
+      const tx = await activeToken.delegate(addr);
       await tx.wait();
       setStatus({ type: 'success', message: `Delegated voting power to ${addr.slice(0, 10)}...` });
       setDelegateAddr('');
@@ -206,7 +297,7 @@ const Governance: React.FC = () => {
 
   // ─── Create proposal ─────────────────────────────────────
   const handlePropose = async () => {
-    if (!contracts || !proposalDescription) return;
+    if (!activeGovernor || !proposalDescription) return;
     if (proposalType === 'executable' && !roles.isAdmin && !roles.isAgent) return;
     setProposing(true);
     setStatus(null);
@@ -217,7 +308,7 @@ const Governance: React.FC = () => {
 
       if (proposalType === 'executable') {
         const iface = new ethers.Interface(SECURITY_TOKEN_ABI);
-        target = CONTRACT_ADDRESSES.securityToken;
+        target = selectedToken;
 
         switch (proposalAction) {
           case 'mint': {
@@ -259,11 +350,11 @@ const Governance: React.FC = () => {
         }
       } else {
         // Signaling proposal: no on-chain action
-        target = proposalTarget || await contracts.governor.getAddress();
+        target = proposalTarget || await activeGovernor!.getAddress();
         calldata = '0x';
       }
 
-      const tx = await contracts.governor.propose(
+      const tx = await activeGovernor!.propose(
         [target],
         [value],
         [calldata],
@@ -285,11 +376,11 @@ const Governance: React.FC = () => {
 
   // ─── Cast vote ────────────────────────────────────────────
   const handleVote = async (proposalId: string, support: number) => {
-    if (!contracts) return;
+    if (!activeGovernor) return;
     setVoting(proposalId);
     setStatus(null);
     try {
-      const tx = await contracts.governor.castVote(proposalId, support);
+      const tx = await activeGovernor.castVote(proposalId, support);
       await tx.wait();
       const voteLabel = support === 1 ? 'For' : support === 0 ? 'Against' : 'Abstain';
       setStatus({ type: 'success', message: `Vote cast: ${voteLabel}` });
@@ -303,11 +394,11 @@ const Governance: React.FC = () => {
 
   // ─── Queue proposal ───────────────────────────────────────
   const handleQueue = async (proposal: ProposalInfo) => {
-    if (!contracts) return;
+    if (!activeGovernor) return;
     setStatus(null);
     try {
       const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
-      const tx = await contracts.governor.queue(
+      const tx = await activeGovernor.queue(
         proposal.targets,
         proposal.values,
         proposal.calldatas,
@@ -323,11 +414,11 @@ const Governance: React.FC = () => {
 
   // ─── Execute proposal ─────────────────────────────────────
   const handleExecute = async (proposal: ProposalInfo) => {
-    if (!contracts) return;
+    if (!activeGovernor) return;
     setStatus(null);
     try {
       const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
-      const tx = await contracts.governor.execute(
+      const tx = await activeGovernor.execute(
         proposal.targets,
         proposal.values,
         proposal.calldatas,
@@ -379,6 +470,24 @@ const Governance: React.FC = () => {
           <RefreshCw size={18} className="text-gray-400" />
         </button>
       </header>
+
+      {/* Token Selector */}
+      {governanceSuites.length > 1 && (
+        <div className="glass-card p-4">
+          <label className="block text-sm text-gray-400 mb-2 font-medium">Select Token for Governance</label>
+          <select
+            value={selectedToken}
+            onChange={(e) => setSelectedToken(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm appearance-none cursor-pointer"
+          >
+            {governanceSuites.map((suite) => (
+              <option key={suite.token} value={suite.token} className="bg-gray-900">
+                {tokenNames[suite.token] || suite.token.slice(0, 10) + '…'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Status banner */}
       {status && (
@@ -547,8 +656,8 @@ const Governance: React.FC = () => {
               </div>
 
               <div className="text-xs text-gray-500 bg-white/5 rounded-xl px-4 py-2">
-                Target: <span className="font-mono text-gray-400">{CONTRACT_ADDRESSES.securityToken.slice(0, 10)}…{CONTRACT_ADDRESSES.securityToken.slice(-4)}</span>
-                <span className="ml-2">(HKSTPSecurityToken)</span>
+                Target: <span className="font-mono text-gray-400">{selectedToken.slice(0, 10)}…{selectedToken.slice(-4)}</span>
+                <span className="ml-2">({tokenNames[selectedToken] || 'Security Token'})</span>
               </div>
 
               {(proposalAction === 'mint' || proposalAction === 'burn') && (
@@ -731,8 +840,8 @@ const Governance: React.FC = () => {
           <InfoRow label="Timelock Delay" value={`${timelockDelay.toString()}s (${(Number(timelockDelay) / 3600).toFixed(1)}h)`} />
           <InfoRow label="Proposal Threshold" value={`${ethers.formatEther(proposalThresholdVal)} tokens (1%)`} />
           <InfoRow label="Identity Requirement" value="KYC verified (live check at vote time)" />
-          <InfoRow label="Timelock Address" value={contracts?.timelock?.target?.toString() || '—'} mono />
-          <InfoRow label="Governor Address" value={contracts?.governor?.target?.toString() || '—'} mono />
+          <InfoRow label="Timelock Address" value={activeTimelock?.target?.toString() || '—'} mono />
+          <InfoRow label="Governor Address" value={activeGovernor?.target?.toString() || '—'} mono />
         </dl>
       </div>
     </div>
