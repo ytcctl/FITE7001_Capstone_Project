@@ -40,23 +40,23 @@ export function rpcUrlForBrowser(): string {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0xBa590e0616272F94FdF886Da695782c7F9c0dC82',
-  compliance: '0x4D937dbA57F3228F3061994B5AFA24F924160Dc1',
-  securityToken: '0x284f8B77512efF613A2873045626E7c34Fec09B0',
-  cashToken: '0xC538fd0A079856cE824089c9210AC2dd40C844d8',
-  dvpSettlement: '0x40975C6cacC3A693EF65183afF2c3418A0297850',
-  tokenFactory: '0x0Be199A777EECc870a7b13045946Fef1803Dd9e1',
-  claimIssuer: '0xf03b5af17792D7F7707dc54474083BaCAD17e22F',
-  identityFactory: '0x36A8bE2C24f812ed7a95f14ffEBDB5F778F61699',
-  timelock: '0x68a185CAb9607B9BEb0B210Bf7CC320f3b3A3eFB',
-  governor: '0xD6470D46e2062c4E428375e2D21a0e549B104f3B',
-  walletRegistry: '0x9528a30590cA1E79d4F2dF52c97184296810Ab91',
-  multiSigWarm: '0x28EE8A8F0E4bD7aadd5C8578E15C696D36A95170',
-  oracleCommittee: '0x8F0a859437A5122e2A43C6F6f6f8b54068ad464D',
-  orderBookFactory: '0x51198cF4edEB3AE4f9CA6d6777287906FDF9c738',
-  orderBook: '0x068c8ACA78816edE02562bdB82DCEaf50A757384',
-  tokenFactoryV2: '0xD218078f319c4569Cb1BEfA40a728F15Cef0313E',
-  systemHealthCheck: '0x5bC13f7Eeae521CDD95Cd000B92E586541cF68CE',
+  identityRegistry: '0x5aFEC96d4C650f70845aE9C5FCE318Fb864d1DcA',
+  compliance: '0x6F43253243aF68822462C14Ca3203B51BfDBB1FA',
+  securityToken: '0xa9489f639D2F1794d1a8E1A528b1C11454B1cffA',
+  cashToken: '0x58007B36aFFd661F8D3DC265D409C80f557Eb5e7',
+  dvpSettlement: '0x2C88a29ACbcD2472d1E1698FF8c07b3085B464e2',
+  tokenFactory: '0x046Bfa92B000F015ced65882Bad62Db43993b29B',
+  claimIssuer: '0x96338A290AA80e9A492254de78cEFbeb57B0Dc54',
+  identityFactory: '0xAA881df1D0b4Ab28757059e244d81Ec305a19771',
+  timelock: '0xc4bBed0430F13FE24586Ed18bb223feB733B5ce9',
+  governor: '0x780c6F5e4f56e84Fd1F3E3471F3AFff179Fd80cb',
+  walletRegistry: '0x97756B4B1a23c451FC0543204eA98C12c12Dc888',
+  multiSigWarm: '0x18dfbbbeC4a5A6eE68c7a40B306a3779870AFB5d',
+  oracleCommittee: '0x5694A6cfC42f6dF77E6CC5BC78B7FD397772B401',
+  orderBookFactory: '0x92e1253a32A2a616c52c423e9493cA8Be72010a3',
+  orderBook: '0x3168F97b255A7a11e134cf33F2Ee0c78637c9c0C',
+  tokenFactoryV2: '0x44DA6D482387c5dd88490F8A0cf9e9A066aC3E6a',
+  systemHealthCheck: '0x8eC60639166f38Fb1455f77F956761Bc9c14FD6b',
 };
 
 // -----------------------------------------------------------------
@@ -140,12 +140,12 @@ export const COMPLIANCE_ABI = [
   'function setConcentrationCap(address token, address investor, uint256 cap) external',
   'function setGlobalConcentrationCap(address token, uint256 cap) external',
   'function setJurisdiction(bytes2 jurisdiction, bool allowed) external',
-  'function setLockUp(address investor, uint256 endTime) external',
+  'function setLockUp(address token, address investor, uint256 endTime) external',
   // Views
   'function concentrationCap(address token, address investor) view returns (uint256)',
   'function globalConcentrationCap(address token) view returns (uint256)',
   'function allowedJurisdictions(bytes2 jurisdiction) view returns (bool)',
-  'function lockUpEnd(address investor) view returns (uint256)',
+  'function lockUpEnd(address token, address investor) view returns (uint256)',
   'function domainSeparator() view returns (bytes32)',
   // Verification
   'function verifyAttestation(address from, address to, uint256 amount, uint256 expiry, uint256 nonce, bytes sig) view returns (bool)',
@@ -160,7 +160,7 @@ export const COMPLIANCE_ABI = [
   'event JurisdictionSet(bytes2 indexed jurisdiction, bool allowed)',
   'event GlobalConcentrationCapSet(address indexed token, uint256 cap)',
   'event ConcentrationCapSet(address indexed token, address indexed investor, uint256 cap)',
-  'event LockUpSet(address indexed investor, uint256 lockUpEnd)',
+  'event LockUpSet(address indexed token, address indexed investor, uint256 lockUpEnd)',
 ];
 
 export const SECURITY_TOKEN_ABI = [

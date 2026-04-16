@@ -54,8 +54,8 @@ contract HKSTPCompliance is AccessControl, EIP712 {
     /// @dev Approved jurisdiction codes (ISO-3166 two-letter, e.g. "HK").
     mapping(bytes2 => bool) public allowedJurisdictions;
 
-    /// @dev Per-token lock-up end timestamps: investor => lockUpEnd (Unix).
-    mapping(address => uint256) public lockUpEnd;
+    /// @dev Per-token lock-up end timestamps: token => investor => lockUpEnd (Unix).
+    mapping(address => mapping(address => uint256)) public lockUpEnd;
 
     // -------------------------------------------------------------------------
     // Events
@@ -65,7 +65,7 @@ contract HKSTPCompliance is AccessControl, EIP712 {
     event ConcentrationCapSet(address indexed token, address indexed investor, uint256 cap);
     event GlobalConcentrationCapSet(address indexed token, uint256 cap);
     event JurisdictionSet(bytes2 indexed jurisdiction, bool allowed);
-    event LockUpSet(address indexed investor, uint256 lockUpEnd);
+    event LockUpSet(address indexed token, address indexed investor, uint256 lockUpEnd);
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -137,13 +137,14 @@ contract HKSTPCompliance is AccessControl, EIP712 {
     }
 
     /**
-     * @notice Set a lock-up end timestamp for an investor.
+     * @notice Set a lock-up end timestamp for an investor on a specific token.
+     * @param token    Token contract address.
      * @param investor Investor wallet.
      * @param endTime  Unix timestamp after which the investor may transfer.
      */
-    function setLockUp(address investor, uint256 endTime) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        lockUpEnd[investor] = endTime;
-        emit LockUpSet(investor, endTime);
+    function setLockUp(address token, address investor, uint256 endTime) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        lockUpEnd[token][investor] = endTime;
+        emit LockUpSet(token, investor, endTime);
     }
 
     // -------------------------------------------------------------------------
@@ -231,8 +232,9 @@ contract HKSTPCompliance is AccessControl, EIP712 {
         bytes2  fromCountry,
         bytes2  toCountry
     ) external view returns (bool ok, string memory reason) {
-        // Lock-up check
-        if (lockUpEnd[from] != 0 && block.timestamp < lockUpEnd[from]) {
+        // Lock-up check (keyed by calling token = msg.sender)
+        uint256 lockEnd = lockUpEnd[msg.sender][from];
+        if (lockEnd != 0 && block.timestamp < lockEnd) {
             return (false, "HKSTPCompliance: sender locked up");
         }
 

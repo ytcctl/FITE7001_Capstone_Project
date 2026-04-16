@@ -233,9 +233,11 @@ describe("HKSTPCompliance", function () {
 
     it("should block when sender is under lock-up", async function () {
       const block = await ethers.provider.getBlock("latest");
-      await compliance.connect(admin).setLockUp(alice.address, block.timestamp + 3600);
+      // Set lock-up keyed to tokenRole (simulates the calling token)
+      await compliance.connect(admin).setLockUp(tokenRole.address, alice.address, block.timestamp + 3600);
 
-      const [ok, reason] = await compliance.checkModules(
+      // Call checkModules from tokenRole so msg.sender = token address
+      const [ok, reason] = await compliance.connect(tokenRole).checkModules(
         alice.address, bob.address,
         100n, 200n,
         toBytes2Hex("HK"), toBytes2Hex("HK")

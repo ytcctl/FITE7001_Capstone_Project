@@ -17,6 +17,7 @@ const ComplianceRules: React.FC = () => {
   // Token list for dropdown
   const [tokenList, setTokenList] = useState<{name: string; symbol: string; address: string}[]>([]);
   // Lock-up
+  const [lockToken, setLockToken] = useState('');
   const [lockAddress, setLockAddress] = useState('');
   const [lockDate, setLockDate] = useState('');
   // Read state
@@ -161,12 +162,12 @@ const ComplianceRules: React.FC = () => {
   };
 
   const handleSetLockUp = async () => {
-    if (!contracts || !lockAddress || !lockDate) return;
+    if (!contracts || !lockToken || !lockAddress || !lockDate) return;
     setIsSubmitting(true);
     setTxStatus('Setting lock-up…');
     try {
       const endTime = Math.floor(new Date(lockDate).getTime() / 1000);
-      const tx = await contracts.compliance.setLockUp(lockAddress, endTime);
+      const tx = await contracts.compliance.setLockUp(lockToken, lockAddress, endTime);
       await tx.wait();
       setTxStatus(`✓ Lock-up set for ${lockAddress.slice(0, 10)}… until ${lockDate}`);
     } catch (e: any) {
@@ -341,7 +342,22 @@ const ComplianceRules: React.FC = () => {
             <Clock size={20} className="text-pink-400" />
             <h3 className="font-bold text-white">Lock-Up Period</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Token</label>
+              <select
+                value={lockToken}
+                onChange={(e) => setLockToken(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm"
+              >
+                <option value="" className="bg-gray-900">Select a token…</option>
+                {tokenList.map((t) => (
+                  <option key={t.address} value={t.address} className="bg-gray-900">
+                    {t.symbol} — {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Investor Address</label>
               <input type="text" value={lockAddress} onChange={(e) => setLockAddress(e.target.value)} placeholder="0x…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm" />
@@ -351,7 +367,7 @@ const ComplianceRules: React.FC = () => {
               <input type="datetime-local" value={lockDate} onChange={(e) => setLockDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm" />
             </div>
             <div className="flex items-end">
-              <button onClick={handleSetLockUp} disabled={isSubmitting || !lockAddress || !lockDate} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              <button onClick={handleSetLockUp} disabled={isSubmitting || !lockToken || !lockAddress || !lockDate} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                 Set Lock-Up
               </button>
