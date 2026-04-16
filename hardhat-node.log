@@ -38,7 +38,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            3366824 of 16777216
-  Block #1:            0x0156b3df54035519dc6ea13ca4e572f2e30d40c90b3c34695ca2e002ab5432f6
+  Block #1:            0x62425456bf3e7488e96d309e87a9d8d3447e6f67fcdf035f46a9e10a9eece4d0
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -57,7 +57,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            1525158 of 16777216
-  Block #2:            0xfb7031ec390d521291389594fd789cc2b64f6e4b67d422e0a77ec358b2b41348
+  Block #2:            0x6f6e4ed0829df07f1950d11f0409ecfde227ce75a2f1535b65ca4b741f8c165e
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -81,7 +81,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            3998744 of 16777216
-  Block #3:            0x53b5909851ccee26c776fa36e687cf051567cd8a426b32a8c23c4ae2effd3396
+  Block #3:            0x5f162c7f29263f497dd4180699a1be2483b24cd501561491042f1771ce5aaa67
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -100,7 +100,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            638061 of 16777216
-  Block #4:            0x106fa422002ab7b669a4488b27604fd1a1f6243daae22fa9d7c5e870150799f1
+  Block #4:            0xd7aa70f66fbe68731f2810197e317e17c6dc0aa9579d37c8e9324211b3668930
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -119,7 +119,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            2400335 of 16777216
-  Block #5:            0x57ad521774bde96a7ac941552633f871ce604aa48bffc0f6bd94a8a9d6ae5b58
+  Block #5:            0x7078e7b6aae122eea733103c6dae32d56f6da75843a2505d58eabd7a7f93e917
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -138,7 +138,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            5388647 of 16777216
-  Block #6:            0x789e0c4ce5eb67ea5028040c90041c2350daf25e743321e21d1f73075abfcd13
+  Block #6:            0x86243e1fde74bed13969d9b83ea4f8e6562c790de4001d3acc6c7aad99bb0845
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -157,7 +157,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            745457 of 16777216
-  Block #7:            0x5cd00af8452e7318acc931079d7831f40b1a1efc7e54e1aa8b0af1fa047feb75
+  Block #7:            0x8c81800d2d0efb86d96fd55f53e392b9d19c6673b17065988b6e039fb4edcf40
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -176,7 +176,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            2066047 of 16777216
-  Block #8:            0xc3f423552f84c01b00f4bcd3ec24d516bc7e1c98de12d95e8415e32d7b69afad
+  Block #8:            0xd8380b0189b719044122e5d11e9eb55425f1c61955838b9acd5190d6e3f99065
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -195,7 +195,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            1558894 of 16777216
-  Block #9:            0x6509cc742e4deb9616d5c5cf680d2d4034a853f068983c361d7e9f65e795c7dd
+  Block #9:            0x6a25f446f6d81d6afb7adb687a1d29c2d4f68d983ea0a0a7af28799f9e54b3eb
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -214,7 +214,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            4021207 of 16777216
-  Block #10:           0x864ac1cf4ab7ad6559e7f17b16ff658214f01e5fe58b94d66d881bead709303e
+  Block #10:           0xd58c0ecf82c8f38f0e1766ed610142ddcfaaa1aabcb9eb149803b12b769495de
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -233,7 +233,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            2334380 of 16777216
-  Block #11:           0x5961673ddc2a9be17347939661272ee52792f7efe64326468234f43d139e1c90
+  Block #11:           0xc5f939a904c4c81aeb2c75b0ff39bf02d900d647b9b4cfcf7385a0615494f93b
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -252,7 +252,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            1682368 of 16777216
-  Block #12:           0x03e1a705c24d7786c498a42c8ba119667655f65c25f1dc7db00e951a296b82ec
+  Block #12:           0x31612af71802b0c947b94c6907776b4e32f5e99cac36a5e9ea578126bb08824a
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -271,7 +271,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            1742258 of 16777216
-  Block #13:           0xb3847c68a2269ea10f25af904fe70884e47fc7b3dac2300a6a34017faefcbe6e
+  Block #13:           0x4e03c98d37ca1d730711c35f8568c5a8b3a25bef911882fac508ca79eac201c4
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -290,7 +290,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            3932876 of 16777216
-  Block #14:           0x79899eeeae73354d3fd64e4ded57c2f8740f04070fbdc5dd7e18c530aca350e1
+  Block #14:           0x939784217e56691293492e04cbac42e143f095cb0f9aa5bb0b6880ae2f578bd3
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -309,7 +309,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            2561237 of 16777216
-  Block #15:           0x48a704b9ccde1662630d2609c2154f1aaa5964e99e77366c181f53e965bb9be2
+  Block #15:           0x9d27e0beffa35ad3c287d1c8fe4796adba3ed6311fef26e69830ca86be1b107a
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -328,7 +328,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            1946363 of 16777216
-  Block #16:           0xc25533952ec6852cd3554dec06c8799099514767caf71dc1e50977ed4c5dd1c4
+  Block #16:           0x133587063fab0f6dfc0a89080bb7a82d1d8c113f1ba23248091307b2b169d0c2
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -347,7 +347,7 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
   Gas used:            1508653 of 16777216
-  Block #17:           0xd82cf56e674babff1bef261540a2da30dde9bb728af5f92ad7e5786fede58850
+  Block #17:           0xb42ea01a3643b0ee23b9473321531f6f8fbf488a78d1ff2cc00bff06effb6b8a
 
 [32meth_getTransactionByHash[0m
 [32meth_getTransactionReceipt[0m
@@ -359,13 +359,703 @@ Account #4: 0x821aEa9a577a9b44299B9c15c88cf3087F3b5544 (1000000 ETH)
 [32meth_blockNumber[0m
 [32meth_feeHistory[0m
 [32meth_getTransactionCount[0m
-[31meth_sendRawTransaction[0m
+[32meth_sendRawTransaction[0m
   Contract deployment: GovernorFactory
-  Transaction:         0x1c85b38d9589ceb0e04554a19a55d6cc4a66a14f7b0a876db98e545ae7fa8c42
+  Contract address:    0xd6a7c915066e17ba18024c799258c8a286ffbc00
+  Transaction:         0xc0fb7196171b0fc9a68bbffdce05eef297bec24732d68a501630c73ac06cde48
   From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
   Value:               0 ETH
-  Gas used:            16777216 of 16777216
-  Block #18:           0x19348b16b1b00256d4dc7105bff9e50d76aa39248bcf2f9ebdada402cc108497
+  Gas used:            763395 of 16777216
+  Block #18:           0x200eb76478356f4d7555ef80a20f8a78c7e4b3484ae5bf4628f470ec7ab6756e
 
-  TransactionExecutionError: Transaction reverted: trying to deploy a contract whose code is too large
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPCompliance#TOKEN_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xa50a51c09a5c451c52bb714527e1974b686d8e77
 
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPCompliance#grantRole
+  Transaction:         0xb092a48248138d831c9125278fe1f04d3a89c683f5283fde7267d8297176b604
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xa50a51c09a5c451c52bb714527e1974b686d8e77
+  Value:               0 ETH
+  Gas used:            51552 of 16777216
+  Block #19:           0x76dc024cc047c8870ec86c0b547b990529bb558b5a398d116c0eb030ec81e264
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPCompliance#DEFAULT_ADMIN_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xa50a51c09a5c451c52bb714527e1974b686d8e77
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPCompliance#grantRole
+  Transaction:         0xf28e493bf75f1e88dfd5e2854567c87d7250ebeebec9d1c102912b8fac4c6ef3
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xa50a51c09a5c451c52bb714527e1974b686d8e77
+  Value:               0 ETH
+  Gas used:            51168 of 16777216
+  Block #20:           0x663353a0bdf30deaff63d96441d5d81126ac2a578a76b24958270f52611a2d64
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       DvPSettlement#OPERATOR_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x2e1f232a9439c3d459fceca0beef13acc8259dd8
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       DvPSettlement#grantRole
+  Transaction:         0xaaa7d2ba03abc2ce07fc8e07cdf0c3a9f36f77a3d1b315e5b3b932d9245c0550
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x2e1f232a9439c3d459fceca0beef13acc8259dd8
+  Value:               0 ETH
+  Gas used:            51423 of 16777216
+  Block #21:           0x119341480d49252f262733a68f7dc1b4a7401a2f90ea8ea694cf67f64d423212
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       DvPSettlement#grantRole
+  Transaction:         0x3d3657a6419b4cf4ddd9c1a1599c4f7f8ce80759965989236fed274afec6cf7d
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x2e1f232a9439c3d459fceca0beef13acc8259dd8
+  Value:               0 ETH
+  Gas used:            51423 of 16777216
+  Block #22:           0x6a20d4d66234e3c133ff862b94dc15c8b007319be3cbc008dd07a3302d3145db
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       DvPSettlement#grantRole
+  Transaction:         0xc770f41a30ae430287d07c41d942fea14e16fc63cf72e0173a5e0e3185aa7732
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x2e1f232a9439c3d459fceca0beef13acc8259dd8
+  Value:               0 ETH
+  Gas used:            51423 of 16777216
+  Block #23:           0xe9fe97598bcbef6e45e78a3ba6626a731cef5a4997f6b6d8c529b4799d4888d7
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPSecurityToken#AGENT_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+
+[32meth_call[0m
+  Contract call:       HKSTPIdentityRegistry#AGENT_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#grantRole
+  Transaction:         0x1ced169cd1d76007cebfde8068036debbd84fd9b3c9db6de8917ab0250d79e87
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            51513 of 16777216
+  Block #24:           0x7d78e11ae6f1e4bc9f5273259c63ccb0947b714421122547badc65ae3aa1f462
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#grantRole
+  Transaction:         0x4a930f20788b6f1960bb9ae0ae1f4049e69c60c9028916f08069b803577efd47
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            51573 of 16777216
+  Block #25:           0xb6f33e0c4ac055831c113d5db77f34de3eeddc5bace728c334840ef7873f5d16
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#setIdentityFactory
+  Transaction:         0x0520b0c7544b153f40f10a2fea8dcf15cb8f4d930d4d3fa06984cfe9e9637bde
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            47580 of 16777216
+  Block #26:           0x424541e5ff5134892b709ada7a79fa22c10d8cd2facd5f418e3235bb0856dc92
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       IdentityFactory#DEPLOYER_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xe135783649bfa7c9c4c6f8e528c7f56166efc8a6
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       IdentityFactory#grantRole
+  Transaction:         0x606d8c3df8c49ac928758bdfff2cf4458e5200bb9e59ee1e548469d5cf0e1fa9
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xe135783649bfa7c9c4c6f8e528c7f56166efc8a6
+  Value:               0 ETH
+  Gas used:            51529 of 16777216
+  Block #27:           0xd245640c4680098a88cc3ad92617540ad65b834ed51ced167aebff0079fe911a
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#addTrustedIssuer
+  Transaction:         0x63ca7af94ffc5b8e0e3d2ea8aee89aa58e02274721d3027fd34f50abed67624c
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            429866 of 16777216
+  Block #28:           0x0faa49a46c65c6cb83e75a7462c17c43478843cb01963040ca8f7f3ee71fb3f5
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#setMaxShareholders
+  Transaction:         0x712f5363872e496e90354ea27967c44da3a559b77444596fe8a42580e034298c
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            47062 of 16777216
+  Block #29:           0x25a939f0843c2127016fc584d56141097bca1b916c839407e8fa0f8df4ea22bd
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPTimelock#PROPOSER_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xc9bc439c8723c5c6fdbbe14e5ff3a1224f8a0f7c
+
+[32meth_call[0m
+  Contract call:       HKSTPTimelock#EXECUTOR_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xc9bc439c8723c5c6fdbbe14e5ff3a1224f8a0f7c
+
+[32meth_call[0m
+  Contract call:       HKSTPTimelock#CANCELLER_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xc9bc439c8723c5c6fdbbe14e5ff3a1224f8a0f7c
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPTimelock#grantRole
+  Transaction:         0x4fb07d7c14cb8b92bd52ba3dbb8508c552209f8d1aee982ba87a14f90c394a6e
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xc9bc439c8723c5c6fdbbe14e5ff3a1224f8a0f7c
+  Value:               0 ETH
+  Gas used:            51496 of 16777216
+  Block #30:           0x4b9e03812bc51ba863e3cce844dcaaf24153f3e8aa4b1f0cc7b7af9a211d516d
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPTimelock#grantRole
+  Transaction:         0x07ab73f5e67bcd72513cd61310be5c43de6b0ff53d7c9fc3e9b343ad6b4143e2
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xc9bc439c8723c5c6fdbbe14e5ff3a1224f8a0f7c
+  Value:               0 ETH
+  Gas used:            51496 of 16777216
+  Block #31:           0x05e1811172fc059e994558100f2da86b94d734247b1daf430238ae2bda64b6b9
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPTimelock#grantRole
+  Transaction:         0xc32bf7fc68801c31eb7a78101019e4b53659e414f60b59f161501ed3c5bae814
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xc9bc439c8723c5c6fdbbe14e5ff3a1224f8a0f7c
+  Value:               0 ETH
+  Gas used:            51496 of 16777216
+  Block #32:           0xdd2fb74e64fb85d8ba05de5652b60173c450b2db9da58d8675927fb881d83ebc
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPSecurityToken#DEFAULT_ADMIN_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#grantRole
+  Transaction:         0x94dd84c44dc771b57b30263a8cc17f85f3680db68f93a5e374a51ba65abe690a
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            51129 of 16777216
+  Block #33:           0x1900a87c7bd1bb8f6bb4a75a00607232d3f2ef786c20d67690f5a3495867e2f4
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       GovernorFactory#registerGovernance
+  Transaction:         0x00f685f8e0af0c270732380a552d3d215edf33d57bd9d11f18967e959370539d
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xd6a7c915066e17ba18024c799258c8a286ffbc00
+  Value:               0 ETH
+  Gas used:            160696 of 16777216
+  Block #34:           0x44a1724f5c8f677d4ba224ce7ed4e10e6640eb40ee1b5e1e01254071af0f478f
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       WalletRegistry#addTrackedToken
+  Transaction:         0x2c0a8f1f5d88562fff62184de1cf80914556e95cfbac9d13a436df20cbf59423
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x686afd6e502a81d2e77f2e038a23c0def4949a20
+  Value:               0 ETH
+  Gas used:            92082 of 16777216
+  Block #35:           0x120b3a71cfae30a32836b07a1d7a022b0441363f4bb770210df9fbaf1fde9dde
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       WalletRegistry#addTrackedToken
+  Transaction:         0xc025c3a867d27cd3872ae71dc3d46689d7814d073050ff42866834ab3ba170d9
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x686afd6e502a81d2e77f2e038a23c0def4949a20
+  Value:               0 ETH
+  Gas used:            74982 of 16777216
+  Block #36:           0xc7cef31a6e336aefa517e07a99ee658f202ccaabab9c8cec3c90dbb11808d054
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       WalletRegistry#registerWallet
+  Transaction:         0x9ec149b8b8282a89293c32108a341cb4aacab036e9f1b9437f458eb3ca7ba82f
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x686afd6e502a81d2e77f2e038a23c0def4949a20
+  Value:               0 ETH
+  Gas used:            161662 of 16777216
+  Block #37:           0x728ab3ae91f783e421d83fcd2d7c038869f718fff03255e212ff4447916145cb
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       WalletRegistry#registerWallet
+  Transaction:         0x8e591647b954812f5011943e4cf103b7c7864f9e6ce7a48565c26938c3e9f7e3
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x686afd6e502a81d2e77f2e038a23c0def4949a20
+  Value:               0 ETH
+  Gas used:            144550 of 16777216
+  Block #38:           0x9dea108d7d27de4a3daa00583c28c19d4b83a74c8392ea6f05c93d1436497c9d
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#setSafeList
+  Transaction:         0x59be51f553174648cf626f281832f6ac5aa99c93d705b60757fcb91ba0e46e71
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            48152 of 16777216
+  Block #39:           0x81dba7a07f69c5dc0f3690ad3fd6197fe533a7b88979559a12e774fd191f84d3
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#setSafeList
+  Transaction:         0x9bd22bfddece0715007bd3082808f40e04f6725a508906986ec65b933397f7d2
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            48152 of 16777216
+  Block #40:           0x0f75c10f74dab859d6fd43ebf22428cf0c4d8e08925102d80bcfacae1a57d773
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#setSafeList
+  Transaction:         0x45e8fedeb11b33a526e2b5941995f12ad939171086e7156ebdb36183a3e79a7b
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            48152 of 16777216
+  Block #41:           0xcf803b315a2c89fc8069ddc34c58521803cbb11cf4e64cf4120408e1e063af37
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPCompliance#grantRole
+  Transaction:         0x422b15dee9d8682996888e3deae5730da79ce615230ca85f196f66de2d4d5da1
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xa50a51c09a5c451c52bb714527e1974b686d8e77
+  Value:               0 ETH
+  Gas used:            51168 of 16777216
+  Block #42:           0x25f22128380d6a59e23ce7c0cd0c3a0ba2dcf901ea882a267894bc8ef6c3e3ab
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPCompliance#grantRole
+  Transaction:         0xccce81f1af5fdea94584556654c33d5cb85f9e7f40bdb4d58c4e404ea3db258d
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xa50a51c09a5c451c52bb714527e1974b686d8e77
+  Value:               0 ETH
+  Gas used:            51168 of 16777216
+  Block #43:           0x628d93b055b170c5ecea9ba5456822bc9dd2b9a980584563590c275a71a879e2
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#setSafeList
+  Transaction:         0x8046250c6d54b41defb8b3f6c4ab11e5cf61b850258589d4e7ed6285b9fd53a9
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            48152 of 16777216
+  Block #44:           0x0132c34cc73b2536a99ef9f9b94929e9d86b67de27ce0ceeda96a17e75d89254
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPIdentityRegistry#AGENT_ROLE
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+
+[32meth_call[0m
+  Contract call:       HKSTPIdentityRegistry#hasRole
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+
+[32meth_call[0m
+  Contract call:       HKSTPIdentityRegistry#contains
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+
+[32meth_call[0m
+  Contract call:       IdentityFactory#getIdentity
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xe135783649bfa7c9c4c6f8e528c7f56166efc8a6
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#registerIdentity
+  Transaction:         0x3a98245fc082c11d568a9bbf953aef8eb24f4fc35bca5fbc785e9afa48dddb46
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            684852 of 16777216
+  Block #45:           0x3b5d777e5db67ab2a79b0cf4c3beda1476ba227dff714ef372025e6d75d6fc32
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#setClaim
+  Transaction:         0x1c285f4899c94d0cf3a0c027593243e930464d1dc9dd9098686ad6f6d6d52910
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            53086 of 16777216
+  Block #46:           0xb73e9eff0f245fcd8ee027a08adcd1ae76581bb6ebf5405d5750625413528f64
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#setClaim
+  Transaction:         0xe3a2f7f45b6d70190bf33496f216c90fbe480089ed68471cc500b7fc85a5a513
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            53086 of 16777216
+  Block #47:           0xa872ce055783f9743bd89d7d1c0b70f876d88bbc4f905686444f7afc85227ad8
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#setClaim
+  Transaction:         0x8afab7f29e15ab03adee8957d024c25fe82ed44f4789e5eb2b7d446670cf33e0
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            53086 of 16777216
+  Block #48:           0x5762eaf461ad032d7b4f0496a0dd2cf533b9be55b4762f4019e08387a2d1964c
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#setClaim
+  Transaction:         0x277315dfe4a57215c007977b4e519d770eaccfe4b7234d9cad7488ba456e213b
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            53086 of 16777216
+  Block #49:           0xcc51913c62c440f627e6dfbdc67558ed097630844a691917c7ad35ab8f529990
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#setClaim
+  Transaction:         0xfec33b60a932923ac992e954021693260d630c2d49ee38e126c77ba37d8ffeb8
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            53086 of 16777216
+  Block #50:           0xe435a4dd3805a9dd2a099c6cb442408bc76ddde1496e2b54813a535bd3190b15
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPIdentityRegistry#identity
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+
+[32meth_call[0m
+  Contract call:       ClaimIssuer#getClaimHash
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xfeae27388a65ee984f452f86effed42aabd438fd
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#issueClaim
+  Transaction:         0x416cd63b2d1d92756bd2e77e18d2d8b1c6b35ea77a6fe0816bf049471cb5713a
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            328638 of 16777216
+  Block #51:           0x7fb97379c3310af44333e969882e2699d3c0e901870dba2b17261f536c81c110
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       ClaimIssuer#getClaimHash
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xfeae27388a65ee984f452f86effed42aabd438fd
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#issueClaim
+  Transaction:         0x544d3849fc5177203dad56ded0091c6f08bc1ba07e685b1c62fb1fac15aaaa55
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            328626 of 16777216
+  Block #52:           0xe71761bb5dbf1a95ae3184f637e26c2f8897981eb784a8aeae63520c17910fe9
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       ClaimIssuer#getClaimHash
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xfeae27388a65ee984f452f86effed42aabd438fd
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#issueClaim
+  Transaction:         0x531b23782d16102b2a27a12df1176583a1857ed8972a2d88702350ce9331d6dc
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            328638 of 16777216
+  Block #53:           0x448f2eb428e48cab162aa650390d9c50cf343a79830e25a2671d720d2e7edf19
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       ClaimIssuer#getClaimHash
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xfeae27388a65ee984f452f86effed42aabd438fd
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#issueClaim
+  Transaction:         0x759123b2a52df7ea05774a952ed52a22e33a8d14b3d1ec8073a5b28eb29e9bc4
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            328638 of 16777216
+  Block #54:           0x3f2847f77dff81ecff536b677b0370d2454aab408d2a706000510ab817e807eb
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       ClaimIssuer#getClaimHash
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0xfeae27388a65ee984f452f86effed42aabd438fd
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPIdentityRegistry#issueClaim
+  Transaction:         0xd00f9c4a343f34315b07d80b79bf23ef6ebed4e920377e4511c17a48df18d9dc
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+  Value:               0 ETH
+  Gas used:            328638 of 16777216
+  Block #55:           0xed4ce4d82625f7f344fa9891b2f044339f6abac9ef04c5c334e40a21e463f438
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPIdentityRegistry#isVerified
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x42699a7612a82f1d9c36148af9c77354759b210b
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       HKSTPSecurityToken#mint
+  Transaction:         0xc6a2baeac1da56d5f49ebb09170329bbbd7bd82d2cf0491f3a7dba793d31a1f1
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+  Value:               0 ETH
+  Gas used:            609887 of 16777216
+  Block #56:           0x5e3ebc0105e4d4d0a3888c0afe905bfb6e5217a907fc52b2259e1bf3a3fe5319
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       HKSTPSecurityToken#balanceOf
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9a3dbca554e9f6b9257aaa24010da8377c57c17e
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       MockCashToken#mint
+  Transaction:         0x4ef11dc0b6ba1164575d0f929ba9562b631ebf773bebfbf637f67bd5757fd42e
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9b8397f1b0fecd3a1a40cdd5e8221fa461898517
+  Value:               0 ETH
+  Gas used:            70635 of 16777216
+  Block #57:           0x86100d4f53db819d1dbd86b01402b092b9c169b843794ec7a532a87cf428210b
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       MockCashToken#balanceOf
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  To:                  0x9b8397f1b0fecd3a1a40cdd5e8221fa461898517
+
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32meth_blockNumber[0m
+[32meth_getBlockByNumber[0m
+[32meth_feeHistory[0m
+[32meth_getTransactionCount[0m
+[32meth_chainId[0m
+[32meth_sendRawTransaction[0m
+  Contract deployment: SystemHealthCheck
+  Contract address:    0xdf3149b11d7457ea472a56463bb9c0928fc25946
+  Transaction:         0xaab54140574333f1c021150cd51bc3d52deeab8a7d6532140c8f897419085296
+  From:                0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+  Value:               0 ETH
+  Gas used:            1508653 of 16777216
+  Block #58:           0xd16ae084d87829faa70bb2c8b9b33f7901140782ea346988b80cd2b45360169c
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m

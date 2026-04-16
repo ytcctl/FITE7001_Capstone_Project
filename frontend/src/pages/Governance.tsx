@@ -472,7 +472,7 @@ const Governance: React.FC = () => {
       </header>
 
       {/* Token Selector */}
-      {governanceSuites.length > 1 && (
+      {governanceSuites.length >= 1 && (
         <div className="glass-card p-4">
           <label className="block text-sm text-gray-400 mb-2 font-medium">Select Token for Governance</label>
           <select
