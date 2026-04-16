@@ -4,6 +4,57 @@ import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI } from '../config/contracts';
 import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer, Rocket } from 'lucide-react';
 
+// ─── Human-readable error decoder for Governor / Timelock custom errors ───
+function decodeGovernanceError(e: any): string {
+  // ethers v6 sometimes populates e.reason
+  if (e.reason && !e.reason.includes('unknown custom error')) return e.reason;
+
+  // Try to decode the revert data from the error
+  const data: string | undefined =
+    e.data ?? e.error?.data ?? e.transaction?.data ? undefined : undefined;
+  const revertData: string | undefined =
+    e.data ?? e.error?.data;
+
+  if (revertData && revertData.startsWith('0x')) {
+    const sel = revertData.slice(0, 10);
+    try {
+      // GovernorInsufficientProposerVotes(address proposer, uint256 votes, uint256 threshold)
+      if (sel === '0xc242ee16') {
+        const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+          ['address', 'uint256', 'uint256'], '0x' + revertData.slice(10));
+        const votes = Number(ethers.formatUnits(decoded[1], 18));
+        const threshold = Number(ethers.formatUnits(decoded[2], 18));
+        return `Insufficient voting power to propose. You have ${votes.toLocaleString()} votes but need at least ${threshold.toLocaleString()}.`;
+      }
+      // GovernorUnexpectedProposalState
+      if (sel === '0x5765a514') {
+        return 'Proposal is not in the expected state for this action.';
+      }
+      // GovernorAlreadyCastVote
+      if (sel === '0x45c4b9e6') {
+        return 'You have already voted on this proposal.';
+      }
+      // GovernorNonexistentProposal
+      if (sel === '0xa8f42a59') {
+        return 'This proposal does not exist.';
+      }
+      // GovernorRestrictedProposer
+      if (sel === '0x3d523170') {
+        return 'You are not authorized to submit proposals.';
+      }
+      // TimelockUnexpectedOperationState
+      if (sel === '0x7a3c4c17') {
+        return 'Timelock operation is not in the expected state.';
+      }
+    } catch { /* ignore decode failures */ }
+  }
+
+  // Fallback: clean up the message
+  const msg: string = e.shortMessage || e.message || 'Transaction failed';
+  // Strip long hex data from the message
+  return msg.replace(/\(data="0x[0-9a-fA-F]+"/, '(data=…').replace(/transaction=\{[^}]+\}/, '').trim();
+}
+
 // Proposal state enum (matches GovernorCountingSimple)
 const PROPOSAL_STATES = [
   'Pending',    // 0
@@ -355,7 +406,7 @@ const Governance: React.FC = () => {
       setDelegateAddr('');
       await loadVotingInfo();
     } catch (e: any) {
-      setStatus({ type: 'error', message: e.reason || e.message || 'Delegation failed' });
+      setStatus({ type: 'error', message: decodeGovernanceError(e) });
     } finally {
       setDelegating(false);
     }
@@ -434,7 +485,7 @@ const Governance: React.FC = () => {
       setActionParam2('');
       await loadProposals();
     } catch (e: any) {
-      setStatus({ type: 'error', message: e.reason || e.message || 'Proposal failed' });
+      setStatus({ type: 'error', message: decodeGovernanceError(e) });
     } finally {
       setProposing(false);
     }
@@ -452,7 +503,7 @@ const Governance: React.FC = () => {
       setStatus({ type: 'success', message: `Vote cast: ${voteLabel}` });
       await loadProposals();
     } catch (e: any) {
-      setStatus({ type: 'error', message: e.reason || e.message || 'Vote failed' });
+      setStatus({ type: 'error', message: decodeGovernanceError(e) });
     } finally {
       setVoting(null);
     }
@@ -474,7 +525,7 @@ const Governance: React.FC = () => {
       setStatus({ type: 'success', message: 'Proposal queued in Timelock!' });
       await loadProposals();
     } catch (e: any) {
-      setStatus({ type: 'error', message: e.reason || e.message || 'Queue failed' });
+      setStatus({ type: 'error', message: decodeGovernanceError(e) });
     }
   };
 
@@ -494,7 +545,7 @@ const Governance: React.FC = () => {
       setStatus({ type: 'success', message: 'Proposal executed!' });
       await loadProposals();
     } catch (e: any) {
-      setStatus({ type: 'error', message: e.reason || e.message || 'Execution failed' });
+      setStatus({ type: 'error', message: decodeGovernanceError(e) });
     }
   };
 
@@ -602,7 +653,7 @@ const Governance: React.FC = () => {
       await loadGovernanceSuites();
     } catch (e: any) {
       console.error('Deploy governance failed:', e);
-      setStatus({ type: 'error', message: e.reason || e.message || 'Failed to deploy governance' });
+      setStatus({ type: 'error', message: decodeGovernanceError(e) });
     } finally {
       setDeployingGov(false);
     }
