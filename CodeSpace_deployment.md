@@ -12,3 +12,10 @@ start a new terminal then run below code
 cd frontend && npm run dev
 
 ## 4. For the port forward tab in the bottom panel of VSCode, make both port 8545 and 3000 from private to public
+
+You just open the Codespace and everything is ready. No commands needed.
+
+If you ever need to start fresh (wipe all data), delete the state file first:
+
+rm .devcontainer/anvil-state.json
+bash .devcontainer/start.sh
