@@ -111,6 +111,23 @@ contract OrderBook is ReentrancyGuard, Pausable, AccessControl {
         uint256 timestamp
     );
 
+    event OrderForceCancelled(
+        uint256 indexed orderId,
+        address indexed trader,
+        address indexed cancelledBy,
+        string  reason,
+        uint256 timestamp
+    );
+
+    /// @notice Emitted when a force-cancel cannot refund tokens due to compliance
+    ///         restrictions.  Tokens remain escrowed in the OrderBook contract.
+    event TokensEscrowed(
+        uint256 indexed orderId,
+        address indexed trader,
+        uint256 amount,
+        string  tokenType
+    );
+
     event TradeExecuted(
         uint256 indexed tradeId,
         uint256 indexed buyOrderId,
@@ -261,6 +278,92 @@ contract OrderBook is ReentrancyGuard, Pausable, AccessControl {
         _removeFromTraderOrders(msg.sender, orderId);
 
         emit OrderCancelled(orderId, msg.sender, block.timestamp);
+    }
+
+    // -------------------------------------------------------------------------
+    // Force Cancel (Admin / Compliance)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice Force-cancel an open order. Only callable by DEFAULT_ADMIN_ROLE.
+     *         Refunds remaining locked tokens to the original trader.
+     * @param orderId The order to force-cancel.
+     * @param reason  Human-readable reason (e.g. "KYC revoked", "PEP flagged").
+     */
+    function forceCancelOrder(uint256 orderId, string calldata reason)
+        external
+        nonReentrant
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        _forceCancel(orderId, reason);
+    }
+
+    /**
+     * @notice Cancel ALL open orders for an investor who is no longer KYC-verified.
+     *         Checks `identityRegistry.isVerified()` and reverts if the investor
+     *         is still verified (guards against accidental misuse).
+     * @param investor The investor whose orders should be cancelled.
+     */
+    function cancelOrdersForNonCompliant(address investor)
+        external
+        nonReentrant
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(
+            !identityRegistry.isVerified(investor),
+            "OrderBook: investor is still verified"
+        );
+
+        uint256[] memory oids = _traderOrders[investor];
+        uint256 cancelled = 0;
+        for (uint256 i = 0; i < oids.length; i++) {
+            Order storage o = orders[oids[i]];
+            if (o.status == OrderStatus.Open || o.status == OrderStatus.PartiallyFilled) {
+                _forceCancel(oids[i], "KYC/compliance revoked");
+                cancelled++;
+            }
+        }
+        require(cancelled > 0, "OrderBook: no open orders to cancel");
+    }
+
+    /**
+     * @dev Internal helper: force-cancel a single order and refund locked tokens.
+     *      Attempts to refund to the original trader.  If the security-token
+     *      compliance layer blocks the transfer (e.g. KYC revoked), the tokens
+     *      are sent to the admin (msg.sender) for manual disposition.
+     */
+    function _forceCancel(uint256 orderId, string memory reason) internal {
+        Order storage o = orders[orderId];
+        require(
+            o.status == OrderStatus.Open || o.status == OrderStatus.PartiallyFilled,
+            "OrderBook: not cancellable"
+        );
+
+        o.status = OrderStatus.Cancelled;
+        uint256 remaining = o.quantity - o.filled;
+
+        if (o.side == Side.Buy) {
+            uint256 refund = _cashAmount(o.price, remaining);
+            // Cash tokens (THKD) have no compliance hook — always succeeds
+            cashToken.transfer(o.trader, refund);
+            _removeFromArray(buyOrderIds, orderId);
+        } else {
+            // Security tokens may block transfer to non-verified recipient.
+            // Try refund to trader; if compliance blocks it, tokens remain
+            // escrowed in this contract for admin disposition via forcedTransfer.
+            try securityToken.transfer(o.trader, remaining) returns (bool) {
+                // Refund succeeded — tokens returned to trader
+            } catch {
+                // Tokens stay in the OrderBook — admin must use
+                // HKSTPSecurityToken.forcedTransfer() to move them.
+                emit TokensEscrowed(orderId, o.trader, remaining, "securityToken");
+            }
+            _removeFromArray(sellOrderIds, orderId);
+        }
+
+        _removeFromTraderOrders(o.trader, orderId);
+
+        emit OrderForceCancelled(orderId, o.trader, msg.sender, reason, block.timestamp);
     }
 
     // -------------------------------------------------------------------------

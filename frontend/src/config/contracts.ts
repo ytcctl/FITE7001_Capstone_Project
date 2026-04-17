@@ -551,6 +551,9 @@ export const ORDER_BOOK_ABI = [
   'function placeSellOrder(uint256 price, uint256 quantity) returns (uint256)',
   // Cancel
   'function cancelOrder(uint256 orderId) external',
+  // Force Cancel (Admin)
+  'function forceCancelOrder(uint256 orderId, string reason) external',
+  'function cancelOrdersForNonCompliant(address investor) external',
   // Views — order book
   'function getBuyOrderIds() view returns (uint256[])',
   'function getSellOrderIds() view returns (uint256[])',
@@ -581,6 +584,7 @@ export const ORDER_BOOK_ABI = [
   // Events
   'event OrderPlaced(uint256 indexed orderId, address indexed trader, uint8 side, uint256 price, uint256 quantity, uint256 timestamp)',
   'event OrderCancelled(uint256 indexed orderId, address indexed trader, uint256 timestamp)',
+  'event OrderForceCancelled(uint256 indexed orderId, address indexed trader, address indexed cancelledBy, string reason, uint256 timestamp)',
   'event TradeExecuted(uint256 indexed tradeId, uint256 indexed buyOrderId, uint256 indexed sellOrderId, address buyer, address seller, uint256 price, uint256 quantity, uint256 cashAmount, uint256 timestamp)',
 ];
 
