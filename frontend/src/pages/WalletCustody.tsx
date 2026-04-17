@@ -831,6 +831,7 @@ const WalletCustody: React.FC = () => {
                   <thead>
                     <tr className="text-gray-500 text-xs uppercase border-b border-white/5">
                       <th className="text-left py-2 px-2"><Hash size={12} className="inline" /> ID</th>
+                      <th className="text-left py-2 px-2">Token</th>
                       <th className="text-left py-2 px-2">To</th>
                       <th className="text-left py-2 px-2">Amount</th>
                       <th className="text-left py-2 px-2">Reason</th>
@@ -843,6 +844,7 @@ const WalletCustody: React.FC = () => {
                     {multiSigTxs.map((tx) => (
                       <tr key={tx.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                         <td className="py-2 px-2 text-gray-400">{tx.id}</td>
+                        <td className="py-2 px-2 text-yellow-300">{tokenOptions.find(t => t.address === tx.token)?.symbol || shortAddr(tx.token)}</td>
                         <td className="py-2 px-2 font-mono text-gray-300">{shortAddr(tx.to)}</td>
                         <td className="py-2 px-2 text-white">{formatTokens(tx.amount)}</td>
                         <td className="py-2 px-2 text-gray-400">{tx.reason}</td>

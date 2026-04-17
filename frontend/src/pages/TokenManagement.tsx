@@ -149,8 +149,15 @@ const TokenManagement: React.FC = () => {
           await trackTx.wait();
         } catch (trackErr) {
           console.warn('Auto-track token in WalletRegistry failed:', trackErr);
-        }
-      }
+        }        // Auto-safe-list MultiSigWarm on the new token so custody transfers work
+        try {
+          const newToken = new ethers.Contract(newAddress, ['function setSafeList(address,bool)'], contracts.securityToken.runner);
+          const msAddr = await contracts.multiSigWarm.getAddress();
+          const safeTx = await newToken.setSafeList(msAddr, true);
+          await safeTx.wait();
+        } catch (safeErr) {
+          console.warn('Auto-safe-list MultiSigWarm on new token failed:', safeErr);
+        }      }
 
       setCreateSuccess(
         `✅ Token "${tokenName}" (${tokenSymbol}) created at ${newAddress}`
@@ -256,8 +263,15 @@ const TokenManagement: React.FC = () => {
           await trackTx.wait();
         } catch (trackErr) {
           console.warn('Auto-track V2 token in WalletRegistry failed:', trackErr);
-        }
-      }
+        }        // Auto-safe-list MultiSigWarm on the new token so custody transfers work
+        try {
+          const newToken = new ethers.Contract(newAddress, ['function setSafeList(address,bool)'], contracts.securityToken.runner);
+          const msAddr = await contracts.multiSigWarm.getAddress();
+          const safeTx = await newToken.setSafeList(msAddr, true);
+          await safeTx.wait();
+        } catch (safeErr) {
+          console.warn('Auto-safe-list MultiSigWarm on new V2 token failed:', safeErr);
+        }      }
 
       setCreateSuccessV2(`✅ Upgradeable token "${v2TokenName}" (${v2TokenSymbol}) created at ${newAddress}`);
       setV2TokenName('');

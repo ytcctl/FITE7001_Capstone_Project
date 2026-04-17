@@ -100,11 +100,15 @@ const Portfolio: React.FC = () => {
     try { to = ethers.getAddress(transferTo.trim()); } catch { setTxStatus('✗ Invalid recipient address'); return; }
 
     // KYC gate: verify recipient is registered and KYC-verified before any transfer
+    // Safe-listed addresses (custody wallets, escrow, treasury) bypass KYC checks
     try {
-      const recipientVerified = await contracts.identityRegistry.isVerified(to);
-      if (!recipientVerified) {
-        setTxStatus('✗ Recipient is not KYC-verified. Transfers are only permitted to verified investors.');
-        return;
+      const isSafeListed = await contracts.securityToken.safeListed(to);
+      if (!isSafeListed) {
+        const recipientVerified = await contracts.identityRegistry.isVerified(to);
+        if (!recipientVerified) {
+          setTxStatus('✗ Recipient is not KYC-verified. Transfers are only permitted to verified investors or safe-listed addresses.');
+          return;
+        }
       }
     } catch {
       setTxStatus('✗ Unable to verify recipient KYC status. Please try again.');
