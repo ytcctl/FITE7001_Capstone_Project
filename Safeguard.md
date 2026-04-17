@@ -524,3 +524,49 @@ governance votes that record token holder sentiment on the blockchain.
 | **Security** | Executable proposals are gated to admin/agent, preventing unauthorized minting, burning, or pausing. |
 | **Audit trail** | Both types are recorded on-chain with full vote tallies, making governance decisions transparent and verifiable. |
 | **Regulatory alignment** | Under HK SFC guidelines, investor participation in governance is encouraged, but privileged operations (supply changes, transfer restrictions) must remain under authorized control. |
+
+---
+
+## Safe-Listed Status (Portfolio Page)
+
+The Portfolio page displays four identity/compliance indicators for the
+connected wallet: **Registered**, **Verified**, **Frozen**, and
+**Safe-Listed**. These statuses serve different purposes:
+
+| Status | Meaning | Who Gets It |
+|---|---|---|
+| **Registered** | Address exists in the Identity Registry | All onboarded investors |
+| **Verified** | KYC / claim-topic attestations are valid | All compliant investors |
+| **Frozen** | All transfers blocked for this address | Addresses flagged by admin |
+| **Safe-Listed** | Bypasses compliance checks entirely on transfers | Only system contracts / operational wallets (treasury, escrow, OrderBook, custody) |
+
+### Why Is My Account Not Safe-Listed?
+
+**Normal investor accounts should always show "Safe-Listed: No".** This is
+the correct and expected state.
+
+Safe-listing is an **admin-only privilege** granted via
+`setSafeList(address, bool)` on `HKSTPSecurityToken`. It is reserved for
+trusted infrastructure addresses (e.g. OrderBook escrow contracts, treasury,
+custody wallets) so they can move tokens without triggering KYC checks on
+themselves. It is **not** part of the investor onboarding flow.
+
+### How Safe-Listing Affects Transfers
+
+The `_update()` hook in `HKSTPSecurityToken` evaluates safe-listed status on
+every mint, burn, and transfer:
+
+- If **both** sender and recipient are safe-listed → the entire compliance
+  pipeline (identity registry, claim checks, concentration caps) is skipped.
+- If **only one** side is safe-listed → the other party still undergoes full
+  compliance verification.
+- If **neither** side is safe-listed → both parties must be registered,
+  verified, and pass all compliance module checks.
+
+### Summary
+
+An investor with **Registered: Yes**, **Verified: Yes**, **Safe-Listed: No**
+is fully compliant and can trade normally. The compliance pipeline verifies
+their identity on each transfer and allows it through because they are
+registered and verified. No action is required to change the safe-listed
+status for investor accounts.
