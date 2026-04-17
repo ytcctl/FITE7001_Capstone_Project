@@ -180,6 +180,7 @@ ERC-3643 (T-REX) inspired security token — **one token per HKSTP portfolio sta
 |---------|-------------|
 | Transfer control | Every transfer checks Identity Registry + Compliance modules |
 | Safe-list | Operational addresses (treasury, escrow) bypass per-transfer attestation |
+| Minting enforcement | Mints (`from == address(0)`) pass through the full compliance pipeline — concentration caps, jurisdiction, KYC checks are enforced on the recipient. Only burns (`to == address(0)`) skip compliance. |
 | Minting / Burning | `AGENT_ROLE` for day-to-day mints; `TIMELOCK_MINTER_ROLE` required above `mintThreshold` |
 | Supply cap | `maxSupply` hard ceiling prevents unlimited inflation (0 = unlimited) |
 | Pause | Admin can emergency-pause all transfers |
@@ -202,7 +203,7 @@ Modular compliance contract — "**Policy off-chain, enforcement on-chain**".
 
 - **EIP-712 attestation** — Per-transfer signed approval from Compliance Oracle, bound to `(from, to, amount, expiry, nonce)`
 - **Replay protection** — Each attestation hash is one-time-use
-- **Modules** — Concentration caps, jurisdiction whitelist / blacklist, lock-up enforcement
+- **Per-token modules** — Concentration caps (per-investor and global), jurisdiction whitelist / blacklist, and lock-up periods are all stored **per token address**, allowing each security token deployed through the factory to have independent compliance rules. The token contract calls `checkModules()` during `_update()`, and `msg.sender` (the token contract) is used as the key — no interface change required.
 
 #### `DvPSettlement.sol`
 Atomic **Delivery-versus-Payment** settlement contract.
@@ -336,6 +337,16 @@ Modified OpenZeppelin Governor — ensures only **verified identity holders** ca
 
 #### `governance/HKSTPTimelock.sol`
 `TimelockController` — enforces a 48-hour execution delay on passed proposals, giving shareholders a final review window.
+
+#### `governance/GovernorFactory.sol`
+Per-token governance registry — stores a mapping of security token → (Governor, Timelock) suites so each factory-deployed token can have its own governance instance.
+
+| Feature | Description |
+|---------|-------------|
+| `registerGovernance()` | Links a token address to its Governor + Timelock pair |
+| `getGovernance()` | Look up the governance suite for a given token |
+| `governedTokens()` | List all tokens with registered governance |
+| Role-gated | `DEFAULT_ADMIN_ROLE` required to register governance |
 
 ### 3.6  Operations & Utilities
 
@@ -476,7 +487,8 @@ contracts/
 │   └── MultiSigWarm.sol          # 2-of-3 multi-sig warm wallet
 ├── governance/
 │   ├── HKSTPGovernor.sol         # OZ Governor + KYC-gated voting
-│   └── HKSTPTimelock.sol         # 48-hour execution delay
+│   ├── HKSTPTimelock.sol         # 48-hour execution delay
+│   └── GovernorFactory.sol       # Per-token governance registry
 ├── identity/
 │   ├── Identity.sol              # ONCHAINID (ERC-734/735)
 │   ├── IIdentity.sol             # Identity interface
@@ -532,7 +544,7 @@ npx hardhat compile
 | `npm run deploy:besu:raw` | `hardhat run scripts/deploy.js --network besu` | Deploy to Besu (requires separate block producer) |
 | `npm run clean` | `hardhat clean` | Remove artifacts & cache |
 
-> **Recommended workflow:** Use `deploy-and-update-frontend.js` (see §9 below) instead of the individual `deploy:local` script — it deploys all 14 contracts, seeds Investor1, and auto-updates the frontend config.
+> **Recommended workflow:** Use `deploy-and-update-frontend.js` (see §9 below) instead of the individual `deploy:local` script — it deploys all 18 contracts, seeds Investor1, and auto-updates the frontend config.
 
 ---
 
@@ -599,7 +611,7 @@ npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 ```
 
 `deploy-and-update-frontend.js` is the **unified deploy script** that:
-1. Deploys all **14 contracts** (IdentityRegistry → Compliance → SecurityToken → … → OrderBook → SystemHealthCheck)
+1. Deploys all **18 contracts** (IdentityRegistry → Compliance → SecurityToken → … → OrderBook → GovernorFactory → SystemHealthCheck)
 2. Configures all roles, safe-lists, ONCHAINID wiring, governance, and custody links
 3. **Seeds Investor1** — registers identity, sets KYC claims 1–5, issues ERC-735 on-chain claims, mints 10,000 HKSAT + 5,000,000 THKD
 4. **Auto-updates** `frontend/src/config/contracts.ts` with all deployed addresses (including `orderBook`)
@@ -676,8 +688,12 @@ The unified `deploy-and-update-frontend.js` deploys contracts in this order:
 | 10 | `HKSTPGovernor` | OZ Governor + KYC-gated voting |
 | 11 | `WalletRegistry` | Custody tier registry + 98/2 enforcement |
 | 12 | `MultiSigWarm` | 2-of-3 warm wallet multi-sig |
-| 13 | `OrderBook` | On-chain limit-order book with KYC gate |
-| 14 | `SystemHealthCheck` | Post-deployment wiring verification (optional) |
+| 13 | `OracleCommittee` | Multi-oracle threshold attestation |
+| 14 | `OrderBookFactory` | Deploys one OrderBook per security-token / cash-token pair |
+| 15 | `OrderBook` | On-chain limit-order book with KYC gate |
+| 16 | `TokenFactoryV2` | Upgradeable proxy factory (ERC-1967) |
+| 17 | `SystemHealthCheck` | Post-deployment wiring verification (optional) |
+| 18 | `GovernorFactory` | Per-token governance registry |
 
 After deployment, the script automatically:
 - Configures all roles (AGENT, OPERATOR, TOKEN, FACTORY, etc.)

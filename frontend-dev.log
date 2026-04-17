@@ -1,0 +1,9 @@
+
+  VITE v5.4.21  ready in 1599 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://10.0.13.153:3000/
+Error: spawn xdg-open ENOENT
+    at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)

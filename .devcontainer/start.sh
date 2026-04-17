@@ -40,7 +40,7 @@ done
 
 # ── 2. Deploy all contracts ─────────────────────────────────────
 echo ""
-echo "▶ Deploying all contracts (17 contracts + roles + seed investor + frontend auto-update)..."
+echo "▶ Deploying all contracts (18 contracts + roles + seed investor + frontend auto-update)..."
 npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 
 # ── 3. (Optional) Deploy SystemHealthCheck ───────────────────────

@@ -6,7 +6,7 @@
 
 ## Architecture Overview
 
-TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible) with four validator nodes — HKSTP, Platform Operator, Licensed Custodian, and Regulator Observer.
+TokenHub operates on a **Hardhat Network** (development) or **Hyperledger Besu** (production-like) EVM-compatible blockchain. The Hardhat Network is the recommended development environment — it auto-mines instantly, pre-funds accounts, and requires zero external dependencies. Besu is available as an optional production-like alternative with four validator nodes.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -22,7 +22,7 @@ TokenHub operates on a **Hyperledger Besu** permissioned network (EVM-compatible
          └─────────────────────────┬────────────────────────┘
                                    │
 ┌──────────────────────────────────▼───────────────────────────────────────┐
-│                  HYPERLEDGER BESU  (Permissioned EVM)                    │
+│                  HARDHAT NETWORK / BESU  (EVM)                           │
 │                                                                          │
 │  ┌─────────────────────┐  ┌───────────────────────┐  ┌───────────────┐  │
 │  │ HKSTPSecurityToken  │  │ HKSTPIdentityRegistry │  │ TokenFactory  │  │
@@ -298,6 +298,8 @@ Multi-oracle committee that replaces single-signer compliance attestation with a
 | Oracle management | `addOracle()` / `removeOracle()` / `setThreshold()` — admin-gated |
 | EIP-712 domain | Full domain separator for structured attestation data |
 
+> **Production-readiness note:** The devnet currently uses a single Compliance Oracle via `consumeAttestation()` for convenience. In a production SFC/VASP deployment, `HKSTPCompliance` would route transfers through `OracleCommittee.consumeMultiAttestation()`, requiring M-of-N independent oracle signatures per transfer. This eliminates the single-oracle key as a point of failure — a compromised key alone cannot forge compliance approvals.
+
 ### 3.4  Token Factory
 
 #### `TokenFactory.sol`
@@ -335,6 +337,16 @@ Modified OpenZeppelin Governor — ensures only **verified identity holders** ca
 
 #### `governance/HKSTPTimelock.sol`
 `TimelockController` — enforces a 48-hour execution delay on passed proposals, giving shareholders a final review window.
+
+#### `governance/GovernorFactory.sol`
+Per-token governance registry — stores a mapping of security token → (Governor, Timelock) suites so each factory-deployed token can have its own governance instance.
+
+| Feature | Description |
+|---------|-------------|
+| `registerGovernance()` | Links a token address to its Governor + Timelock pair |
+| `getGovernance()` | Look up the governance suite for a given token |
+| `governedTokens()` | List all tokens with registered governance |
+| Role-gated | `DEFAULT_ADMIN_ROLE` required to register governance |
 
 ### 3.6  Operations & Utilities
 
@@ -475,7 +487,8 @@ contracts/
 │   └── MultiSigWarm.sol          # 2-of-3 multi-sig warm wallet
 ├── governance/
 │   ├── HKSTPGovernor.sol         # OZ Governor + KYC-gated voting
-│   └── HKSTPTimelock.sol         # 48-hour execution delay
+│   ├── HKSTPTimelock.sol         # 48-hour execution delay
+│   └── GovernorFactory.sol       # Per-token governance registry
 ├── identity/
 │   ├── Identity.sol              # ONCHAINID (ERC-734/735)
 │   ├── IIdentity.sol             # Identity interface
@@ -494,7 +507,8 @@ scripts/
 ├── deploy-orderbook-factory.js   # Deploy OrderBookFactory + initial HKSTP market
 ├── seed-investor.js              # Seed test investor identities
 ├── harden-admin.js               # Post-deploy admin hardening
-└── burn-excess.js                # Burn excess token supply
+├── burn-excess.js                # Burn excess token supply
+└── start-dev.sh                  # Quick-start dev environment (node + deploy + frontend)
 
 besu/
 ├── block-producer.js             # Engine API V3 block forger for post-merge Besu
@@ -533,7 +547,8 @@ frontend/
 │       ├── Governance.tsx        # On-chain governance proposals
 │       ├── FreezeManagement.tsx  # Freeze/unfreeze investor addresses (Agent)
 │       ├── OracleCommittee.tsx   # Multi-oracle threshold management
-│       └── WalletCustody.tsx     # Hot/warm/cold wallet management
+│       ├── WalletCustody.tsx     # Hot/warm/cold wallet management
+│       └── TokenDetail.tsx       # Individual token detail view
 └── ...
 
 test/
@@ -571,7 +586,7 @@ The fastest way to get a running instance with zero local setup:
    **`postStartCommand` → `start.sh`** *(runs on every start / restart / resume)*
    - Kills any stale Hardhat / Vite processes from the previous session
    - Starts **Hardhat Network** in background (chain ID 31337, auto-mine)
-   - Deploys all 17 contracts via `deploy-and-update-frontend.js`
+   - Deploys all 18 contracts via `deploy-and-update-frontend.js`
    - Auto-updates `frontend/src/config/contracts.ts` with deployed addresses + chain ID
    - Seeds Investor1 (KYC + tokens)
    - Launches the Vite frontend on port 3000
@@ -1202,12 +1217,12 @@ npm run compile
 # Terminal 1 — start Hardhat node (stays running)
 npx hardhat node
 
-# Terminal 2 — deploy all 14 contracts + configure roles + seed Investor1 + auto-update frontend
+# Terminal 2 — deploy all 18 contracts + configure roles + seed Investor1 + auto-update frontend
 npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 ```
 
 `scripts/deploy-and-update-frontend.js` performs the following in a single run:
-1. Deploys all **14 contracts**: IdentityRegistry, Compliance, SecurityToken, MockCashToken, DvPSettlement, TokenFactory, ClaimIssuer, IdentityFactory, Timelock, Governor, WalletRegistry, MultiSigWarm, **OrderBook**, SystemHealthCheck
+1. Deploys all **18 contracts**: IdentityRegistry, Compliance, SecurityToken, MockCashToken, DvPSettlement, TokenFactory, ClaimIssuer, IdentityFactory, Timelock, Governor, WalletRegistry, MultiSigWarm, **OracleCommittee**, **OrderBookFactory**, **OrderBook**, **TokenFactoryV2**, SystemHealthCheck, **GovernorFactory**
 2. Configures all roles: TOKEN_ROLE, OPERATOR_ROLE, AGENT_ROLE, DEPLOYER_ROLE, PROPOSER_ROLE, EXECUTOR_ROLE, CANCELLER_ROLE
 3. Safe-lists: Treasury, Escrow, WalletRegistry, MultiSigWarm, **OrderBook** on the SecurityToken
 4. Wires ONCHAINID: IdentityFactory → IdentityRegistry, ClaimIssuer as Trusted Issuer
@@ -1217,7 +1232,7 @@ npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 8. **Seeds Investor1** (`0x5e33E2E5333DD9b7b428AC38AE361E9b707046f3`): registers identity, sets KYC claims (1–5), issues ERC-735 claims, mints 10,000 HKSAT + 5,000,000 THKD
 9. **Auto-updates** `frontend/src/config/contracts.ts` with all deployed addresses (including OrderBook)
 
-> **No manual address updates needed** — the script writes all 13 contract addresses directly into the frontend config file.
+> **No manual address updates needed** — the script writes all deployed contract addresses directly into the frontend config file.
 
 #### Alternative: Unified Launcher
 
@@ -1225,7 +1240,7 @@ npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 npm run deploy:besu    # Auto-spawns Hardhat node + deploys core contracts
 ```
 
-`npm run deploy:besu` runs `scripts/deploy-besu.js` which auto-detects whether a node is running and spawns one if needed. Note: this deploys only the 5 core contracts; for the full 14-contract deployment, use `deploy-and-update-frontend.js` above.
+`npm run deploy:besu` runs `scripts/deploy-besu.js` which auto-detects whether a node is running and spawns one if needed. Note: this deploys only the 5 core contracts; for the full 18-contract deployment, use `deploy-and-update-frontend.js` above.
 
 #### Manual Start (Step-by-Step)
 
@@ -1233,7 +1248,7 @@ npm run deploy:besu    # Auto-spawns Hardhat node + deploys core contracts
 # Terminal 1 — start the Hardhat node (stays running)
 npx hardhat node
 
-# Terminal 2 — deploy everything (14 contracts + seed + auto-update)
+# Terminal 2 — deploy everything (18 contracts + seed + auto-update)
 npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
 
 # Terminal 2 — start the frontend
@@ -1357,8 +1372,12 @@ npx hardhat run scripts/deploy-orderbook-factory.js --network besu
 | 10 | **HKSTPGovernor** | On-chain governance with KYC-gated voting |
 | 11 | **WalletRegistry** | Custody tier registry + 98/2 enforcement |
 | 12 | **MultiSigWarm** | 2-of-3 warm wallet multi-sig |
-| 13 | **OrderBook** | On-chain order book (HKSAT/THKD, KYC-gated) |
-| 14 | **SystemHealthCheck** | Post-deployment wiring verification (optional) |
+| 13 | **OracleCommittee** | Multi-oracle threshold attestation |
+| 14 | **OrderBookFactory** | Deploys one OrderBook per security-token / cash-token pair |
+| 15 | **OrderBook** | On-chain order book (HKSAT/THKD, KYC-gated) |
+| 16 | **TokenFactoryV2** | Upgradeable proxy factory (ERC-1967) |
+| 17 | **SystemHealthCheck** | Post-deployment wiring verification (optional) |
+| 18 | **GovernorFactory** | Per-token governance registry |
 
 After deployment, the script also:
 - Configures all roles and safe-lists
@@ -1574,7 +1593,7 @@ Deploy contracts to a public EVM testnet for persistent shared access.
 |------|------|
 | Persistent — survives restarts | Requires testnet ETH (faucets) |
 | Closest to production | Slower block times (~12 s on Sepolia) |
-| No tunneling or port forwarding | Deploying 14 contracts takes longer |
+| No tunneling or port forwarding | Deploying 18 contracts takes longer |
 
 > This option is best for final integration testing, not day-to-day development.
 
@@ -1833,7 +1852,7 @@ TokenHub is purpose-built for the Hong Kong regulatory framework, covering the f
 
 ### 15.11  Comprehensive Test Coverage
 
-The project includes **301 documented frontend test cases** (147 positive + 154 negative) across 15 functional areas, plus 12 Hardhat Solidity test suites — unusual for a startup/academic project and critical for regulatory audit readiness. All test cases are documented inline in [Section 8](#8--testing) above, and also available as machine-readable QMetry CSV in [`frontend/FRONTEND-TEST-CASES-QMetry.csv`](frontend/FRONTEND-TEST-CASES-QMetry.csv).
+The project includes **321 documented frontend test cases** (160 positive + 161 negative) across 15 functional areas (plus the Token Compliance Detail sub-module), plus 12 Hardhat Solidity test suites — unusual for a startup/academic project and critical for regulatory audit readiness. All test cases are documented inline in [Section 8](#8--testing) above, and also available as machine-readable QMetry CSV in [`frontend/FRONTEND-TEST-CASES-QMetry.csv`](frontend/FRONTEND-TEST-CASES-QMetry.csv).
 
 ---
 
