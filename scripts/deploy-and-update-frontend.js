@@ -296,18 +296,20 @@ async function main() {
   const walletRegistryAddress = await walletRegistry.getAddress();
   console.log("     WalletRegistry:", walletRegistryAddress);
 
-  // 12. MultiSigWarm (2-of-3 multi-sig for warm wallet)
+  // 12. MultiSigWarm (configurable multi-sig for warm wallet)
   console.log("12/17 Deploying MultiSigWarm...");
   // Use deployer + first two deterministic Besu accounts as initial signers
   // In production, replace with actual custody officer keys
   const warmSigner1 = deployer.address;
   const warmSigner2 = process.env.WARM_SIGNER_2 || "0x627306090abaB3A6e1400e9345bC60c78a8BEf57";
   const warmSigner3 = process.env.WARM_SIGNER_3 || "0xf17f52151EbEF6C7334FAD080c5704D77216b732";
+  const warmSigners = [warmSigner1, warmSigner2, warmSigner3];
+  const warmThreshold = parseInt(process.env.WARM_THRESHOLD || "2", 10);
   const MultiSigWarm = await ethers.getContractFactory("MultiSigWarm");
-  const multiSigWarm = await MultiSigWarm.deploy([warmSigner1, warmSigner2, warmSigner3]);
+  const multiSigWarm = await MultiSigWarm.deploy(warmSigners, warmThreshold);
   await multiSigWarm.waitForDeployment();
   const multiSigWarmAddress = await multiSigWarm.getAddress();
-  console.log("     MultiSigWarm:", multiSigWarmAddress);
+  console.log("     MultiSigWarm:", multiSigWarmAddress, `(${warmThreshold}-of-${warmSigners.length})`);
 
   // 13. OracleCommittee (multi-oracle threshold attestation)
   console.log("13/17 Deploying OracleCommittee...");

@@ -40,24 +40,24 @@ export function rpcUrlForBrowser(): string {
 // Contract Addresses (update after deployment)
 // -----------------------------------------------------------------
 export const CONTRACT_ADDRESSES = {
-  identityRegistry: '0x42699A7612A82f1d9C36148af9C77354759b210b',
-  compliance: '0xa50a51c09a5c451C52BB714527E1974b686D8e77',
-  securityToken: '0x9a3DBCa554e9f6b9257aAa24010DA8377C57c17e',
-  cashToken: '0x9B8397f1B0FEcD3a1a40CdD5E8221Fa461898517',
-  dvpSettlement: '0x2E1f232a9439C3D459FcEca0BeEf13acc8259Dd8',
-  tokenFactory: '0x05d91B9031A655d08E654177336d08543ac4B711',
-  claimIssuer: '0xfeae27388A65eE984F452f86efFEd42AaBD438FD',
-  identityFactory: '0xe135783649BfA7c9c4c6F8E528C7f56166efC8a6',
-  timelock: '0xC9Bc439c8723c5c6fdbBE14E5fF3a1224f8A0f7C',
-  governor: '0xDE87AF9156a223404885002669D3bE239313Ae33',
-  walletRegistry: '0x686AfD6e502A81D2e77f2e038A23C0dEf4949A20',
-  multiSigWarm: '0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741',
-  oracleCommittee: '0x9ab7CA8a88F8e351f9b0eEEA5777929210199295',
-  orderBookFactory: '0x43D1F9096674B5722D359B6402381816d5B22F28',
-  orderBook: '0x4245CF4518CB2C280f5e9c6a03c90C147F80B4d9',
-  tokenFactoryV2: '0x5EB5888938e3fE7b334b1838B19C1e828c5148aA',
-  systemHealthCheck: '0x4261D524bc701dA4AC49339e5F8b299977045eA5',
-  governorFactory: '0xd6A7c915066E17ba18024c799258C8A286fFBc00',
+  identityRegistry: '0x8e42abdbC3c1d9c6eB2e4bF753D853F8bA6AC633',
+  compliance: '0xF6095d91C36CaeF7C1c73cc506B86C25db3177C0',
+  securityToken: '0xe9285d38c5B3A8207c818AB4a865970dFfE0aa20',
+  cashToken: '0x5aFEC96d4C650f70845aE9C5FCE318Fb864d1DcA',
+  dvpSettlement: '0x6F43253243aF68822462C14Ca3203B51BfDBB1FA',
+  tokenFactory: '0xa9489f639D2F1794d1a8E1A528b1C11454B1cffA',
+  claimIssuer: '0x58007B36aFFd661F8D3DC265D409C80f557Eb5e7',
+  identityFactory: '0x2C88a29ACbcD2472d1E1698FF8c07b3085B464e2',
+  timelock: '0x046Bfa92B000F015ced65882Bad62Db43993b29B',
+  governor: '0x96338A290AA80e9A492254de78cEFbeb57B0Dc54',
+  walletRegistry: '0xAA881df1D0b4Ab28757059e244d81Ec305a19771',
+  multiSigWarm: '0xc4bBed0430F13FE24586Ed18bb223feB733B5ce9',
+  oracleCommittee: '0x780c6F5e4f56e84Fd1F3E3471F3AFff179Fd80cb',
+  orderBookFactory: '0x97756B4B1a23c451FC0543204eA98C12c12Dc888',
+  orderBook: '0x18dfbbbeC4a5A6eE68c7a40B306a3779870AFB5d',
+  tokenFactoryV2: '0x5694A6cfC42f6dF77E6CC5BC78B7FD397772B401',
+  systemHealthCheck: '0x92e1253a32A2a616c52c423e9493cA8Be72010a3',
+  governorFactory: '0x3168F97b255A7a11e134cf33F2Ee0c78637c9c0C',
 };
 
 // -----------------------------------------------------------------
@@ -510,15 +510,19 @@ export const MULTI_SIG_WARM_ABI = [
   'function cancelTx(uint256 txId) external',
   // Signer management
   'function replaceSigner(uint256 index, address newSigner) external',
+  'function addSigner(address newSigner) external',
+  'function removeSigner(uint256 index) external',
+  'function setThreshold(uint256 newThreshold) external',
   // View helpers
   'function REQUIRED_CONFIRMATIONS() view returns (uint256)',
   'function MAX_SIGNERS() view returns (uint256)',
   'function EXPIRY_PERIOD() view returns (uint256)',
   'function transactionCount() view returns (uint256)',
   'function pendingCount() view returns (uint256)',
-  'function getSigners() view returns (address[3])',
+  'function getSigners() view returns (address[])',
   'function isSigner(address) view returns (bool)',
   'function signers(uint256) view returns (address)',
+  'function admin() view returns (address)',
   'function transactions(uint256) view returns (address token, address to, uint256 amount, string reason, uint256 proposedAt, bool executed, bool cancelled, uint256 confirmations)',
   'function confirmed(uint256, address) view returns (bool)',
   'function isExpired(uint256 txId) view returns (bool)',
@@ -529,6 +533,9 @@ export const MULTI_SIG_WARM_ABI = [
   'event TxExecuted(uint256 indexed txId, address indexed executor)',
   'event TxCancelled(uint256 indexed txId, address indexed canceller)',
   'event SignerReplaced(uint256 indexed index, address indexed oldSigner, address indexed newSigner)',
+  'event SignerAdded(address indexed newSigner, uint256 totalSigners)',
+  'event SignerRemoved(address indexed removedSigner, uint256 totalSigners)',
+  'event ThresholdChanged(uint256 oldThreshold, uint256 newThreshold)',
 ];
 
 export const SYSTEM_HEALTH_CHECK_ABI = [

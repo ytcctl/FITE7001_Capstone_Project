@@ -44,9 +44,9 @@ describe("Wallet Architecture (98/2 Rule)", function () {
     const WalletRegistry = await ethers.getContractFactory("WalletRegistry");
     walletRegistry = await WalletRegistry.deploy(admin.address);
 
-    // Deploy MultiSigWarm (3 signers)
+    // Deploy MultiSigWarm (3 signers, threshold 2)
     const MultiSigWarm = await ethers.getContractFactory("MultiSigWarm");
-    multiSig = await MultiSigWarm.deploy([signer1.address, signer2.address, signer3.address]);
+    multiSig = await MultiSigWarm.deploy([signer1.address, signer2.address, signer3.address], 2);
 
     // Grant OPERATOR_ROLE
     const OPERATOR_ROLE = await walletRegistry.OPERATOR_ROLE();
@@ -529,7 +529,7 @@ describe("Wallet Architecture (98/2 Rule)", function () {
   // =========================================================================
   describe("MultiSigWarm — Signer Management", function () {
     it("should replace a signer", async function () {
-      await multiSig.connect(signer1).replaceSigner(2, outsider.address);
+      await multiSig.connect(admin).replaceSigner(2, outsider.address);
       expect(await multiSig.isSigner(outsider.address)).to.be.true;
       expect(await multiSig.isSigner(signer3.address)).to.be.false;
       expect(await multiSig.signers(2)).to.equal(outsider.address);
@@ -537,13 +537,13 @@ describe("Wallet Architecture (98/2 Rule)", function () {
 
     it("should reject replacing with zero address", async function () {
       await expect(
-        multiSig.connect(signer1).replaceSigner(0, ethers.ZeroAddress)
+        multiSig.connect(admin).replaceSigner(0, ethers.ZeroAddress)
       ).to.be.revertedWith("MultiSigWarm: zero address");
     });
 
     it("should reject replacing with existing signer", async function () {
       await expect(
-        multiSig.connect(signer1).replaceSigner(0, signer2.address)
+        multiSig.connect(admin).replaceSigner(0, signer2.address)
       ).to.be.revertedWith("MultiSigWarm: already a signer");
     });
   });

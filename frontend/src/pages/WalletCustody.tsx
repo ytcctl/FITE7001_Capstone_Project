@@ -94,6 +94,8 @@ const WalletCustody: React.FC = () => {
   const [signers, setSigners] = useState<string[]>([]);
   const [sweepRecords, setSweepRecords] = useState<SweepRecord[]>([]);
   const [isSigner, setIsSigner] = useState(false);
+  const [requiredConfirmations, setRequiredConfirmations] = useState<number>(2);
+  const [maxSigners, setMaxSigners] = useState<number>(3);
   const [warmBalances, setWarmBalances] = useState<{ address: string; symbol: string; name: string; decimals: number; balance: bigint }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +113,12 @@ const WalletCustody: React.FC = () => {
   const [proposeReason, setProposeReason] = useState('sweep-to-cold');
   const [isProposing, setIsProposing] = useState(false);
   const [proposeStatus, setProposeStatus] = useState<string | null>(null);
+
+  // Admin: signer/threshold management
+  const [newSignerAddr, setNewSignerAddr] = useState('');
+  const [newThresholdVal, setNewThresholdVal] = useState('');
+  const [adminStatus, setAdminStatus] = useState<string | null>(null);
+  const [isAdminSubmitting, setIsAdminSubmitting] = useState(false);
 
   const shortAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
@@ -206,10 +214,19 @@ const WalletCustody: React.FC = () => {
         setWarmBalances([]);
       }
 
-      // Multi-sig signers
+      // Multi-sig signers & threshold
       try {
         const s = await ms.getSigners();
         setSigners([...s]);
+        // Read threshold and max signers from contract
+        try {
+          const [reqConf, maxS] = await Promise.all([
+            ms.REQUIRED_CONFIRMATIONS(),
+            ms.MAX_SIGNERS(),
+          ]);
+          setRequiredConfirmations(Number(reqConf));
+          setMaxSigners(Number(maxS));
+        } catch { /* keep defaults */ }
         // Check if current account is a signer
         if (account) {
           try {
@@ -373,7 +390,7 @@ const WalletCustody: React.FC = () => {
       'MultiSigWarm: already executed': 'This transaction has already been executed.',
       'MultiSigWarm: already cancelled': 'This transaction has already been cancelled.',
       'MultiSigWarm: expired': 'This transaction has expired (48-hour limit exceeded).',
-      'MultiSigWarm: not enough confirmations': 'Not enough confirmations yet — at least 2 of 3 signers must confirm before execution.',
+      'MultiSigWarm: not enough confirmations': `Not enough confirmations yet — at least ${requiredConfirmations} of ${maxSigners} signers must confirm before execution.`,
       'MultiSigWarm: not confirmed': 'You have not confirmed this transaction, so you cannot revoke.',
       'MultiSigWarm: transfer failed': 'The token transfer failed. Ensure the warm wallet holds sufficient balance.',
     };
@@ -471,6 +488,62 @@ const WalletCustody: React.FC = () => {
       loadData();
     } catch (e: unknown) {
       setError((e as Error).message || 'Sweep check failed');
+    }
+  };
+
+  // ─── Admin: Signer & Threshold Management ────────────────────
+  const handleAddSigner = async () => {
+    if (!contracts || !newSignerAddr) return;
+    setIsAdminSubmitting(true);
+    setAdminStatus('Adding signer…');
+    try {
+      const tx = await contracts.multiSigWarm.addSigner(newSignerAddr);
+      await tx.wait();
+      setAdminStatus('✓ Signer added');
+      setNewSignerAddr('');
+      loadData();
+    } catch (e: unknown) {
+      setAdminStatus(`✗ ${parseMultiSigError(e, 'Add signer failed')}`);
+    } finally {
+      setIsAdminSubmitting(false);
+    }
+  };
+
+  const handleRemoveSigner = async (index: number) => {
+    if (!contracts) return;
+    setIsAdminSubmitting(true);
+    setAdminStatus(`Removing signer #${index + 1}…`);
+    try {
+      const tx = await contracts.multiSigWarm.removeSigner(index);
+      await tx.wait();
+      setAdminStatus('✓ Signer removed');
+      loadData();
+    } catch (e: unknown) {
+      setAdminStatus(`✗ ${parseMultiSigError(e, 'Remove signer failed')}`);
+    } finally {
+      setIsAdminSubmitting(false);
+    }
+  };
+
+  const handleSetThreshold = async () => {
+    if (!contracts || !newThresholdVal) return;
+    const val = parseInt(newThresholdVal, 10);
+    if (isNaN(val) || val < 2) {
+      setAdminStatus('✗ Threshold must be at least 2');
+      return;
+    }
+    setIsAdminSubmitting(true);
+    setAdminStatus('Updating threshold…');
+    try {
+      const tx = await contracts.multiSigWarm.setThreshold(val);
+      await tx.wait();
+      setAdminStatus(`✓ Threshold updated to ${val}`);
+      setNewThresholdVal('');
+      loadData();
+    } catch (e: unknown) {
+      setAdminStatus(`✗ ${parseMultiSigError(e, 'Set threshold failed')}`);
+    } finally {
+      setIsAdminSubmitting(false);
     }
   };
 
@@ -584,7 +657,7 @@ const WalletCustody: React.FC = () => {
               <p className="text-xs text-gray-400 mt-1">
                 {pctOf(breakdown.warmBal, breakdown.total)}% of AUM
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">2-of-3 multi-sig required</p>
+              <p className="text-xs text-gray-500 mt-0.5">{requiredConfirmations}-of-{maxSigners} multi-sig required</p>
             </div>
 
             {/* Cold */}
@@ -750,7 +823,7 @@ const WalletCustody: React.FC = () => {
           <div className="bg-white/5 border border-yellow-500/20 rounded-2xl p-6">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Users size={20} className="text-yellow-400" />
-              Multi-Sig Warm Wallet (2-of-3)
+              Multi-Sig Warm Wallet ({requiredConfirmations}-of-{maxSigners})
             </h2>
 
             {/* Signers */}
@@ -758,12 +831,77 @@ const WalletCustody: React.FC = () => {
               <h3 className="text-sm text-gray-400 mb-2">Authorized Signers</h3>
               <div className="flex flex-wrap gap-2">
                 {signers.map((s, i) => (
-                  <span key={i} className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs font-mono text-yellow-400">
+                  <span key={i} className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs font-mono text-yellow-400 inline-flex items-center gap-1.5">
                     #{i + 1} {shortAddr(s)}
+                    {roles.isAdmin && signers.length > requiredConfirmations && (
+                      <button
+                        onClick={() => handleRemoveSigner(i)}
+                        className="ml-1 text-red-400/60 hover:text-red-400 transition-colors"
+                        title="Remove this signer"
+                        disabled={isAdminSubmitting}
+                      >
+                        ×
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
             </div>
+
+            {/* Admin: Add Signer / Set Threshold */}
+            {roles.isAdmin && (
+              <div className="mb-4 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl space-y-3">
+                <h3 className="text-sm font-medium text-yellow-400 mb-2">Signer & Threshold Management</h3>
+                {adminStatus && (
+                  <p className={`text-xs font-medium ${adminStatus.startsWith('✓') ? 'text-emerald-400' : adminStatus.startsWith('✗') ? 'text-red-400' : 'text-purple-300'}`}>
+                    {adminStatus}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="text-xs text-gray-500 mb-1 block">Add New Signer</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newSignerAddr}
+                        onChange={(e) => setNewSignerAddr(e.target.value)}
+                        placeholder="0x…"
+                        className="flex-1 px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500 font-mono"
+                      />
+                      <button
+                        onClick={handleAddSigner}
+                        disabled={isAdminSubmitting || !newSignerAddr}
+                        className="px-3 py-2 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                  <div className="min-w-[180px]">
+                    <label className="text-xs text-gray-500 mb-1 block">Set Signature Threshold</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={2}
+                        max={signers.length}
+                        value={newThresholdVal}
+                        onChange={(e) => setNewThresholdVal(e.target.value)}
+                        placeholder={String(requiredConfirmations)}
+                        className="w-20 px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                      />
+                      <span className="self-center text-xs text-gray-500">of {signers.length}</span>
+                      <button
+                        onClick={handleSetThreshold}
+                        disabled={isAdminSubmitting || !newThresholdVal}
+                        className="px-3 py-2 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        Set
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Warm Wallet Balances */}
             <div className="mb-4">
@@ -885,7 +1023,7 @@ const WalletCustody: React.FC = () => {
                         <td className="py-2 px-2 font-mono text-gray-300">{shortAddr(tx.to)}</td>
                         <td className="py-2 px-2 text-white">{formatTokens(tx.amount)}</td>
                         <td className="py-2 px-2 text-gray-400">{tx.reason}</td>
-                        <td className="py-2 px-2 text-yellow-400">{tx.confirmations}/2</td>
+                        <td className="py-2 px-2 text-yellow-400">{tx.confirmations}/{requiredConfirmations}</td>
                         <td className="py-2 px-2">
                           {tx.executed ? (
                             <span className="text-green-400 text-xs">✓ Executed</span>
@@ -912,11 +1050,11 @@ const WalletCustody: React.FC = () => {
                                     Confirm
                                   </button>
                                 )}
-                                {tx.confirmations >= 2 && (
+                                {tx.confirmations >= requiredConfirmations && (
                                   <button
                                     onClick={() => handleExecute(tx.id)}
                                     className="px-2 py-1 bg-green-600/80 hover:bg-green-600 text-white rounded text-xs transition-colors"
-                                    title="Execute (requires 2+ confirmations)"
+                                    title={`Execute (requires ${requiredConfirmations}+ confirmations)`}
                                   >
                                     Execute
                                   </button>
