@@ -1,4 +1,4 @@
-# Supply Safeguard — Tiered Minting & Governance Approval
+# Safeguard — Tiered Minting & Governance Approval
 
 This document describes the token supply safeguard mechanism built into the
 HKSTP Security Token platform, including the tiered minting roles and the
