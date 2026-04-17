@@ -98,6 +98,19 @@ const Portfolio: React.FC = () => {
     if (!contracts || !transferTo || !transferAmount) return;
     let to: string;
     try { to = ethers.getAddress(transferTo.trim()); } catch { setTxStatus('✗ Invalid recipient address'); return; }
+
+    // KYC gate: verify recipient is registered and KYC-verified before any transfer
+    try {
+      const recipientVerified = await contracts.identityRegistry.isVerified(to);
+      if (!recipientVerified) {
+        setTxStatus('✗ Recipient is not KYC-verified. Transfers are only permitted to verified investors.');
+        return;
+      }
+    } catch {
+      setTxStatus('✗ Unable to verify recipient KYC status. Please try again.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let tokenContract: ethers.Contract;
