@@ -22,6 +22,7 @@ import {
   X,
   UserPlus,
   ShieldAlert,
+  Snowflake,
 } from 'lucide-react';
 import { useWeb3, TEST_ACCOUNTS, getSavedAccounts, removeSavedAccount } from '../context/Web3Context';
 import type { SavedAccount } from '../context/Web3Context';
@@ -49,7 +50,7 @@ const navItems: NavItem[] = [
   { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, privileged: true },
   { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
   { to: '/custody', label: 'Wallet Custody', icon: Vault, adminOnly: true },
-  { to: '/freeze', label: 'Freeze Management', icon: Lock, adminOrAgent: true },
+  { to: '/freeze', label: 'Freeze Management', icon: Snowflake, adminOrAgent: true },
   { to: '/governance', label: 'Governance', icon: Vote },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
 ];

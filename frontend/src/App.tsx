@@ -12,10 +12,10 @@ import Governance from './pages/Governance';
 import WalletCustody from './pages/WalletCustody';
 import Trading from './pages/Trading';
 import MarketManagement from './pages/MarketManagement';
-import FreezeManagement from './pages/FreezeManagement';
 import OracleCommittee from './pages/OracleCommittee';
 import TokenDetail from './pages/TokenDetail';
 import TokenComplianceDetail from './pages/TokenComplianceDetail';
+import FreezeManagement from './pages/FreezeManagement';
 import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
 import { AlertTriangle } from 'lucide-react';
@@ -86,8 +86,8 @@ const App: React.FC = () => {
           <Route path="/compliance" element={<AdminOnlyRoute><ComplianceRules /></AdminOnlyRoute>} />
           <Route path="/tokens" element={<AdminOnlyRoute><TokenManagement /></AdminOnlyRoute>} />
           <Route path="/custody" element={<AdminOnlyRoute><WalletCustody /></AdminOnlyRoute>} />
-          <Route path="/markets" element={<AdminOnlyRoute><MarketManagement /></AdminOnlyRoute>} />
           <Route path="/freeze" element={<AdminRoute><FreezeManagement /></AdminRoute>} />
+          <Route path="/markets" element={<AdminOnlyRoute><MarketManagement /></AdminOnlyRoute>} />
           <Route path="/token/:address" element={<AdminOnlyRoute><TokenDetail /></AdminOnlyRoute>} />
           <Route path="/compliance/:address" element={<AdminOnlyRoute><TokenComplianceDetail /></AdminOnlyRoute>} />
           {/* Public routes */}
