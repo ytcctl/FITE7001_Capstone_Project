@@ -69,6 +69,7 @@ interface MultiSigTx {
   executed: boolean;
   cancelled: boolean;
   confirmations: number;
+  confirmedByMe: boolean;
 }
 
 interface SweepRecord {
@@ -93,6 +94,7 @@ const WalletCustody: React.FC = () => {
   const [signers, setSigners] = useState<string[]>([]);
   const [sweepRecords, setSweepRecords] = useState<SweepRecord[]>([]);
   const [isSigner, setIsSigner] = useState(false);
+  const [warmBalances, setWarmBalances] = useState<{ address: string; symbol: string; name: string; decimals: number; balance: bigint }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,6 +178,34 @@ const WalletCustody: React.FC = () => {
       const capBps = await wr.hotCapBps();
       setHotCapBps(Number(capBps));
 
+      // Warm wallet token balances
+      try {
+        const msAddress = await ms.getAddress();
+        const erc20Abi = [
+          'function balanceOf(address) view returns (uint256)',
+          'function symbol() view returns (string)',
+          'function name() view returns (string)',
+          'function decimals() view returns (uint8)',
+        ];
+        const provider = wr.runner?.provider ?? wr.runner;
+        const trackedTokens: string[] = await wr.getTrackedTokens();
+        const bals = await Promise.all(
+          trackedTokens.map(async (tokenAddr: string) => {
+            const tok = new ethers.Contract(tokenAddr, erc20Abi, provider);
+            const [balance, symbol, name, decimals] = await Promise.all([
+              tok.balanceOf(msAddress),
+              tok.symbol().catch(() => '???'),
+              tok.name().catch(() => tokenAddr.slice(0, 10)),
+              tok.decimals().then(Number).catch(() => 18),
+            ]);
+            return { address: tokenAddr, symbol, name, decimals, balance };
+          })
+        );
+        setWarmBalances(bals);
+      } catch {
+        setWarmBalances([]);
+      }
+
       // Multi-sig signers
       try {
         const s = await ms.getSigners();
@@ -198,6 +228,10 @@ const WalletCustody: React.FC = () => {
         const txs: MultiSigTx[] = [];
         for (let i = Math.max(0, txCount - 10); i < txCount; i++) {
           const tx = await ms.transactions(i);
+          let myConfirm = false;
+          if (account && !tx.executed && !tx.cancelled) {
+            try { myConfirm = await ms.confirmed(i, account); } catch { /* ignore */ }
+          }
           txs.push({
             id: i,
             token: tx.token,
@@ -208,6 +242,7 @@ const WalletCustody: React.FC = () => {
             executed: tx.executed,
             cancelled: tx.cancelled,
             confirmations: Number(tx.confirmations),
+            confirmedByMe: myConfirm,
           });
         }
         setMultiSigTxs(txs);
@@ -327,6 +362,33 @@ const WalletCustody: React.FC = () => {
     }
   };
 
+  // Parse multi-sig contract errors into human-readable messages
+  const parseMultiSigError = (e: unknown, fallback: string): string => {
+    const err = e as { reason?: string; message?: string; data?: string };
+    const reason = err?.reason || '';
+    const knownErrors: Record<string, string> = {
+      'MultiSigWarm: already confirmed': 'You have already confirmed this transaction. A different signer must confirm.',
+      'MultiSigWarm: not signer': 'Only authorized signers can perform this action.',
+      'MultiSigWarm: tx does not exist': 'This transaction does not exist.',
+      'MultiSigWarm: already executed': 'This transaction has already been executed.',
+      'MultiSigWarm: already cancelled': 'This transaction has already been cancelled.',
+      'MultiSigWarm: expired': 'This transaction has expired (48-hour limit exceeded).',
+      'MultiSigWarm: not enough confirmations': 'Not enough confirmations yet — at least 2 of 3 signers must confirm before execution.',
+      'MultiSigWarm: not confirmed': 'You have not confirmed this transaction, so you cannot revoke.',
+      'MultiSigWarm: transfer failed': 'The token transfer failed. Ensure the warm wallet holds sufficient balance.',
+    };
+    // ERC-20 custom error: ERC20InsufficientBalance(address,uint256,uint256)
+    if (err?.data?.startsWith?.('0xe450d38c') || err?.message?.includes?.('0xe450d38c')) {
+      return 'Insufficient warm wallet balance. Transfer tokens into the MultiSigWarm contract before executing.';
+    }
+    if (reason && knownErrors[reason]) return knownErrors[reason];
+    // Try matching partial reason from message
+    for (const [key, msg] of Object.entries(knownErrors)) {
+      if (err?.message?.includes(key)) return msg;
+    }
+    return err?.reason || err?.message || fallback;
+  };
+
   // Confirm a pending multi-sig transaction
   const handleConfirm = async (txId: number) => {
     if (!contracts) return;
@@ -335,7 +397,7 @@ const WalletCustody: React.FC = () => {
       await tx.wait();
       loadData();
     } catch (e: unknown) {
-      setError((e as Error).message || 'Failed to confirm transaction');
+      setError(parseMultiSigError(e, 'Failed to confirm transaction'));
     }
   };
 
@@ -347,7 +409,7 @@ const WalletCustody: React.FC = () => {
       await tx.wait();
       loadData();
     } catch (e: unknown) {
-      setError((e as Error).message || 'Failed to execute transaction');
+      setError(parseMultiSigError(e, 'Failed to execute transaction'));
     }
   };
 
@@ -359,7 +421,7 @@ const WalletCustody: React.FC = () => {
       await tx.wait();
       loadData();
     } catch (e: unknown) {
-      setError((e as Error).message || 'Failed to cancel transaction');
+      setError(parseMultiSigError(e, 'Failed to cancel transaction'));
     }
   };
 
@@ -666,6 +728,28 @@ const WalletCustody: React.FC = () => {
               </div>
             </div>
 
+            {/* Warm Wallet Balances */}
+            <div className="mb-4">
+              <h3 className="text-sm text-gray-400 mb-2">Warm Wallet Holdings</h3>
+              {warmBalances.length === 0 ? (
+                <p className="text-gray-600 text-sm">No tracked tokens.</p>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {warmBalances.map((b) => (
+                    <div key={b.address} className={`px-3 py-2 rounded-lg border text-xs ${
+                      b.balance === 0n
+                        ? 'bg-red-500/5 border-red-500/20 text-red-400'
+                        : 'bg-yellow-500/5 border-yellow-500/20 text-yellow-300'
+                    }`}>
+                      <span className="font-medium">{b.symbol}</span>
+                      <span className="ml-2 font-mono">{formatTokens(b.balance, b.decimals)}</span>
+                      {b.balance === 0n && <span className="ml-1 text-red-500">⚠ empty</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Propose Transfer Form — only for signers */}
             {isSigner && (
               <div className="mb-6 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
@@ -776,13 +860,19 @@ const WalletCustody: React.FC = () => {
                           <td className="py-2 px-2">
                             {!tx.executed && !tx.cancelled && (
                               <div className="flex gap-1.5">
-                                <button
-                                  onClick={() => handleConfirm(tx.id)}
-                                  className="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-xs transition-colors"
-                                  title="Confirm this transaction"
-                                >
-                                  Confirm
-                                </button>
+                                {tx.confirmedByMe ? (
+                                  <span className="px-2 py-1 bg-blue-600/30 text-blue-300/60 rounded text-xs cursor-not-allowed" title="You already confirmed this transaction">
+                                    ✓ Confirmed
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleConfirm(tx.id)}
+                                    className="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-xs transition-colors"
+                                    title="Confirm this transaction"
+                                  >
+                                    Confirm
+                                  </button>
+                                )}
                                 {tx.confirmations >= 2 && (
                                   <button
                                     onClick={() => handleExecute(tx.id)}

@@ -85,7 +85,7 @@ const App: React.FC = () => {
           {/* Admin-only routes (Agent has NO on-chain role on these contracts) */}
           <Route path="/compliance" element={<AdminOnlyRoute><ComplianceRules /></AdminOnlyRoute>} />
           <Route path="/tokens" element={<AdminOnlyRoute><TokenManagement /></AdminOnlyRoute>} />
-          <Route path="/custody" element={<AdminOnlyRoute><WalletCustody /></AdminOnlyRoute>} />
+          <Route path="/custody" element={<PrivilegedRoute><WalletCustody /></PrivilegedRoute>} />
           <Route path="/freeze" element={<AdminRoute><FreezeManagement /></AdminRoute>} />
           <Route path="/markets" element={<AdminOnlyRoute><MarketManagement /></AdminOnlyRoute>} />
           <Route path="/token/:address" element={<AdminOnlyRoute><TokenDetail /></AdminOnlyRoute>} />

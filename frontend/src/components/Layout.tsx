@@ -49,7 +49,7 @@ const navItems: NavItem[] = [
   { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
   { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, privileged: true },
   { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
-  { to: '/custody', label: 'Wallet Custody', icon: Vault, adminOnly: true },
+  { to: '/custody', label: 'Wallet Custody', icon: Vault, privileged: true },
   { to: '/freeze', label: 'Freeze Management', icon: Snowflake, adminOrAgent: true },
   { to: '/governance', label: 'Governance', icon: Vote },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
