@@ -33,6 +33,9 @@ echo "▶ Cleaning up stale processes..."
 pkill -f "hardhat node" 2>/dev/null || true
 pkill -f "anvil" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
+# Force-kill anything stuck on our ports
+fuser -k 8545/tcp 2>/dev/null || true
+fuser -k 3000/tcp 2>/dev/null || true
 sleep 1
 
 # ── 1. Start Anvil (persistent local devnet) ────────────────────
