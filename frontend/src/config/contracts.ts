@@ -296,7 +296,7 @@ export const DVP_SETTLEMENT_ABI = [
 // Claim topic mapping for display
 export const CLAIM_TOPICS: Record<number, string> = {
   1: 'KYC Verified',
-  2: 'Accredited Investor',
+  2: 'Accredited Investor (Professional Investor)',
   3: 'Jurisdiction Approved',
   4: 'Source of Funds Verified',
   5: 'PEP/Sanctions Clear',

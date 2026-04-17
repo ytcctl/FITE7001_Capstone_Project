@@ -326,7 +326,49 @@ The pre-flight approach:
 
 ---
 
-## 9. KYC Verification Paths — Boolean vs ONCHAINID Claims
+## 9. Claim Topics — On-Chain Investor Eligibility Requirements
+
+Every investor must hold a set of **verified claims** before they can
+receive, transfer, or trade security tokens. The `isVerified()` function
+checks that all required claim topics are present and valid.
+
+### Claim Topic Reference
+
+| Topic ID | Label | Regulatory Basis | Description |
+|---|---|---|---|
+| 1 | **KYC Verified** | AMLO Part 4 — Customer Due Diligence | Investor's identity has been verified through standard KYC procedures (government ID, proof of address, liveness check). Required for all participants. |
+| 2 | **Accredited Investor (Professional Investor)** | SFO Cap. 571, Schedule 1 Part 1 | Investor meets the SFC's Professional Investor threshold: individual portfolio ≥ HKD 8M, corporate portfolio ≥ HKD 8M or assets ≥ HKD 40M. Required because HK STOs are currently restricted to Professional Investors only. |
+| 3 | **Jurisdiction Approved** | SFC VATP Conduct Standards, OFAC/HKMA sanctions | Investor's country/jurisdiction is not on a sanctioned or blocked list. Enforced both via claim flag and the `checkModules()` jurisdiction whitelist/blacklist. |
+| 4 | **Source of Funds Verified** | AMLO Part 4 — Source of Wealth/Funds | Origin of the investor's funds has been verified as legitimate (bank statements, employment records, business income documentation). Required to prevent money laundering. |
+| 5 | **PEP/Sanctions Clear** | AMLO Part 4, FATF Recommendations 12 & 22 | Investor has been screened against Politically Exposed Persons (PEP) lists and international sanctions databases (OFAC SDN, UN, EU, HKMA). Must be clear to participate. |
+| 6 | **FPS Name-Match Verified** | SFC VATP Conduct Standards — withdrawal controls | Investor's registered name matches the name on their FPS-linked bank account. Ensures withdrawals return to the verified owner's account (closed-loop AML compliance). |
+
+### How Claims Are Used
+
+- **`isVerified(investor)`** — returns `true` only if **all** required claim
+  topics are present and valid for the investor. A single missing or revoked
+  claim blocks all token operations.
+- **Transfer enforcement** — the security token's `_update()` hook calls
+  `isVerified()` on both sender and recipient (unless safe-listed). If either
+  party fails, the transfer reverts.
+- **Trading gate** — the OrderBook checks `isVerified(msg.sender)` on every
+  buy/sell order. Non-verified investors are rejected at order time.
+- **Cash transfer gate** — the frontend checks `isVerified(recipient)` before
+  allowing cash token (THKD) transfers from the Portfolio page.
+
+### Issuing Claims
+
+Claims can be issued via two paths (see Section 10 below):
+
+1. **Boolean path** — Admin calls `setClaim(investor, topicId, true)` for
+   each topic. Lightweight, suitable for development/testing.
+2. **ONCHAINID path** — A trusted ClaimIssuer issues signed ERC-735 claims
+   with cryptographic proof, expiry, and non-repudiation. Required for
+   production.
+
+---
+
+## 10. KYC Verification Paths — Boolean vs ONCHAINID Claims
 
 `isVerified()` in the Identity Registry supports two verification paths.
 The path used is determined automatically per investor at call time:
@@ -339,7 +381,7 @@ investor registered?
               └─ NO  → Boolean path (simple flag per claim topic)
 ```
 
-### 8.1 Boolean (Simple) Claims
+### 10.1 Boolean (Simple) Claims
 
 Boolean claims are the lightweight / backward-compatible path. They are used
 when **either** of the following is true:
@@ -363,7 +405,7 @@ With the boolean path, verification simply checks that
 4. The investor can now receive minted tokens, participate in DvP settlement,
    transfer tokens, and trade on the OrderBook.
 
-### 8.2 ONCHAINID (Cryptographic) Claims
+### 10.2 ONCHAINID (Cryptographic) Claims
 
 The ONCHAINID path is used when **both** conditions are met:
 
@@ -387,7 +429,7 @@ Trusted ClaimIssuer, and checks for revocation and expiry.
 5. `isVerified(investor)` returns `true` if valid, non-revoked, non-expired
    claims exist for every required topic from a trusted issuer.
 
-### 8.3 Path Priority
+### 10.3 Path Priority
 
 Once an investor has **both** an Identity contract linked **and** Trusted
 Issuers are configured, the ONCHAINID path takes priority and boolean claims
@@ -397,7 +439,7 @@ no effect on `isVerified()` in this case.
 To revert an investor to the boolean path, the Identity contract address
 must be cleared (re-register with `address(0)`).
 
-### 8.4 Regulatory Compliance Considerations (Hong Kong)
+### 10.4 Regulatory Compliance Considerations (Hong Kong)
 
 Hong Kong's SFC and AMLO require KYC/AML due diligence, investor
 accreditation, ongoing monitoring, and auditable record-keeping. These are
@@ -440,7 +482,7 @@ production-grade compliance solution.
 
 ---
 
-## 10. Delegate Votes — Activating On-Chain Voting Power
+## 11. Delegate Votes — Activating On-Chain Voting Power
 
 HKSTPSecurityToken inherits OpenZeppelin's **ERC20Votes**, which tracks
 voting power through an explicit **delegation** mechanism rather than raw
@@ -474,7 +516,7 @@ counted **exactly once** at the proposal snapshot block.
 
 ---
 
-## 11. Signaling Proposals — Non-Executable Governance Votes
+## 12. Signaling Proposals — Non-Executable Governance Votes
 
 The Governance page supports two proposal types: **Executable** and
 **Signaling**. They serve fundamentally different purposes.
