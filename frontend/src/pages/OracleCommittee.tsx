@@ -137,6 +137,11 @@ const OracleCommittee: React.FC = () => {
           <strong className="text-white">{threshold}-of-{members.length}</strong>{' '}
           oracle signatures to pass compliance checks, eliminating single-point-of-failure risk.
         </p>
+        <p className="text-gray-500 text-sm mt-1 italic">
+          Production-readiness note: The current devnet uses a single Compliance Oracle for convenience.
+          In production, HKSTPCompliance would call <code className="text-gray-400">consumeMultiAttestation()</code> instead,
+          requiring M-of-N oracle signatures per transfer — preventing any single compromised key from forging approvals.
+        </p>
       </div>
 
       {/* Status banner */}

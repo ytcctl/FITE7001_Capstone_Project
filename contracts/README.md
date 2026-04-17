@@ -289,6 +289,8 @@ Factory that deploys lightweight EIP-1167 minimal proxy Identity contracts per i
 #### `OracleCommittee.sol`
 Multi-oracle committee that replaces single-signer compliance attestation with a **threshold-based multi-signature** model.
 
+> **Production-readiness note:** The devnet currently uses a single Compliance Oracle via `consumeAttestation()` for convenience. In a production SFC/VASP deployment, `HKSTPCompliance` would route transfers through `OracleCommittee.consumeMultiAttestation()`, requiring M-of-N independent oracle signatures per transfer. This eliminates the single-oracle key as a point of failure — a compromised key alone cannot forge compliance approvals.
+
 | Feature | Description |
 |---------|-------------|
 | Threshold signatures | Configurable N-of-M oracle quorum for EIP-712 attestations |
