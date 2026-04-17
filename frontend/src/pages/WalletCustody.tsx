@@ -401,12 +401,29 @@ const WalletCustody: React.FC = () => {
     }
   };
 
-  // Execute a fully-confirmed multi-sig transaction
+  // Execute a fully-confirmed multi-sig transaction and auto-record in audit trail
   const handleExecute = async (txId: number) => {
     if (!contracts) return;
     try {
-      const tx = await contracts.multiSigWarm.executeTx(txId);
-      await tx.wait();
+      const execTx = await contracts.multiSigWarm.executeTx(txId);
+      await execTx.wait();
+      // Auto-record in WalletRegistry audit trail
+      try {
+        const txData = multiSigTxs.find(t => t.id === txId);
+        if (txData) {
+          const msAddr = await contracts.multiSigWarm.getAddress();
+          const recordTx = await contracts.walletRegistry.recordSweep(
+            txData.token,
+            msAddr,
+            txData.to,
+            txData.amount,
+            txData.reason
+          );
+          await recordTx.wait();
+        }
+      } catch (recordErr) {
+        console.warn('Auto-record sweep failed (needs OPERATOR_ROLE):', recordErr);
+      }
       loadData();
     } catch (e: unknown) {
       setError(parseMultiSigError(e, 'Failed to execute transaction'));
@@ -424,6 +441,26 @@ const WalletCustody: React.FC = () => {
       setError(parseMultiSigError(e, 'Failed to cancel transaction'));
     }
   };
+
+  // Log an executed multi-sig transfer to the WalletRegistry audit trail
+  const handleRecordSweep = async (tx: MultiSigTx) => {
+    if (!contracts) return;
+    try {
+      const msAddr = await contracts.multiSigWarm.getAddress();
+      const recordTx = await contracts.walletRegistry.recordSweep(
+        tx.token,
+        msAddr,
+        tx.to,
+        tx.amount,
+        tx.reason
+      );
+      await recordTx.wait();
+      loadData();
+    } catch (e: unknown) {
+      setError(parseMultiSigError(e, 'Failed to record sweep'));
+    }
+  };
+  void handleRecordSweep; // referenced via auto-record only
 
   // Check and emit sweep
   const handleCheckSweep = async () => {

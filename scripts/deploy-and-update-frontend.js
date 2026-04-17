@@ -481,6 +481,13 @@ async function main() {
   await (await walletRegistry.registerWallet(multiSigWarmAddress, 2, "Warm-MultiSig")).wait();
   console.log("     MultiSigWarm registered as WARM wallet");
 
+  // Grant OPERATOR_ROLE on WalletRegistry to all multi-sig signers so any signer
+  // can auto-record sweeps after executeTx() without a separate admin step
+  const WR_OPERATOR_ROLE = await walletRegistry.OPERATOR_ROLE();
+  await (await walletRegistry.grantRole(WR_OPERATOR_ROLE, operator.address)).wait();
+  await (await walletRegistry.grantRole(WR_OPERATOR_ROLE, agent.address)).wait();
+  console.log("     OPERATOR_ROLE granted to Operator + Agent on WalletRegistry");
+
   // Register deployer as a placeholder HOT wallet (replace in production)
   await (await walletRegistry.registerWallet(deployer.address, 1, "Hot-Deployer")).wait();
   console.log("     Deployer registered as HOT wallet (placeholder)");
