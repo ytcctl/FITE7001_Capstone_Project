@@ -14,6 +14,7 @@ import {
   Clock,
   Users,
   Hash,
+  Send,
 } from 'lucide-react';
 import { useWeb3 } from '../context/Web3Context';
 
@@ -91,6 +92,7 @@ const WalletCustody: React.FC = () => {
   const [multiSigTxs, setMultiSigTxs] = useState<MultiSigTx[]>([]);
   const [signers, setSigners] = useState<string[]>([]);
   const [sweepRecords, setSweepRecords] = useState<SweepRecord[]>([]);
+  const [isSigner, setIsSigner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +101,14 @@ const WalletCustody: React.FC = () => {
   const [newWalletTier, setNewWalletTier] = useState(1);
   const [newWalletLabel, setNewWalletLabel] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Propose form state
+  const [proposeToken, setProposeToken] = useState('');
+  const [proposeTo, setProposeTo] = useState('');
+  const [proposeAmount, setProposeAmount] = useState('');
+  const [proposeReason, setProposeReason] = useState('sweep-to-cold');
+  const [isProposing, setIsProposing] = useState(false);
+  const [proposeStatus, setProposeStatus] = useState<string | null>(null);
 
   const shortAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
@@ -170,8 +180,16 @@ const WalletCustody: React.FC = () => {
       try {
         const s = await ms.getSigners();
         setSigners([...s]);
+        // Check if current account is a signer
+        if (account) {
+          try {
+            const signer = await ms.isSigner(account);
+            setIsSigner(signer);
+          } catch { setIsSigner(false); }
+        }
       } catch {
         setSigners([]);
+        setIsSigner(false);
       }
 
       // Multi-sig transactions
@@ -283,6 +301,65 @@ const WalletCustody: React.FC = () => {
       loadData();
     } catch (e: unknown) {
       setError((e as Error).message || 'Failed to update wallet status');
+    }
+  };
+
+  // Propose a multi-sig transfer
+  const handlePropose = async () => {
+    if (!contracts || !proposeToken || !proposeTo || !proposeAmount) return;
+    setIsProposing(true);
+    setProposeStatus(null);
+    try {
+      const opt = tokenOptions.find(t => t.address === proposeToken);
+      const decimals = opt?.decimals ?? 18;
+      const amountWei = ethers.parseUnits(proposeAmount, decimals);
+      const tx = await contracts.multiSigWarm.proposeTx(proposeToken, proposeTo, amountWei, proposeReason);
+      await tx.wait();
+      setProposeStatus('Transaction proposed successfully');
+      setProposeTo('');
+      setProposeAmount('');
+      setProposeReason('sweep-to-cold');
+      loadData();
+    } catch (e: unknown) {
+      setProposeStatus((e as Error).message || 'Failed to propose transaction');
+    } finally {
+      setIsProposing(false);
+    }
+  };
+
+  // Confirm a pending multi-sig transaction
+  const handleConfirm = async (txId: number) => {
+    if (!contracts) return;
+    try {
+      const tx = await contracts.multiSigWarm.confirmTx(txId);
+      await tx.wait();
+      loadData();
+    } catch (e: unknown) {
+      setError((e as Error).message || 'Failed to confirm transaction');
+    }
+  };
+
+  // Execute a fully-confirmed multi-sig transaction
+  const handleExecute = async (txId: number) => {
+    if (!contracts) return;
+    try {
+      const tx = await contracts.multiSigWarm.executeTx(txId);
+      await tx.wait();
+      loadData();
+    } catch (e: unknown) {
+      setError((e as Error).message || 'Failed to execute transaction');
+    }
+  };
+
+  // Cancel a pending multi-sig transaction
+  const handleCancel = async (txId: number) => {
+    if (!contracts) return;
+    try {
+      const tx = await contracts.multiSigWarm.cancelTx(txId);
+      await tx.wait();
+      loadData();
+    } catch (e: unknown) {
+      setError((e as Error).message || 'Failed to cancel transaction');
     }
   };
 
@@ -589,6 +666,77 @@ const WalletCustody: React.FC = () => {
               </div>
             </div>
 
+            {/* Propose Transfer Form — only for signers */}
+            {isSigner && (
+              <div className="mb-6 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
+                <h3 className="text-sm font-medium text-yellow-400 mb-3 flex items-center gap-2">
+                  <Send size={14} /> Propose Transfer
+                </h3>
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="text-xs text-gray-500 mb-1 block">Token</label>
+                    <select
+                      value={proposeToken}
+                      onChange={(e) => setProposeToken(e.target.value)}
+                      className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                    >
+                      <option value="">Select token…</option>
+                      {tokenOptions.map((t) => (
+                        <option key={t.address} value={t.address}>
+                          {t.symbol} — {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1 min-w-[220px]">
+                    <label className="text-xs text-gray-500 mb-1 block">Destination Address</label>
+                    <input
+                      type="text"
+                      value={proposeTo}
+                      onChange={(e) => setProposeTo(e.target.value)}
+                      placeholder="0x…"
+                      className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder:text-gray-600 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                    />
+                  </div>
+                  <div className="min-w-[120px]">
+                    <label className="text-xs text-gray-500 mb-1 block">Amount</label>
+                    <input
+                      type="text"
+                      value={proposeAmount}
+                      onChange={(e) => setProposeAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder:text-gray-600 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                    />
+                  </div>
+                  <div className="min-w-[160px]">
+                    <label className="text-xs text-gray-500 mb-1 block">Reason</label>
+                    <select
+                      value={proposeReason}
+                      onChange={(e) => setProposeReason(e.target.value)}
+                      className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                    >
+                      <option value="sweep-to-cold">Sweep to Cold</option>
+                      <option value="replenish-hot">Replenish Hot</option>
+                      <option value="withdrawal">Withdrawal</option>
+                      <option value="rebalance">Rebalance</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={handlePropose}
+                    disabled={isProposing || !proposeToken || !proposeTo || !proposeAmount}
+                    className="px-5 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    {isProposing ? 'Proposing…' : 'Propose'}
+                  </button>
+                </div>
+                {proposeStatus && (
+                  <p className={`mt-2 text-xs ${proposeStatus.includes('success') ? 'text-green-400' : 'text-red-400'}`}>
+                    {proposeStatus}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Transactions */}
             <h3 className="text-sm text-gray-400 mb-2">Recent Transactions</h3>
             {multiSigTxs.length === 0 ? (
@@ -604,6 +752,7 @@ const WalletCustody: React.FC = () => {
                       <th className="text-left py-2 px-2">Reason</th>
                       <th className="text-left py-2 px-2">Confirms</th>
                       <th className="text-left py-2 px-2">Status</th>
+                      {isSigner && <th className="text-left py-2 px-2">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -623,6 +772,37 @@ const WalletCustody: React.FC = () => {
                             <span className="text-yellow-400 text-xs">⏳ Pending</span>
                           )}
                         </td>
+                        {isSigner && (
+                          <td className="py-2 px-2">
+                            {!tx.executed && !tx.cancelled && (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleConfirm(tx.id)}
+                                  className="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-xs transition-colors"
+                                  title="Confirm this transaction"
+                                >
+                                  Confirm
+                                </button>
+                                {tx.confirmations >= 2 && (
+                                  <button
+                                    onClick={() => handleExecute(tx.id)}
+                                    className="px-2 py-1 bg-green-600/80 hover:bg-green-600 text-white rounded text-xs transition-colors"
+                                    title="Execute (requires 2+ confirmations)"
+                                  >
+                                    Execute
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleCancel(tx.id)}
+                                  className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs transition-colors"
+                                  title="Cancel this transaction"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

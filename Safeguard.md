@@ -629,7 +629,53 @@ Key safeguards:
 - **Revocation**: A signer can revoke their confirmation before execution.
 - **Reentrancy protection**: The contract uses OpenZeppelin `ReentrancyGuard`.
 - **Reason tagging**: Every transfer is tagged with a reason string
-  (`"sweep-to-cold"`, `"replenish-hot"`, `"withdrawal"`) for audit trail.
+  for audit trail (see Transfer Reason Types below).
+
+### Transfer Reason Types
+
+Every warm-wallet `proposeTx` call must specify a **reason** tag. The UI
+exposes four predefined reasons, each with a distinct trigger condition,
+workflow, and rationale.
+
+#### 1. `sweep-to-cold` — Sweep to Cold Storage
+
+| Aspect | Detail |
+|---|---|
+| **Direction** | Hot → Warm → Cold |
+| **Trigger** | Hot wallet balance exceeds the 2% cap (`SweepRequired` event emitted by `WalletRegistry`) |
+| **Rationale** | SFC VATP standards mandate that ≤ 2% of client AUM resides in hot (always-online) wallets. Excess funds must be moved to air-gapped cold storage to minimise exposure to online threats. |
+| **Scenario** | After a large token mint or a batch of investor deposits, the hot wallet's balance grows from 1.8% to 3.1% of total AUM. The custody service detects the `SweepRequired` event. A signer proposes `proposeTx(token, coldAddr, excessAmount, "sweep-to-cold")`; a second signer confirms; the transaction executes and the hot balance drops back below 2%. |
+| **Condition** | Proposer must be a registered signer. The destination address must be a registered **Cold-tier** wallet in `WalletRegistry`. |
+
+#### 2. `replenish-hot` — Replenish Hot Wallet
+
+| Aspect | Detail |
+|---|---|
+| **Direction** | Cold → (air-gap sign) → Warm → Hot |
+| **Trigger** | Hot wallet liquidity is too low to service pending FPS withdrawals, market-making fills, or order settlements |
+| **Rationale** | While cold storage protects the majority of assets, the hot wallet must maintain enough liquidity to fulfil real-time obligations (instant FPS pay-outs, order book fills). Replenishment keeps the platform operational without breaching the 2% cap. |
+| **Scenario** | A cluster of investor redemptions drains the hot wallet to 0.3% of AUM. The operations team prepares a signed transaction on the air-gapped cold device, imports it into the warm wallet, and a signer proposes `proposeTx(token, hotAddr, topUpAmount, "replenish-hot")`. After 2-of-3 confirmation the hot wallet is topped up to ~1.5%. |
+| **Condition** | The pre-signed cold-wallet transaction must first deposit funds into the warm wallet. The destination must be a registered **Hot-tier** wallet. The resulting hot balance must still be ≤ 2% of AUM after the transfer. |
+
+#### 3. `withdrawal` — Client Withdrawal
+
+| Aspect | Detail |
+|---|---|
+| **Direction** | Warm → External (investor / redemption address) |
+| **Trigger** | An approved client redemption or off-platform withdrawal request that exceeds hot wallet liquidity or requires warm-wallet authorisation |
+| **Rationale** | Large or out-of-band withdrawals (e.g., institutional block redemptions, regulatory-mandated asset returns) may require manual warm-wallet disbursement with multi-sig approval to maintain segregation controls and provide an auditable sign-off trail. |
+| **Scenario** | An institutional investor submits a block redemption of 500 000 tokens. The compliance team verifies the request off-chain, and a signer proposes `proposeTx(token, investorAddr, 500000e18, "withdrawal")`. A second signer reviews the compliance ticket and confirms; a third executes. |
+| **Condition** | The destination must pass compliance verification (registered, verified, not frozen in the Identity Registry). The withdrawal amount must not cause the platform's reserve to fall below minimum thresholds. |
+
+#### 4. `rebalance` — General Rebalance
+
+| Aspect | Detail |
+|---|---|
+| **Direction** | Any inter-tier movement (Hot ↔ Warm, Warm ↔ Cold, or lateral between wallets of the same tier) |
+| **Trigger** | Periodic portfolio rebalancing, wallet rotation, infrastructure migration, or post-incident key-rotation |
+| **Rationale** | Operational maintenance may require moving funds between wallets that don't fit the sweep or replenish patterns — for example rotating a compromised hot key to a fresh hot wallet, consolidating balances across multiple cold wallets, or redistributing assets after a token factory creates a new security token. A generic `rebalance` reason provides a catch-all audit tag for these operations. |
+| **Scenario** | The platform rotates its hot-wallet key as a precautionary measure. A signer proposes `proposeTx(token, newHotAddr, fullBalance, "rebalance")` to migrate all funds from the old hot wallet to the new one. A second signer confirms. The old wallet is then deactivated via `deactivateWallet()` in `WalletRegistry`. |
+| **Condition** | Both source and destination must be registered wallets (active) in `WalletRegistry`. The resulting tier balances must still satisfy the 98/2 rule after the move. |
 
 ### Rebalancing Flow
 
