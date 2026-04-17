@@ -99,10 +99,34 @@ const Portfolio: React.FC = () => {
     let to: string;
     try { to = ethers.getAddress(transferTo.trim()); } catch { setTxStatus('✗ Invalid recipient address'); return; }
 
+    // Resolve the actual token contract being transferred
+    let tokenContract: ethers.Contract;
+    let decimals: number;
+    let sym: string;
+    if (transferType === 'security') {
+      tokenContract = contracts.securityToken;
+      decimals = 18;
+      sym = tokenSymbol;
+    } else if (transferType === 'cash') {
+      tokenContract = contracts.cashToken;
+      decimals = 6;
+      sym = cashSymbol;
+    } else {
+      const holding = factoryHoldings.find(h => h.address === transferType);
+      if (!holding) return;
+      const provider = (contracts.securityToken as any).runner ?? contracts.securityToken.runner;
+      tokenContract = new ethers.Contract(holding.address, SECURITY_TOKEN_ABI, provider);
+      decimals = holding.decimals;
+      sym = holding.symbol;
+    }
+
+    // Use the actual token for pre-checks (each token has its own safeListed/frozen mappings)
+    const checkContract = transferType === 'cash' ? contracts.securityToken : tokenContract;
+
     // KYC gate: verify recipient is registered and KYC-verified before any transfer
     // Safe-listed addresses (custody wallets, escrow, treasury) bypass KYC checks
     try {
-      const isSafeListed = await contracts.securityToken.safeListed(to);
+      const isSafeListed = await checkContract.safeListed(to);
       if (!isSafeListed) {
         const recipientVerified = await contracts.identityRegistry.isVerified(to);
         if (!recipientVerified) {
@@ -115,29 +139,27 @@ const Portfolio: React.FC = () => {
       return;
     }
 
+    // Frozen check: block transfers to or from frozen addresses
+    try {
+      const recipientFrozen = await checkContract.frozen(to);
+      if (recipientFrozen) {
+        setTxStatus('✗ Recipient address is frozen. Transfers to frozen accounts are not permitted.');
+        return;
+      }
+      if (account) {
+        const senderFrozen = await checkContract.frozen(account);
+        if (senderFrozen) {
+          setTxStatus('✗ Your address is frozen. Transfers from frozen accounts are not permitted.');
+          return;
+        }
+      }
+    } catch {
+      setTxStatus('✗ Unable to verify frozen status. Please try again.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      let tokenContract: ethers.Contract;
-      let decimals: number;
-      let sym: string;
-
-      if (transferType === 'security') {
-        tokenContract = contracts.securityToken;
-        decimals = 18;
-        sym = tokenSymbol;
-      } else if (transferType === 'cash') {
-        tokenContract = contracts.cashToken;
-        decimals = 6;
-        sym = cashSymbol;
-      } else {
-        // Factory-deployed token (transferType is the address)
-        const holding = factoryHoldings.find(h => h.address === transferType);
-        if (!holding) return;
-        const provider = (contracts.securityToken as any).runner ?? contracts.securityToken.runner;
-        tokenContract = new ethers.Contract(holding.address, SECURITY_TOKEN_ABI, provider);
-        decimals = holding.decimals;
-        sym = holding.symbol;
-      }
 
       setTxStatus(`Transferring ${transferAmount} ${sym}…`);
       const tx = await tokenContract.transfer(to, ethers.parseUnits(transferAmount, decimals));

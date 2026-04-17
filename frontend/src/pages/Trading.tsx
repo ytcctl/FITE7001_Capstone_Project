@@ -401,6 +401,17 @@ const Trading: React.FC = () => {
       return;
     }
 
+    // Check if the connected wallet is frozen on the security token
+    try {
+      const isFrozen = await secTokenContract.frozen(account);
+      if (isFrozen) {
+        setFormError('Your wallet is frozen by the compliance administrator. Trading is not permitted.');
+        return;
+      }
+    } catch {
+      // frozen() not available — skip pre-check; on-chain enforcement will still block
+    }
+
     const priceNum = parseFloat(price);
     const qtyNum = parseFloat(quantity);
     if (isNaN(priceNum) || priceNum <= 0) {

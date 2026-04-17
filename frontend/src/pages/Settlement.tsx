@@ -154,12 +154,82 @@ const Settlement: React.FC = () => {
     loadTokenOptions();
   }, [contracts]);
 
+  /** Parse settlement errors into human-readable messages */
+  const parseSettlementError = (e: any): string => {
+    const raw = e?.reason || e?.message || '';
+    // ENS not supported on local chain
+    if (raw.includes('does not support ENS') || (e?.code === 'UNSUPPORTED_OPERATION' && raw.includes('getEnsAddress'))) {
+      return 'Invalid address format. Please enter a valid Ethereum address (0x…).';
+    }
+    if (raw.includes('invalid address') || raw.includes('INVALID_ARGUMENT')) {
+      return 'Invalid address format. Please enter a valid Ethereum address (0x…).';
+    }
+    if (raw.includes('creator cannot execute') || raw.includes('createdBy')) {
+      return 'Only the counterparty can execute this DvP settlement.';
+    }
+    // Custom error selectors
+    const data = typeof e?.data === 'string' ? e.data
+      : typeof e?.error?.data === 'string' ? e.error.data : null;
+    if (data && data.startsWith('0x')) {
+      const selector = data.slice(0, 10).toLowerCase();
+      const knownErrors: Record<string, string> = {
+        '0xe450d38c': 'Insufficient token balance',
+        '0xfb8f41b2': 'Insufficient allowance — please approve tokens first',
+        '0x1a83e5fc': 'Token transfer failed — sender or recipient may be frozen or not KYC-verified',
+      };
+      if (knownErrors[selector]) return knownErrors[selector];
+      if (selector === '0x08c379a0' && data.length >= 74) {
+        try {
+          const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + data.slice(10));
+          return decoded[0];
+        } catch { /* fall through */ }
+      }
+    }
+    // String revert reason from message
+    const match = raw.match(/reverted with reason string '([^']+)'/);
+    if (match) return match[1];
+    if (raw.length > 200) return raw.slice(0, 200) + '…';
+    return raw || 'Transaction failed';
+  };
+
   const handleCreate = async () => {
     if (!contracts || !seller || !buyer || !tokenAmount || !cashAmount || !selectedSecurityToken) return;
+
+    // Validate addresses
+    if (!ethers.isAddress(seller)) {
+      setTxStatus('✗ Invalid seller address. Please enter a valid Ethereum address (0x…).');
+      return;
+    }
+    if (!ethers.isAddress(buyer)) {
+      setTxStatus('✗ Invalid buyer address. Please enter a valid Ethereum address (0x…).');
+      return;
+    }
+
     setIsSubmitting(true);
     setTxStatus('Creating settlement…');
     try {
+      // Frozen pre-check on the selected security token
       const signer = (contracts.dvpSettlement as any).runner as ethers.Signer;
+      const secToken = new ethers.Contract(selectedSecurityToken, SECURITY_TOKEN_ABI, signer);
+      try {
+        const [sellerFrozen, buyerFrozen] = await Promise.all([
+          secToken.frozen(seller),
+          secToken.frozen(buyer),
+        ]);
+        if (sellerFrozen) {
+          setTxStatus('✗ Seller address is frozen by the compliance administrator. Settlement cannot be created.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (buyerFrozen) {
+          setTxStatus('✗ Buyer address is frozen by the compliance administrator. Settlement cannot be created.');
+          setIsSubmitting(false);
+          return;
+        }
+      } catch {
+        // frozen() not available — skip pre-check
+      }
+
       const me = (await signer.getAddress()).toLowerCase();
       const dvpAddr = await contracts.dvpSettlement.getAddress();
       const tokenAmountBN = ethers.parseUnits(tokenAmount, 18);
@@ -206,7 +276,7 @@ const Settlement: React.FC = () => {
       setCashAmount('');
       loadSettlements();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Create failed'}`);
+      setTxStatus(`✗ ${parseSettlementError(e)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -264,12 +334,7 @@ const Settlement: React.FC = () => {
       }
       loadSettlements();
     } catch (e: any) {
-      const msg = e?.reason || e?.message || '';
-      if (msg.includes('creator cannot execute') || msg.includes('createdBy')) {
-        setTxStatus('✗ Only Counterparty can execute the DvP settlement.');
-      } else {
-        setTxStatus(`✗ ${msg || 'Execute failed'}`);
-      }
+      setTxStatus(`✗ ${parseSettlementError(e)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -285,7 +350,7 @@ const Settlement: React.FC = () => {
       setTxStatus(`✓ Settlement #${id} cancelled`);
       loadSettlements();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Cancel failed'}`);
+      setTxStatus(`✗ ${parseSettlementError(e)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -301,7 +366,7 @@ const Settlement: React.FC = () => {
       setTxStatus(`✓ Settlement #${id} marked as Failed (deadline expired)`);
       loadSettlements();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Mark failed error'}`);
+      setTxStatus(`✗ ${parseSettlementError(e)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -370,12 +435,7 @@ const Settlement: React.FC = () => {
       setSelectedIds(new Set());
       loadSettlements();
     } catch (e: any) {
-      const msg = e?.reason || e?.message || '';
-      if (msg.includes('creator cannot execute') || msg.includes('createdBy')) {
-        setTxStatus('✗ Only Counterparty can execute the DvP settlement.');
-      } else {
-        setTxStatus(`✗ ${msg || 'Batch execute failed'}`);
-      }
+      setTxStatus(`✗ ${parseSettlementError(e)}`);
     } finally {
       setIsSubmitting(false);
     }
