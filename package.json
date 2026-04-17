@@ -14,7 +14,8 @@
     "besu:start": "powershell -ExecutionPolicy Bypass -File besu/start-besu.ps1 -Detach",
     "besu:stop": "docker stop tokenhub-besu && docker rm tokenhub-besu",
     "besu:logs": "docker logs -f tokenhub-besu",
-    "clean": "hardhat clean"
+    "clean": "hardhat clean",
+    "seed:testdata": "hardhat run scripts/seed-all-testdata.js --network localhost"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2"

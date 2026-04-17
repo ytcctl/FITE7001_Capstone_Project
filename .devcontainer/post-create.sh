@@ -18,7 +18,15 @@ echo "▶ Installing Hardhat + frontend dependencies..."
 npm ci
 cd frontend && npm ci && cd ..
 
-# ── 2. Compile Solidity contracts ────────────────────────────────
+# ── 2. Install Foundry (Anvil — persistent local devnet) ─────────
+echo ""
+echo "▶ Installing Foundry (Anvil)..."
+curl -L https://foundry.paradigm.xyz | bash
+export PATH="$HOME/.foundry/bin:$PATH"
+foundryup
+echo "  ✓ Anvil $(anvil --version | head -1)"
+
+# ── 3. Compile Solidity contracts ────────────────────────────────
 echo ""
 echo "▶ Compiling Solidity contracts..."
 npx hardhat compile

@@ -35,3 +35,7 @@ besu/data/
 
 # Optional: hardhat network files
 deployments/
+
+# Anvil persistent state (machine-local)
+.devcontainer/anvil-state.json
+anvil-node.log
