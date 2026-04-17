@@ -139,7 +139,7 @@ Every transaction is intercepted by a compliance layer that validates the identi
 | **Token Contract** | ERC-3643 (T-REX) compliant | Standardizes transfer logic with compliance hooks |
 | **Identity Registry** | Mapping of addresses → ONCHAINID | Ensures all participants are KYC/AML verified |
 | **Compliance Contract** | Modular rule sets + EIP-712 attestation | Enforces jurisdictional limits, investor caps, lock-ups |
-| **Claim Topics Registry** | List of required verifications (5 topics) | Specifies required claims (e.g., PI status) |
+| **Claim Topics Registry** | List of required verifications (6 topics) | Specifies required claims (e.g., PI status, FPS name-match) |
 
 ### 2.2  Transfer Flow
 
@@ -192,10 +192,11 @@ Maps investor wallet addresses to ONCHAINID identity contracts (ERC-734/735 styl
 | Claim Topic | Description |
 |-------------|-------------|
 | 1 | KYC Verified |
-| 2 | Accredited Investor |
+| 2 | Accredited Investor (Professional Investor) |
 | 3 | Jurisdiction Approved (HK / non-sanctioned) |
 | 4 | Source of Funds Verified |
 | 5 | PEP / Sanctions Clear |
+| 6 | FPS Name-Match Verified |
 
 #### `HKSTPCompliance.sol`
 Modular compliance contract — "**Policy off-chain, enforcement on-chain**".
@@ -530,6 +531,7 @@ frontend/
 │       ├── ComplianceRules.tsx   # Compliance module configuration (per-token caps, lock-ups, jurisdiction)
 │       ├── TokenComplianceDetail.tsx # Per-token compliance detail view (/compliance/:address) — caps, lock-ups, remove actions
 │       ├── Governance.tsx        # On-chain governance proposals
+│       ├── FreezeManagement.tsx  # Freeze/unfreeze investor addresses (Agent)
 │       ├── OracleCommittee.tsx   # Multi-oracle threshold management
 │       └── WalletCustody.tsx     # Hot/warm/cold wallet management
 └── ...
@@ -1006,7 +1008,7 @@ The Investor Portal has **321 documented functional test cases** (160 positive +
 | ID | Test Case | Steps | Expected Result | Priority |
 |----|-----------|-------|-----------------|----------|
 | P-P-01 | Display balances | Connect wallet with holdings | Security token and cash token balances shown with symbols | High |
-| P-P-02 | Identity status display | Connect KYC-verified wallet | Registered: ✓, Verified: ✓, Frozen: No, Safe-Listed: Yes, Country: "HK" | High |
+| P-P-02 | Identity status display | Connect KYC-verified wallet | Registered: ✓, Verified: ✓, Frozen: No, Country: "HK" | High |
 | P-P-03 | Claims grid | Connect wallet with all claims | All 6 claim topics show ✓ | Medium |
 | P-P-04 | Transfer security tokens | Select "Security" → enter recipient + 10 → Transfer | Tx succeeds, balance decreases by 10, recipient receives 10 | Critical |
 | P-P-05 | Transfer cash tokens | Select "Cash" → enter recipient + 100 → Transfer | Tx succeeds, THKD balance decreases, recipient receives | Critical |
@@ -1064,7 +1066,7 @@ The Investor Portal has **321 documented functional test cases** (160 positive +
 | WC-P-01 | Register hot wallet | Enter address → tier "Hot" → label → Register | Wallet appears in table with 🔥 Hot tier | High |
 | WC-P-02 | Register warm wallet | Enter address → tier "Warm" → Register | Wallet appears with 🌡️ Warm tier | High |
 | WC-P-03 | Register cold wallet | Enter address → tier "Cold" → Register | Wallet appears with ❄️ Cold tier | High |
-| WC-P-04 | Tier breakdown display | Multiple wallets registered | Hot/Warm/Cold balance cards show correct balances and % of AUM | High |
+| WC-P-04 | Tier breakdown display | Multiple wallets registered + multiple tracked tokens | Hot/Warm/Cold balance cards show per-token breakdowns (HKSAT, THKD, factory tokens) with correct balances and % of AUM | High |
 | WC-P-05 | Compliance check — compliant | Hot wallet < 2% of AUM | Compliance card shows "COMPLIANT" (green) | Critical |
 | WC-P-06 | Trigger sweep check | Hot wallet over cap → "Trigger Sweep Check" | Sweep recorded, appears in audit trail | Critical |
 | WC-P-07 | Multi-sig signers display | Open Custody page | Lists 3 authorized signers for warm wallet | Medium |
@@ -1260,7 +1262,7 @@ The unified deploy script (`deploy-and-update-frontend.js`) automatically seeds 
 
 **Investor1 seeded state** (after deploy):
 - ✅ Identity registered in `HKSTPIdentityRegistry` (country: HK)
-- ✅ KYC claims verified (topics 1–5: AML, CFT, CDD, Accredited Investor, Domicile)
+- ✅ KYC claims verified (topics 1–6: KYC, Accredited Investor / Professional Investor, Jurisdiction, Source of Funds, PEP/Sanctions, FPS Name-Match)
 - ✅ ERC-735 on-chain claims signed by `ClaimIssuer`
 - ✅ **10,000 HKSAT** (security tokens) minted
 - ✅ **5,000,000 THKD** (test HKD cash tokens) minted
@@ -1672,7 +1674,7 @@ All administrative functions (KYC management, token issuance, compliance configu
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Investor suitability | `HKSTPIdentityRegistry` — 5 claim topics + ONCHAINID identity verification |
+| Investor suitability | `HKSTPIdentityRegistry` — 6 claim topics + ONCHAINID identity verification |
 | Transfer restrictions | `HKSTPCompliance` — jurisdiction, lock-up, concentration caps |
 | Multi-oracle attestation | `OracleCommittee` — threshold-based multi-sig for compliance approvals |
 | **Order book KYC gate** | `OrderBook` — `identityRegistry.isVerified()` enforced on every buy/sell order; non-KYC wallets cannot trade even via MetaMask |

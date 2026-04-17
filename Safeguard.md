@@ -569,6 +569,105 @@ governance votes that record token holder sentiment on the blockchain.
 
 ---
 
+## 13. Custody Wallet Architecture — Hot / Warm / Cold Tiers
+
+The platform implements a three-tier custody model aligned with
+SFC VATP Conduct Standards and VASP requirements. Two on-chain contracts
+enforce this architecture:
+[`WalletRegistry.sol`](contracts/custody/WalletRegistry.sol) (tier
+classification + balance caps) and
+[`MultiSigWarm.sol`](contracts/custody/MultiSigWarm.sol) (multi-sig
+approval for warm wallet operations).
+
+### Wallet Tiers
+
+| Tier | Connectivity | AUM Share | Security Model | Purpose |
+|---|---|---|---|---|
+| **HOT** | Always online | **≤ 2%** (enforced on-chain via `hotCapBps = 200`) | Single operational key | Instant settlement — FPS withdrawals, market-making, order fills |
+| **WARM** | Partially online | Transient buffer | **2-of-3 multi-sig** (`MultiSigWarm`) | Rebalancing between hot ↔ cold; acts as segregation gate |
+| **COLD** | Air-gapped / HSM | **≥ 98%** | FIPS 140-2 Level 3+ HSM, offline signing | Long-term bulk asset storage |
+
+### 98/2 Hot Cap Rule
+
+`WalletRegistry` enforces that hot wallet balances never exceed 2% of total
+tracked AUM:
+
+- Every tracked ERC-20 token (security token + cash token) is monitored.
+- When a hot wallet receives tokens that would push its balance above the cap,
+  a **`SweepRequired`** event is emitted.
+- An off-chain custody service listens for this event and triggers an
+  automatic sweep to cold storage via the warm wallet.
+
+### Cold Wallet Transfer Restriction
+
+Transfers **from** cold wallets are blocked on-chain. All outbound cold wallet
+movements must follow the air-gapped signing workflow:
+
+1. Proposal is created offline on the air-gapped signing device.
+2. Signed transaction is transported to the warm wallet.
+3. Warm wallet multi-sig validates and routes the funds.
+
+This prevents compromised online systems from draining cold storage.
+
+### Warm Wallet Multi-Sig Workflow (`MultiSigWarm`)
+
+All fund movements through the warm wallet require **2-of-3** approval from
+designated signers:
+
+| Step | Action | Who |
+|---|---|---|
+| 1 | **Propose** — call `proposeTx(token, to, amount, reason)` | Any signer |
+| 2 | **Confirm** — call `confirmTx(txId)` | A second signer |
+| 3 | **Execute** — call `executeTx(txId)` | Any signer (after 2 confirmations) |
+
+Key safeguards:
+
+- **Auto-expiry**: Unexecuted transactions expire after **48 hours**
+  (`EXPIRY_PERIOD`), preventing stale proposals from being executed later.
+- **Cancellation**: Any signer can cancel a pending transaction before
+  execution.
+- **Revocation**: A signer can revoke their confirmation before execution.
+- **Reentrancy protection**: The contract uses OpenZeppelin `ReentrancyGuard`.
+- **Reason tagging**: Every transfer is tagged with a reason string
+  (`"sweep-to-cold"`, `"replenish-hot"`, `"withdrawal"`) for audit trail.
+
+### Rebalancing Flow
+
+```
+  ┌──────────┐     sweep-to-cold     ┌──────────┐    air-gap     ┌──────────┐
+  │   HOT    │ ───────────────────→  │   WARM   │ ────────────→  │   COLD   │
+  │  (≤ 2%)  │                       │  (2-of-3 │                │  (≥ 98%) │
+  │          │ ←───────────────────  │  multisig)│ ←────────────  │          │
+  └──────────┘     replenish-hot     └──────────┘    air-gap     └──────────┘
+```
+
+- **Auto-sweep** (hot → cold via warm): Triggered when hot balance exceeds
+  2% cap. The custody operator proposes a sweep through the warm wallet;
+  a second signer confirms; funds move to cold storage.
+- **Replenish** (cold → hot via warm): When hot wallet needs liquidity,
+  funds are signed offline from cold, routed through warm multi-sig, then
+  deposited to hot.
+
+### Access Control
+
+| Role | Contract | Permissions |
+|---|---|---|
+| `DEFAULT_ADMIN_ROLE` | `WalletRegistry` | Register/deactivate wallets, set hot cap, add/remove tracked tokens |
+| `OPERATOR_ROLE` | `WalletRegistry` | Execute sweeps, record rebalance operations |
+| Signer (1 of 3) | `MultiSigWarm` | Propose, confirm, revoke, execute, cancel transactions |
+
+### Regulatory Alignment
+
+| Requirement | Implementation |
+|---|---|
+| **SFC VATP — Segregation of client assets** | Three-tier architecture with on-chain enforcement; cold storage is air-gapped |
+| **SFC VATP — Hot wallet cap** | `hotCapBps = 200` (2%) enforced by `WalletRegistry` with `SweepRequired` events |
+| **VASP — Multi-signature custody** | Warm wallet requires 2-of-3 approval via `MultiSigWarm` |
+| **VASP — Audit trail** | All sweep/rebalance operations are logged on-chain (`SweepRecord[]`) with timestamps and reason codes |
+| **FIPS 140-2 Level 3+ HSM** | Cold wallet signing occurs on certified hardware; on-chain contract blocks direct cold transfers |
+
+---
+
 ## Safe-Listed Status (Portfolio Page)
 
 The Portfolio page displays four identity/compliance indicators for the

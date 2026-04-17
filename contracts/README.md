@@ -139,7 +139,7 @@ Every transaction is intercepted by a compliance layer that validates the identi
 | **Token Contract** | ERC-3643 (T-REX) compliant | Standardizes transfer logic with compliance hooks |
 | **Identity Registry** | Mapping of addresses → ONCHAINID | Ensures all participants are KYC/AML verified |
 | **Compliance Contract** | Modular rule sets + EIP-712 attestation | Enforces jurisdictional limits, investor caps, lock-ups |
-| **Claim Topics Registry** | List of required verifications (5 topics) | Specifies required claims (e.g., PI status) |
+| **Claim Topics Registry** | List of required verifications (6 topics) | Specifies required claims (e.g., PI status, FPS name-match) |
 
 ### 2.2  Transfer Flow
 
@@ -191,10 +191,11 @@ Maps investor wallet addresses to ONCHAINID identity contracts (ERC-734/735 styl
 | Claim Topic | Description |
 |-------------|-------------|
 | 1 | KYC Verified |
-| 2 | Accredited Investor |
+| 2 | Accredited Investor (Professional Investor) |
 | 3 | Jurisdiction Approved (HK / non-sanctioned) |
 | 4 | Source of Funds Verified |
 | 5 | PEP / Sanctions Clear |
+| 6 | FPS Name-Match Verified |
 
 #### `HKSTPCompliance.sol`
 Modular compliance contract — "**Policy off-chain, enforcement on-chain**".
@@ -738,7 +739,7 @@ After deployment, the script automatically:
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Investor suitability | `HKSTPIdentityRegistry` — 5 claim topics + ONCHAINID identity verification |
+| Investor suitability | `HKSTPIdentityRegistry` — 6 claim topics + ONCHAINID identity verification |
 | Transfer restrictions | `HKSTPCompliance` — jurisdiction, lock-up, concentration caps |
 | Multi-oracle attestation | `OracleCommittee` — threshold-based multi-sig for compliance approvals |
 | **Order book KYC gate** | `OrderBook` — `identityRegistry.isVerified()` enforced on every buy/sell order; non-KYC wallets cannot trade even via MetaMask |

@@ -142,6 +142,16 @@ const TokenManagement: React.FC = () => {
         newAddress = parsed?.args?.tokenAddress || '';
       }
 
+      // Auto-register the new token in WalletRegistry for custody tracking
+      if (newAddress && contracts.walletRegistry) {
+        try {
+          const trackTx = await contracts.walletRegistry.addTrackedToken(newAddress);
+          await trackTx.wait();
+        } catch (trackErr) {
+          console.warn('Auto-track token in WalletRegistry failed:', trackErr);
+        }
+      }
+
       setCreateSuccess(
         `✅ Token "${tokenName}" (${tokenSymbol}) created at ${newAddress}`
       );
@@ -238,6 +248,17 @@ const TokenManagement: React.FC = () => {
         const parsed = contracts.tokenFactoryV2.interface.parseLog({ topics: event.topics as string[], data: event.data });
         newAddress = parsed?.args?.proxyAddress || '';
       }
+
+      // Auto-register the new token in WalletRegistry for custody tracking
+      if (newAddress && contracts.walletRegistry) {
+        try {
+          const trackTx = await contracts.walletRegistry.addTrackedToken(newAddress);
+          await trackTx.wait();
+        } catch (trackErr) {
+          console.warn('Auto-track V2 token in WalletRegistry failed:', trackErr);
+        }
+      }
+
       setCreateSuccessV2(`✅ Upgradeable token "${v2TokenName}" (${v2TokenSymbol}) created at ${newAddress}`);
       setV2TokenName('');
       setV2TokenSymbol('');

@@ -16,7 +16,6 @@ import {
   Hash,
 } from 'lucide-react';
 import { useWeb3 } from '../context/Web3Context';
-import { CONTRACT_ADDRESSES } from '../config/contracts';
 
 // Wallet tier enum values matching the contract
 const TIER_LABELS: Record<number, string> = {
@@ -47,6 +46,10 @@ interface WalletInfo {
 }
 
 interface TierBreakdown {
+  tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  decimals: number;
   hotBal: bigint;
   warmBal: bigint;
   coldBal: bigint;
@@ -81,7 +84,7 @@ const WalletCustody: React.FC = () => {
 
   // State
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
-  const [breakdown, setBreakdown] = useState<TierBreakdown | null>(null);
+  const [breakdowns, setBreakdowns] = useState<TierBreakdown[]>([]);
   const [hotCapBps, setHotCapBps] = useState<number>(0);
   const [multiSigTxs, setMultiSigTxs] = useState<MultiSigTx[]>([]);
   const [signers, setSigners] = useState<string[]>([]);
@@ -123,20 +126,46 @@ const WalletCustody: React.FC = () => {
       );
       setWallets(walletInfos);
 
-      // Fetch tier breakdown for security token
+      // Fetch tier breakdown for ALL tracked tokens
       try {
-        const bd = await wr.tierBreakdown(CONTRACT_ADDRESSES.securityToken);
-        setBreakdown({
-          hotBal: bd.hotBal,
-          warmBal: bd.warmBal,
-          coldBal: bd.coldBal,
-          total: bd.total,
-          hotCapVal: bd.hotCapVal,
-          overCap: bd.overCap,
-        });
+        const trackedTokens: string[] = await wr.getTrackedTokens();
+        const erc20MinAbi = [
+          'function name() view returns (string)',
+          'function symbol() view returns (string)',
+          'function decimals() view returns (uint8)',
+        ];
+        const provider = wr.runner?.provider ?? wr.runner;
+        const bds: TierBreakdown[] = await Promise.all(
+          trackedTokens.map(async (tokenAddr: string) => {
+            const bd = await wr.tierBreakdown(tokenAddr);
+            let tokenName = tokenAddr.slice(0, 10) + '…';
+            let tokenSymbol = '???';
+            let decimals = 18;
+            try {
+              const tok = new ethers.Contract(tokenAddr, erc20MinAbi, provider);
+              [tokenName, tokenSymbol, decimals] = await Promise.all([
+                tok.name(),
+                tok.symbol(),
+                tok.decimals().then(Number),
+              ]);
+            } catch { /* fallback to address */ }
+            return {
+              tokenAddress: tokenAddr,
+              tokenName,
+              tokenSymbol,
+              decimals,
+              hotBal: bd.hotBal,
+              warmBal: bd.warmBal,
+              coldBal: bd.coldBal,
+              total: bd.total,
+              hotCapVal: bd.hotCapVal,
+              overCap: bd.overCap,
+            };
+          })
+        );
+        setBreakdowns(bds);
       } catch {
-        // Token may not be tracked yet
-        setBreakdown(null);
+        setBreakdowns([]);
       }
 
       // Hot cap
@@ -233,9 +262,9 @@ const WalletCustody: React.FC = () => {
     }
   };
 
-  const formatTokens = (val: bigint) => {
+  const formatTokens = (val: bigint, decimals = 18) => {
     try {
-      return Number(ethers.formatEther(val)).toLocaleString(undefined, { maximumFractionDigits: 2 });
+      return Number(ethers.formatUnits(val, decimals)).toLocaleString(undefined, { maximumFractionDigits: 2 });
     } catch {
       return '0';
     }
@@ -289,7 +318,16 @@ const WalletCustody: React.FC = () => {
       ) : (
         <>
           {/* ── Tier Breakdown Cards ── */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {breakdowns.length === 0 ? (
+            <p className="text-gray-500 text-sm">No tracked tokens. Add tokens via WalletRegistry to see tier breakdowns.</p>
+          ) : breakdowns.map((bd) => (
+            <div key={bd.tokenAddress} className="mb-6">
+              <h3 className="text-md font-semibold text-gray-200 mb-3 flex items-center gap-2">
+                <Shield size={16} className="text-purple-400" />
+                {bd.tokenSymbol} — {bd.tokenName}
+                <span className="text-xs text-gray-500 font-mono">({bd.tokenAddress.slice(0, 6)}…{bd.tokenAddress.slice(-4)})</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Hot */}
             <div className="bg-white/5 border border-red-500/20 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -297,13 +335,13 @@ const WalletCustody: React.FC = () => {
                 <h3 className="text-sm font-semibold text-red-400 uppercase">Hot Wallet</h3>
               </div>
               <p className="text-2xl font-bold text-white">
-                {breakdown ? formatTokens(breakdown.hotBal) : '—'}
+                {formatTokens(bd.hotBal, bd.decimals)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                {breakdown ? `${pctOf(breakdown.hotBal, breakdown.total)}% of AUM` : '—'}
+                {pctOf(bd.hotBal, bd.total)}% of AUM
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Cap: {(hotCapBps / 100).toFixed(1)}% ({breakdown ? formatTokens(breakdown.hotCapVal) : '—'} tokens)
+                Cap: {(hotCapBps / 100).toFixed(1)}% ({formatTokens(bd.hotCapVal, bd.decimals)} tokens)
               </p>
             </div>
 
@@ -314,10 +352,10 @@ const WalletCustody: React.FC = () => {
                 <h3 className="text-sm font-semibold text-yellow-400 uppercase">Warm Wallet</h3>
               </div>
               <p className="text-2xl font-bold text-white">
-                {breakdown ? formatTokens(breakdown.warmBal) : '—'}
+                {formatTokens(bd.warmBal, bd.decimals)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                {breakdown ? `${pctOf(breakdown.warmBal, breakdown.total)}% of AUM` : '—'}
+                {pctOf(bd.warmBal, bd.total)}% of AUM
               </p>
               <p className="text-xs text-gray-500 mt-0.5">2-of-3 multi-sig required</p>
             </div>
@@ -329,35 +367,35 @@ const WalletCustody: React.FC = () => {
                 <h3 className="text-sm font-semibold text-blue-400 uppercase">Cold Storage</h3>
               </div>
               <p className="text-2xl font-bold text-white">
-                {breakdown ? formatTokens(breakdown.coldBal) : '—'}
+                {formatTokens(bd.coldBal, bd.decimals)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                {breakdown ? `${pctOf(breakdown.coldBal, breakdown.total)}% of AUM` : '—'}
+                {pctOf(bd.coldBal, bd.total)}% of AUM
               </p>
               <p className="text-xs text-gray-500 mt-0.5">FIPS 140-2 L3+ HSM / Air-gapped</p>
             </div>
 
             {/* Status */}
             <div className={`bg-white/5 border rounded-2xl p-5 ${
-              breakdown?.overCap
+              bd.overCap
                 ? 'border-red-500/30 bg-red-500/5'
                 : 'border-green-500/20'
             }`}>
               <div className="flex items-center gap-2 mb-3">
-                {breakdown?.overCap ? (
+                {bd.overCap ? (
                   <AlertTriangle size={20} className="text-red-400" />
                 ) : (
                   <CheckCircle2 size={20} className="text-green-400" />
                 )}
                 <h3 className="text-sm font-semibold text-gray-300 uppercase">Compliance</h3>
               </div>
-              <p className={`text-2xl font-bold ${breakdown?.overCap ? 'text-red-400' : 'text-green-400'}`}>
-                {breakdown?.overCap ? 'OVER CAP' : 'COMPLIANT'}
+              <p className={`text-2xl font-bold ${bd.overCap ? 'text-red-400' : 'text-green-400'}`}>
+                {bd.overCap ? 'OVER CAP' : 'COMPLIANT'}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Total AUM: {breakdown ? formatTokens(breakdown.total) : '—'} tokens
+                Total AUM: {formatTokens(bd.total, bd.decimals)} {bd.tokenSymbol}
               </p>
-              {breakdown?.overCap && (
+              {bd.overCap && (
                 <button
                   onClick={handleCheckSweep}
                   className="mt-2 text-xs px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
@@ -366,7 +404,9 @@ const WalletCustody: React.FC = () => {
                 </button>
               )}
             </div>
-          </div>
+              </div>
+            </div>
+          ))}
 
           {/* ── Registered Wallets Table ── */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
