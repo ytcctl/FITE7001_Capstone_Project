@@ -54,8 +54,21 @@ function decodeGovernanceError(e: any): string {
     } catch { /* ignore decode failures */ }
   }
 
+  // Dig into nested RPC error objects (ethers v6 UNKNOWN_ERROR wraps the
+  // real node message inside e.error or e.info.error)
+  const nested: string | undefined =
+    (typeof e.error?.data?.message === 'string' && e.error.data.message) ||
+    (typeof e.error?.message === 'string' && e.error.message) ||
+    (typeof e.info?.error?.message === 'string' && e.info.error.message);
+  if (nested && nested !== 'Internal JSON-RPC error.' && nested !== 'Internal JSON-RPC error') {
+    return nested;
+  }
+
   // Fallback: clean up the message
   const msg: string = e.shortMessage || e.message || 'Transaction failed';
+  if (msg.includes('could not coalesce error')) {
+    return 'Transaction rejected by the node. Please check your wallet connection and try again.';
+  }
   return msg.replace(/\(data="0x[0-9a-fA-F]+"/g, '(data=…').replace(/transaction=\{[^}]+\}/g, '').trim();
 }
 
@@ -399,11 +412,12 @@ const Governance: React.FC = () => {
 
   // ─── Delegate ─────────────────────────────────────────────
   const handleDelegate = async () => {
-    if (!activeToken || !delegateAddr) return;
+    if (!activeToken || !delegateAddr || !account) return;
     setDelegating(true);
     setStatus(null);
     try {
-      const addr = delegateAddr === 'self' ? account! : delegateAddr;
+      const raw = delegateAddr.trim().toLowerCase() === 'self' ? account : delegateAddr.trim();
+      const addr = ethers.getAddress(raw); // validates checksum / format
       const tx = await activeToken.delegate(addr);
       await tx.wait();
       setStatus({ type: 'success', message: `Delegated voting power to ${addr.slice(0, 10)}...` });
@@ -838,7 +852,7 @@ const Governance: React.FC = () => {
               </button>
               <button
                 onClick={handleDelegate}
-                disabled={delegating || !delegateAddr}
+                disabled={delegating || !delegateAddr || !account || !activeToken}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {delegating && <Loader2 size={16} className="animate-spin" />}
