@@ -142,7 +142,39 @@ const Portfolio: React.FC = () => {
       setTransferAmount('');
       loadPortfolio();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Transfer failed'}`);
+      let msg = 'Transfer failed';
+      if (e && typeof e === 'object') {
+        if (typeof e.reason === 'string') {
+          msg = e.reason;
+        } else if (e.error && typeof e.error.reason === 'string') {
+          msg = e.error.reason;
+        } else {
+          const data = (typeof e.data === 'string' ? e.data : null)
+            || (e.error && typeof e.error.data === 'string' ? e.error.data : null);
+          if (data && data.startsWith('0x')) {
+            const selector = data.slice(0, 10).toLowerCase();
+            const knownErrors: Record<string, string> = {
+              '0xe450d38c': 'Insufficient balance to complete this transfer',
+              '0xfb8f41b2': 'Insufficient allowance — please approve tokens first',
+              '0x1a83e5fc': 'Token transfer failed',
+            };
+            if (knownErrors[selector]) {
+              msg = knownErrors[selector];
+            } else if (selector === '0x08c379a0' && data.length >= 74) {
+              try {
+                const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + data.slice(10));
+                msg = decoded[0];
+              } catch { /* fall through */ }
+            }
+          }
+          if (msg === 'Transfer failed' && e.message) {
+            const match = e.message.match(/reverted with reason string '([^']+)'/);
+            if (match) msg = match[1];
+            else if (e.message.length <= 200) msg = e.message;
+          }
+        }
+      }
+      setTxStatus(`✗ ${msg.length > 200 ? msg.slice(0, 200) + '…' : msg}`);
     } finally {
       setIsSubmitting(false);
     }
