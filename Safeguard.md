@@ -757,3 +757,111 @@ is fully compliant and can trade normally. The compliance pipeline verifies
 their identity on each transfer and allows it through because they are
 registered and verified. No action is required to change the safe-listed
 status for investor accounts.
+
+---
+
+## 14. Force-Cancel — Admin Compliance Enforcement on Open Orders
+
+When an investor's KYC or compliance status is revoked **after** they have
+already placed orders on the OrderBook, those open orders remain on the book
+and could still be matched against incoming counterparty orders. The
+`forceCancelOrder()` and `cancelOrdersForNonCompliant()` functions allow the
+admin to remove these orders and prevent non-compliant trades.
+
+### The Problem
+
+KYC is checked at **order placement** time (`placeBuyOrder()` /
+`placeSellOrder()` both call `isVerified(msg.sender)`). However, an
+investor's compliance status can change after an order is placed — for
+example, a PEP flag is raised, KYC expires, or sanctions screening fails.
+Without force-cancel, the existing open orders would remain active and
+could be matched, resulting in a trade involving a non-compliant party.
+
+### Solution: Two Admin Functions
+
+#### `forceCancelOrder(uint256 orderId, string reason)`
+
+| Aspect | Detail |
+|---|---|
+| **Who** | `DEFAULT_ADMIN_ROLE` only |
+| **Effect** | Force-cancels a single open or partially-filled order |
+| **Reason** | Admin provides a human-readable reason (e.g. "PEP flagged", "KYC expired") — recorded on-chain in the `OrderForceCancelled` event |
+| **Refund** | Escrowed tokens are returned to the original trader (see "Escrowed Token Handling" below) |
+| **Use case** | Targeted cancellation of a specific order after compliance review |
+
+#### `cancelOrdersForNonCompliant(address investor)`
+
+| Aspect | Detail |
+|---|---|
+| **Who** | `DEFAULT_ADMIN_ROLE` only |
+| **Guard** | Reverts if `identityRegistry.isVerified(investor)` returns `true` — prevents accidental cancellation of a compliant investor's orders |
+| **Effect** | Cancels **all** open and partially-filled orders for the specified investor |
+| **Reason** | Automatically set to `"KYC/compliance revoked"` for all cancelled orders |
+| **Use case** | Batch cleanup after revoking an investor's KYC/AML claims |
+
+### Escrowed Token Handling
+
+When a force-cancel refunds tokens, the behaviour differs by order type:
+
+| Order Type | Escrowed Asset | Refund Behaviour |
+|---|---|---|
+| **Buy order** | Cash token (THKD) | Always succeeds — `MockCashToken` has no compliance hook |
+| **Sell order** | Security token (HKSAT) | May fail — `HKSTPSecurityToken._update()` checks `isVerified(recipient)`. If the trader's KYC has been revoked, the compliance layer **blocks** the refund transfer |
+
+When a sell-order refund is blocked by compliance:
+
+1. The security tokens **remain escrowed** in the OrderBook contract (which
+   is safe-listed and can hold them).
+2. A **`TokensEscrowed(orderId, trader, amount, "securityToken")`** event is
+   emitted, providing a clear on-chain record.
+3. The order is still marked as `Cancelled` — it will not be matched.
+4. The admin must separately use **`HKSTPSecurityToken.forcedTransfer()`**
+   (EIP-1644) to move the escrowed tokens out of the OrderBook contract to
+   an appropriate destination (e.g. treasury, burn address, or the investor
+   once their compliance is restored).
+
+### Admin Workflow
+
+#### Scenario: Investor's PEP Status Revoked
+
+1. **Off-chain**: Compliance team identifies that Investor X is now a PEP.
+2. **Revoke claim**: Admin (or ClaimIssuer) revokes the PEP/Sanctions Clear
+   claim (Topic 5) — `isVerified(investorX)` now returns `false`.
+3. **Freeze** *(optional)*: Admin calls `freeze(investorX)` on the security
+   token to block all transfers immediately.
+4. **Cancel orders**: Admin navigates to **Trading** page → **Compliance —
+   Force Cancel Orders** panel → enters the investor's address → clicks
+   **Cancel All Orders**. This calls `cancelOrdersForNonCompliant(investorX)`.
+5. **Dispose escrowed tokens** *(if any sell orders)*: If the investor had
+   sell orders, the security tokens remain in the OrderBook. Admin uses
+   `forcedTransfer(orderBookAddress, treasury, amount, ...)` on the security
+   token to move them.
+
+### Frontend: Admin Compliance Panel
+
+The **Trading** page shows an admin-only **"Compliance — Force Cancel
+Orders"** panel (visible only to wallets with `DEFAULT_ADMIN_ROLE`):
+
+- **Investor address input** + **"Cancel All Orders"** button — calls
+  `cancelOrdersForNonCompliant(address)`.
+- **Open orders table** — lists all open orders across all traders with a
+  per-order **"Force Cancel"** button that calls
+  `forceCancelOrder(orderId, "Admin force cancel")`.
+
+### Events
+
+| Event | Emitted When | Fields |
+|---|---|---|
+| `OrderForceCancelled` | Any force-cancel (single or batch) | `orderId`, `trader`, `cancelledBy`, `reason`, `timestamp` |
+| `TokensEscrowed` | Sell-order refund blocked by compliance | `orderId`, `trader`, `amount`, `tokenType` |
+
+### Security Considerations
+
+- **On-chain guard**: `cancelOrdersForNonCompliant()` verifies
+  `!isVerified(investor)` on-chain before proceeding — even if the admin
+  accidentally targets a compliant investor, the transaction reverts.
+- **No token loss**: Escrowed tokens are never burned or lost. They either
+  refund to the trader or remain in the OrderBook (a safe-listed contract)
+  until the admin disposes of them via `forcedTransfer()`.
+- **Audit trail**: Both `OrderForceCancelled` and `TokensEscrowed` events
+  provide full traceability for regulatory review.

@@ -242,6 +242,9 @@ On-chain **limit-order book** with automatic price-time priority matching for a 
 | KYC gate | `identityRegistry.isVerified(msg.sender)` checked on every `placeBuyOrder()` and `placeSellOrder()` — non-KYC wallets are rejected at order time |
 | Safe-listed | OrderBook contract is safe-listed on the security token so escrow→buyer transfers pass the token's `_update()` compliance hook |
 | Cancel | Traders can cancel their own open orders and reclaim escrowed funds |
+| Force cancel | Admin can force-cancel any open order via `forceCancelOrder(orderId, reason)` — refunds escrowed tokens to the trader with an on-chain reason string |
+| Batch compliance cancel | `cancelOrdersForNonCompliant(investor)` — cancels **all** open orders for an investor whose KYC/compliance has been revoked. Requires `!isVerified(investor)` on-chain guard to prevent misuse |
+| Escrowed token handling | When a sell order is force-cancelled but the security token's compliance layer blocks the refund (e.g. KYC revoked), tokens remain escrowed in the OrderBook and a `TokensEscrowed` event is emitted. Admin must use `forcedTransfer()` on the security token to dispose of escrowed tokens |
 | Order book queries | `getBuyOrderIds()`, `getSellOrderIds()`, `getOrdersBatch()`, `getTradesBatch()` |
 | Market stats | `bestBid()`, `bestAsk()`, `spread()`, `orderCount()`, `tradeCount()` |
 | Pausable | Admin can emergency-pause all trading activity |
@@ -450,7 +453,9 @@ Investor (buyer)                OrderBook (escrow)            Investor (seller)
 │                       Layer 1: OrderBook                            │
 │  placeBuyOrder()  → identityRegistry.isVerified(msg.sender)       │
 │  placeSellOrder() → identityRegistry.isVerified(msg.sender)       │
-│  ⚡ Primary gate — blocks non-KYC at order time                    │
+│  forceCancelOrder()      → admin force-cancels single order       │
+│  cancelOrdersForNonCompliant() → batch-cancel for revoked KYC     │
+│  ⚡ Primary gate — blocks non-KYC at order time + post-revocation  │
 ├────────────────────────────────────────────────────────────────────┤
 │                  Layer 2: SecurityToken._update()                   │
 │  Every transfer() / transferFrom() triggers compliance hook        │
@@ -535,7 +540,7 @@ frontend/
 │   │   └── Web3Context.tsx       # MetaMask / private-key provider + contract instances
 │   └── pages/
 │       ├── Dashboard.tsx         # Platform overview
-│       ├── Trading.tsx           # Multi-market order book trading (KYC-gated, last price + 24h change)
+│       ├── Trading.tsx           # Multi-market order book trading (KYC-gated, last price + 24h change, admin force-cancel)
 │       ├── MarketManagement.tsx  # Admin: create/manage order book markets
 │       ├── Portfolio.tsx         # Token portfolio view
 │       ├── Settlement.tsx        # DvP settlement management
