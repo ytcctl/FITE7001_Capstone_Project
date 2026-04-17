@@ -18,7 +18,6 @@ const Portfolio: React.FC = () => {
   const [country, setCountry] = useState('');
   const [claims, setClaims] = useState<Record<number, boolean>>({});
   const [isFrozen, setIsFrozen] = useState(false);
-  const [isSafeListed, setIsSafeListed] = useState(false);
   const [factoryHoldings, setFactoryHoldings] = useState<FactoryHolding[]>([]);
 
   // Transfer
@@ -34,7 +33,7 @@ const Portfolio: React.FC = () => {
 
     // Load default token balances & identity status
     try {
-      const [bal, cBal, sym, cSym, verified, registered, ctry, frozen, safe] = await Promise.all([
+      const [bal, cBal, sym, cSym, verified, registered, ctry, frozen] = await Promise.all([
         contracts.securityToken.balanceOf(account),
         contracts.cashToken.balanceOf(account),
         contracts.securityToken.symbol(),
@@ -43,7 +42,6 @@ const Portfolio: React.FC = () => {
         contracts.identityRegistry.contains(account),
         contracts.identityRegistry.investorCountry(account),
         contracts.securityToken.frozen(account),
-        contracts.securityToken.safeListed(account),
       ]);
       setTokenBalance(ethers.formatUnits(bal, 18));
       setCashBalance(ethers.formatUnits(cBal, 6));
@@ -53,7 +51,6 @@ const Portfolio: React.FC = () => {
       setIsRegistered(registered);
       setCountry(ctry);
       setIsFrozen(frozen);
-      setIsSafeListed(safe);
 
       const c: Record<number, boolean> = {};
       for (const t of Object.keys(CLAIM_TOPICS).map(Number)) {
@@ -201,11 +198,10 @@ const Portfolio: React.FC = () => {
       {/* Identity Status */}
       <div className="glass-card p-6">
         <h3 className="font-bold text-white mb-4">Identity & Compliance Status</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           <StatusPill label="Registered" ok={isRegistered} />
           <StatusPill label="Verified" ok={isVerified} />
           <StatusPill label="Frozen" ok={!isFrozen} okText="No" failText="Yes" />
-          <StatusPill label="Safe-Listed" ok={isSafeListed} okText="Yes" failText="No" />
         </div>
         <div className="flex items-center gap-2 mb-4">
           <span className="text-sm text-gray-400">Country:</span>
