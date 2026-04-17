@@ -6,7 +6,7 @@
 # blockchain data (trades, orders, delegations, proposals) persists
 # across Codespace restarts.
 # ─────────────────────────────────────────────────────────────────
-set -euo pipefail
+set -uo pipefail   # no -e: let the script keep going even if a step fails
 
 # Ensure Foundry binaries are on PATH
 export PATH="$HOME/.foundry/bin:$PATH"
@@ -120,10 +120,20 @@ fi
 # ── 4. Start frontend (background) ──────────────────────────────
 echo ""
 echo "▶ Starting Vite dev server..."
-cd frontend
-nohup npx vite --host 0.0.0.0 --port 3000 > ../frontend-dev.log 2>&1 &
-cd ..
-echo "  ✓ Frontend PID: $!"
+cd /workspaces/FITE7001_Capstone_Project/frontend
+npm install --silent 2>/dev/null || true
+nohup npx vite --host 0.0.0.0 --port 3000 > /workspaces/FITE7001_Capstone_Project/frontend-dev.log 2>&1 &
+VITE_PID=$!
+cd /workspaces/FITE7001_Capstone_Project
+echo "  ✓ Frontend PID: $VITE_PID"
+
+# Verify Vite actually started
+sleep 3
+if lsof -i :3000 > /dev/null 2>&1; then
+  echo "  ✓ Vite is listening on port 3000"
+else
+  echo "  ⚠ Vite may still be starting — check frontend-dev.log"
+fi
 
 echo ""
 echo "══════════════════════════════════════════════════"
