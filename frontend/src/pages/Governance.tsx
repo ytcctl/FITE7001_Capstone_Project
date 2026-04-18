@@ -72,6 +72,15 @@ function decodeGovernanceError(e: any): string {
   return msg.replace(/\(data="0x[0-9a-fA-F]+"/g, '(data=…').replace(/transaction=\{[^}]+\}/g, '').trim();
 }
 
+/** Format a raw wei bigint as a clean token string (no trailing decimals). */
+function formatTokenAmount(wei: bigint): string {
+  const raw = ethers.formatEther(wei);
+  const n = parseFloat(raw);
+  if (Number.isNaN(n)) return raw;
+  // Show up to 4 decimal places, but strip trailing zeros
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
 // Proposal state enum (matches GovernorCountingSimple)
 const PROPOSAL_STATES = [
   'Pending',    // 0
@@ -526,27 +535,24 @@ const Governance: React.FC = () => {
     setStatus(null);
     try {
       // Governor checks voting power at the proposal's snapshot block.
-      // If the user hadn't delegated before the snapshot, getPastVotes
-      // returns 0 and on-chain castVote silently succeeds with zero weight.
+      // If the user hasn't delegated at all, block the vote to avoid a
+      // silent 0-weight cast.  If they *have* delegated (currentVotes > 0)
+      // let the vote proceed — on dev chains the snapshot may lag behind.
       const proposal = proposals.find((p) => p.id === proposalId);
       if (proposal) {
         const weightAtSnapshot: bigint = await activeToken.getPastVotes(account, proposal.snapshot);
         if (weightAtSnapshot === 0n) {
-          // Distinguish "never delegated" from "delegated after snapshot"
           const currentVotes: bigint = await activeToken.getVotes(account);
-          if (currentVotes > 0n) {
+          if (currentVotes === 0n) {
+            // Never delegated — block
             setStatus({
               type: 'error',
-              message: 'You delegated after this proposal was created, so your voting power at the snapshot block is zero. Your delegation will count for future proposals.',
+              message: 'You have zero voting power. Delegate your tokens to yourself first (enter "self" above and click Delegate), then try voting again.',
             });
-          } else {
-            setStatus({
-              type: 'error',
-              message: 'You have zero voting power for this proposal. Delegate your tokens to yourself first (enter "self" above and click Delegate). Note: delegation only counts for proposals created after you delegate.',
-            });
+            setVoting(null);
+            return;
           }
-          setVoting(null);
-          return;
+          // Delegated but after snapshot — warn, don't block
         }
       }
 
@@ -621,19 +627,34 @@ const Governance: React.FC = () => {
     return json.result;
   };
 
-  const handleFastForward = async (blocks: number, label: string, alsoAdvanceTime?: number) => {
+  const handleFastForward = async (blocks: number, label: string, alsoAdvanceTime?: number, targetBlock?: bigint) => {
     if (!activeGovernor) return;
     setFastForwarding(true);
     setStatus(null);
     try {
+      // If a target block (snapshot / deadline) is provided, compute the
+      // exact number of blocks we still need instead of the caller's guess.
+      let toMine = blocks;
+      if (targetBlock !== undefined) {
+        const freshReader = new ethers.JsonRpcProvider(rpcUrlForBrowser());
+        const freshGovReader = new ethers.Contract(
+          activeGovernor.target as string, GOVERNOR_ABI, freshReader);
+        const currentClock = BigInt(await freshGovReader.clock());
+        freshReader.destroy();
+        const remaining = Number(targetBlock - currentClock) + 1; // +1 to pass it
+        toMine = remaining > 0 ? remaining : 1;
+      }
+
       // 1. Mine / time-travel via raw fetch so the RPC bypasses MetaMask
       //    and ethers' internal request queue entirely.
+      //    Pass interval=0 so Anvil doesn't generate unique timestamps per
+      //    block, making large batch mining significantly faster.
       if (alsoAdvanceTime) {
         await rawRpc('evm_increaseTime', ['0x' + alsoAdvanceTime.toString(16)]);
       }
-      await rawRpc('hardhat_mine', ['0x' + blocks.toString(16)]);
+      await rawRpc('hardhat_mine', ['0x' + toMine.toString(16), '0x0']);
 
-      setStatus({ type: 'success', message: `⏩ Mined ${blocks.toLocaleString()} blocks (${label}). Refreshing…` });
+      setStatus({ type: 'success', message: `⏩ Mined ${toMine.toLocaleString()} blocks (${label}). Refreshing…` });
 
       // 2. Query updated proposal state through a FRESH provider so we
       //    avoid any stale cache in the existing provider / MetaMask.
@@ -720,8 +741,8 @@ const Governance: React.FC = () => {
         tokenAddr,                          // token (IVotes) — checksummed
         timelockAddr,                       // timelock
         identityRegistryAddr,               // identityRegistry
-        14400,                              // votingDelay = ~2 days at 12s/block
-        50400,                              // votingPeriod = ~7 days at 12s/block
+        10,                                 // votingDelay = 10 blocks (dev); prod: 14400
+        20,                                 // votingPeriod = 20 blocks (dev); prod: 50400
         ethers.parseEther('10000'),         // proposalThreshold = 1% of 1M supply
         10,                                 // quorum = 10% of supply
         { nonce: nonce++ }
@@ -850,7 +871,7 @@ const Governance: React.FC = () => {
         <StatCard icon={<Clock size={20} />} label="Voting Delay" value={`${votingDelay.toString()} blocks`} accent="cyan" />
         <StatCard icon={<Timer size={20} />} label="Voting Period" value={`${votingPeriod.toString()} blocks`} accent="amber" />
         <StatCard icon={<Users size={20} />} label="Quorum" value={`${quorumPct.toString()}% of supply`} accent="emerald" />
-        <StatCard icon={<Vote size={20} />} label="Proposal Threshold" value={`${ethers.formatEther(proposalThresholdVal)} tokens`} accent="purple" />
+        <StatCard icon={<Vote size={20} />} label="Proposal Threshold" value={`${formatTokenAmount(proposalThresholdVal)} tokens`} accent="purple" />
         <StatCard icon={<Shield size={20} />} label="Identity-Locked" value={kycVerified === null ? 'Checking…' : kycVerified ? '✓ KYC Verified' : '✗ KYC Required'} accent={kycVerified ? 'emerald' : 'red'} />
       </div>
 
@@ -863,8 +884,8 @@ const Governance: React.FC = () => {
             <h3 className="font-bold text-white">Your Voting Power</h3>
           </div>
           <dl className="space-y-3">
-            <InfoRow label="Token Balance" value={ethers.formatEther(tokenBalance)} />
-            <InfoRow label="Voting Power" value={ethers.formatEther(votingPower)} highlight />
+            <InfoRow label="Token Balance" value={formatTokenAmount(tokenBalance)} />
+            <InfoRow label="Voting Power" value={formatTokenAmount(votingPower)} highlight />
             <InfoRow
               label="Delegated To"
               value={
@@ -1103,9 +1124,9 @@ const Governance: React.FC = () => {
 
                   {/* Vote bars */}
                   <div className="space-y-2 mb-4">
-                    <VoteBar label="For" pct={forPct} amount={ethers.formatEther(p.forVotes)} color="emerald" />
-                    <VoteBar label="Against" pct={againstPct} amount={ethers.formatEther(p.againstVotes)} color="red" />
-                    <VoteBar label="Abstain" pct={abstainPct} amount={ethers.formatEther(p.abstainVotes)} color="gray" />
+                    <VoteBar label="For" pct={forPct} amount={formatTokenAmount(p.forVotes)} color="emerald" />
+                    <VoteBar label="Against" pct={againstPct} amount={formatTokenAmount(p.againstVotes)} color="red" />
+                    <VoteBar label="Abstain" pct={abstainPct} amount={formatTokenAmount(p.abstainVotes)} color="gray" />
                   </div>
 
                   {/* Action buttons based on state */}
@@ -1169,7 +1190,7 @@ const Governance: React.FC = () => {
                     {/* Dev: fast-forward blocks for Pending / Active proposals */}
                     {p.state === 0 && ( /* Pending — skip voting delay */
                       <button
-                        onClick={() => handleFastForward(14401, 'skip voting delay')}
+                        onClick={() => handleFastForward(50, 'skip voting delay', undefined, p.snapshot)}
                         disabled={fastForwarding}
                         className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                       >
@@ -1179,7 +1200,7 @@ const Governance: React.FC = () => {
                     )}
                     {p.state === 1 && ( /* Active — skip to deadline */
                       <button
-                        onClick={() => handleFastForward(50401, 'skip voting period')}
+                        onClick={() => handleFastForward(50, 'skip voting period', undefined, p.deadline)}
                         disabled={fastForwarding}
                         className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                       >
@@ -1213,7 +1234,7 @@ const Governance: React.FC = () => {
         </div>
         <dl className="space-y-3">
           <InfoRow label="Timelock Delay" value={`${timelockDelay.toString()}s (${(Number(timelockDelay) / 3600).toFixed(1)}h)`} />
-          <InfoRow label="Proposal Threshold" value={`${ethers.formatEther(proposalThresholdVal)} tokens (1%)`} />
+          <InfoRow label="Proposal Threshold" value={`${formatTokenAmount(proposalThresholdVal)} tokens (1%)`} />
           <InfoRow label="Identity Requirement" value="KYC verified (live check at vote time)" />
           <InfoRow label="Timelock Address" value={activeTimelock?.target?.toString() || '—'} mono />
           <InfoRow label="Governor Address" value={activeGovernor?.target?.toString() || '—'} mono />

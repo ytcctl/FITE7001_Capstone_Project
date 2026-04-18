@@ -37,5 +37,6 @@ besu/data/
 deployments/
 
 # Anvil persistent state (machine-local)
+anvil-state*.json
 .devcontainer/anvil-state.json
 anvil-node.log
