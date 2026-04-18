@@ -761,7 +761,7 @@ const Governance: React.FC = () => {
         timelockArtifact.bytecode,
         signer
       );
-      setStatus({ type: 'info', message: 'Deploying Timelock… (1/4)' });
+      setStatus({ type: 'info', message: 'Deploying Timelock… (1/6)' });
       const timelock = await timelockFactory.deploy(
         1,                                  // minDelay = 1s (dev mode)
         [],                                 // proposers — will be granted to Governor after
@@ -779,7 +779,7 @@ const Governance: React.FC = () => {
         governorArtifact.bytecode,
         signer
       );
-      setStatus({ type: 'info', message: 'Deploying Governor… (2/4)' });
+      setStatus({ type: 'info', message: 'Deploying Governor… (2/6)' });
       const governor = await governorFactory.deploy(
         tokenAddr,                          // token (IVotes) — checksummed
         timelockAddr,                       // timelock
@@ -797,19 +797,23 @@ const Governance: React.FC = () => {
       const timelockContract = new ethers.Contract(timelockAddr, timelockArtifact.abi, signer);
       const PROPOSER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('PROPOSER_ROLE'));
       const CANCELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('CANCELLER_ROLE'));
-      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/5)' });
+      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/6)' });
       await (await timelockContract.grantRole(PROPOSER_ROLE, governorAddr, { nonce: nonce++ })).wait();
       await (await timelockContract.grantRole(CANCELLER_ROLE, governorAddr, { nonce: nonce++ })).wait();
 
-      // 4. Grant TIMELOCK_MINTER_ROLE to the Timelock on the security token
-      //    so governance-approved large mints (above mintThreshold) can execute.
+      // 4. Grant AGENT_ROLE + TIMELOCK_MINTER_ROLE to the Timelock on the
+      //    security token so governance-approved mints can execute.
+      //    AGENT_ROLE is needed for mints ≤ mintThreshold;
+      //    TIMELOCK_MINTER_ROLE is needed for large mints above the threshold.
       const tokenContract = new ethers.Contract(tokenAddr, SECURITY_TOKEN_ABI, signer);
+      const AGENT_ROLE_HASH = ethers.keccak256(ethers.toUtf8Bytes('AGENT_ROLE'));
       const TIMELOCK_MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('TIMELOCK_MINTER_ROLE'));
-      setStatus({ type: 'info', message: 'Granting TIMELOCK_MINTER_ROLE on token… (4/5)' });
+      setStatus({ type: 'info', message: 'Granting AGENT_ROLE + TIMELOCK_MINTER_ROLE on token… (4/6)' });
+      await (await tokenContract.grantRole(AGENT_ROLE_HASH, timelockAddr, { nonce: nonce++ })).wait();
       await (await tokenContract.grantRole(TIMELOCK_MINTER_ROLE, timelockAddr, { nonce: nonce++ })).wait();
 
       // 5. Register in GovernorFactory
-      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (5/5)' });
+      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (5/6)' });
       const tx = await contracts.governorFactory.registerGovernance(
         tokenAddr,
         governorAddr,

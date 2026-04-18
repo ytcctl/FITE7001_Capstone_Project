@@ -483,6 +483,13 @@ async function main() {
   await (await token.grantRole(TOKEN_ADMIN_ROLE, timelockAddress)).wait();
   console.log("     DEFAULT_ADMIN_ROLE granted to Timelock on SecurityToken");
 
+  // Grant AGENT_ROLE on SecurityToken + IdentityRegistry to the Timelock
+  // so governance proposals can execute agent functions (mint, burn, freeze, etc.)
+  await (await token.grantRole(AGENT_ROLE_TOKEN, timelockAddress)).wait();
+  console.log("     AGENT_ROLE granted to Timelock on SecurityToken");
+  await (await registry.grantRole(AGENT_ROLE_REGISTRY, timelockAddress)).wait();
+  console.log("     AGENT_ROLE granted to Timelock on IdentityRegistry");
+
   // GovernorFactory: register the initial securityToken's governance
   console.log("\nRegistering initial token governance via GovernorFactory...");
   await (await governorFactory.registerGovernance(tokenAddress, governorAddress, timelockAddress)).wait();
