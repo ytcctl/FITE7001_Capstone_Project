@@ -4,6 +4,26 @@ import { SECURITY_TOKEN_ABI } from '../config/contracts';
 import { Coins, Plus, Minus, RefreshCw, Loader2, ChevronDown, Shield, AlertTriangle, Settings, Vote } from 'lucide-react';
 import { ethers } from 'ethers';
 
+/** Decode a burn transaction error into a human-readable message. */
+function parseBurnError(e: any, amount: string, symbol: string): string {
+  // ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)
+  // Selector: 0xe450d38c
+  const data: string | undefined = e?.data ?? e?.error?.data;
+  if (data && typeof data === 'string' && data.startsWith('0xe450d38c')) {
+    try {
+      const iface = new ethers.Interface([
+        'error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)',
+      ]);
+      const decoded = iface.parseError(data);
+      if (decoded) {
+        const balance = ethers.formatUnits(decoded.args[1], 18);
+        return `Insufficient balance — account holds ${Number(balance).toLocaleString()} ${symbol} but you tried to burn ${Number(amount).toLocaleString()}`;
+      }
+    } catch { /* fall through */ }
+  }
+  return e?.reason || e?.message || 'Burn failed';
+}
+
 interface TokenOption {
   name: string;
   symbol: string;
@@ -228,7 +248,8 @@ const TokenMinting: React.FC = () => {
       setBurnAmount('');
       loadInfo();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Burn failed'}`);
+      const msg = parseBurnError(e, burnAmount, stSymbol);
+      setTxStatus(`✗ ${msg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -266,7 +287,8 @@ const TokenMinting: React.FC = () => {
       setCashBurnAmount('');
       loadInfo();
     } catch (e: any) {
-      setTxStatus(`✗ ${e?.reason || e?.message || 'Burn failed'}`);
+      const msg = parseBurnError(e, cashBurnAmount, ctSymbol);
+      setTxStatus(`✗ ${msg}`);
     } finally {
       setIsSubmitting(false);
     }

@@ -220,6 +220,31 @@ The Governor instructs the Timelock contract to call
 `securityToken.mint(recipient, amount)`. Because the Timelock holds
 `TIMELOCK_MINTER_ROLE`, the mint is authorised and succeeds.
 
+### Contract Call Chain on Execution
+
+```
+Anyone → Governor.execute(targets, values, calldatas, descriptionHash)
+           → TimelockController.executeBatch()
+              → HKSTPSecurityToken.mint(to, amount)
+                 ✓ msg.sender = Timelock (has TIMELOCK_MINTER_ROLE)
+                 ✓ amount > mintThreshold — allowed
+```
+
+### Quick Reference — End-to-End Timeline
+
+| # | Action | Who | Approx. Duration |
+|---|--------|-----|------------------|
+| 1 | Delegate voting power | Token holder | One-time tx |
+| 2 | Create executable "Mint" proposal | Holder with ≥ proposalThreshold votes | One tx |
+| 3 | Voting delay | — | ~2 days (14,400 blocks) |
+| 4 | Cast votes (quorum ≥ 10%, majority For) | KYC-verified holders | ~7 days (50,400 blocks) |
+| 5 | Queue into Timelock | Anyone | One tx |
+| 6 | Timelock delay | — | 48 hours |
+| 7 | Execute | Anyone | One tx |
+
+**Total time (production)**: approximately **11 days** end-to-end
+(2-day delay + 7-day vote + 48-hour timelock).
+
 ---
 
 ## 5. Governance Flow Diagram
