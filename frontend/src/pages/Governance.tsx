@@ -521,10 +521,35 @@ const Governance: React.FC = () => {
 
   // ─── Cast vote ────────────────────────────────────────────
   const handleVote = async (proposalId: string, support: number) => {
-    if (!activeGovernor) return;
+    if (!activeGovernor || !activeToken || !account) return;
     setVoting(proposalId);
     setStatus(null);
     try {
+      // Governor checks voting power at the proposal's snapshot block.
+      // If the user hadn't delegated before the snapshot, getPastVotes
+      // returns 0 and on-chain castVote silently succeeds with zero weight.
+      const proposal = proposals.find((p) => p.id === proposalId);
+      if (proposal) {
+        const weightAtSnapshot: bigint = await activeToken.getPastVotes(account, proposal.snapshot);
+        if (weightAtSnapshot === 0n) {
+          // Distinguish "never delegated" from "delegated after snapshot"
+          const currentVotes: bigint = await activeToken.getVotes(account);
+          if (currentVotes > 0n) {
+            setStatus({
+              type: 'error',
+              message: 'You delegated after this proposal was created, so your voting power at the snapshot block is zero. Your delegation will count for future proposals.',
+            });
+          } else {
+            setStatus({
+              type: 'error',
+              message: 'You have zero voting power for this proposal. Delegate your tokens to yourself first (enter "self" above and click Delegate). Note: delegation only counts for proposals created after you delegate.',
+            });
+          }
+          setVoting(null);
+          return;
+        }
+      }
+
       const tx = await activeGovernor.castVote(proposalId, support);
       await tx.wait();
       const voteLabel = support === 1 ? 'For' : support === 0 ? 'Against' : 'Abstain';
