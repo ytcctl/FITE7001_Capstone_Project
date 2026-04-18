@@ -104,6 +104,34 @@ export function removeSavedAccount(address: string): void {
   localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
 }
 
+// -----------------------------------------------------------------
+// Session persistence (survive page refresh)
+// -----------------------------------------------------------------
+interface WalletSession {
+  mode: WalletMode;
+  /** Private key — only stored for built-in wallets */
+  key?: string;
+}
+
+const SESSION_KEY = 'tokenhub_wallet_session';
+
+function saveSession(session: WalletSession): void {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function loadSession(): WalletSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY);
+}
+
 interface Web3State {
   provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null;
   signer: ethers.JsonRpcSigner | ethers.Wallet | null;
@@ -290,6 +318,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setProvider(browserProvider);
       setSigner(s);
       setWrongNetwork(false);
+      setWalletMode('metamask');
       const c = initContracts(s);
       detectRoles(accounts[0], c);
     } catch {
@@ -352,6 +381,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setChainId(currentChainId);
       setWrongNetwork(false);
       setWalletMode('metamask');
+      saveSession({ mode: 'metamask' });
       const c = initContracts(s);
       detectRoles(accounts[0], c);
     } catch (e: unknown) {
@@ -392,6 +422,9 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setWalletMode('builtin');
       setWrongNetwork(currentChainId !== NETWORK_CONFIG.chainId);
 
+      // Persist session so it survives page refresh
+      saveSession({ mode: 'builtin', key: privateKey });
+
       if (currentChainId === NETWORK_CONFIG.chainId) {
         const c = initContracts(wallet);
         detectRoles(addr, c);
@@ -406,6 +439,7 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /** Disconnect wallet */
   const disconnect = useCallback(() => {
+    clearSession();
     setProvider(null);
     setSigner(null);
     setAccount(null);
@@ -464,10 +498,18 @@ export const Web3Provider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   /** Auto-reconnect on page load if wallet was previously connected.
-   *  Uses reconnect() (silent) — never prompts a network switch popup. */
+   *  For MetaMask: uses reconnect() (silent) — never prompts a network switch popup.
+   *  For built-in wallets: re-derives the Wallet from the saved private key. */
   useEffect(() => {
-    if (!window.ethereum) return;
-    reconnect();
+    const session = loadSession();
+    if (!session) return;
+
+    if (session.mode === 'builtin' && session.key) {
+      // Re-connect with the saved private key (no user interaction needed)
+      connectWithKey(session.key);
+    } else if (session.mode === 'metamask' && window.ethereum) {
+      reconnect();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
