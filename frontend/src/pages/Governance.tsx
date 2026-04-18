@@ -905,7 +905,7 @@ const Governance: React.FC = () => {
           <label className="block text-sm text-gray-400 mb-2 font-medium">Select Token for Governance</label>
           <select
             value={selectedToken}
-            onChange={(e) => setSelectedToken(e.target.value)}
+            onChange={(e) => { setSelectedToken(e.target.value); setStatus(null); }}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm appearance-none cursor-pointer"
           >
             {governanceSuites.map((suite) => (
