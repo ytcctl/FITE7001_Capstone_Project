@@ -48,7 +48,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
-    open: true,
+    open: false,
     proxy: {
       '/rpc': {
         target: 'http://127.0.0.1:8545',
