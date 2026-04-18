@@ -428,6 +428,11 @@ const Governance: React.FC = () => {
     }
   }, [activeGovernor, activeTimelock, activeToken, loadGovernorInfo, loadVotingInfo, loadProposals]);
 
+  // ─── Clear banner on wallet disconnect / account change ───
+  useEffect(() => {
+    setStatus(null);
+  }, [account]);
+
   // ─── Delegate ─────────────────────────────────────────────
   const handleDelegate = async () => {
     if (!activeToken || !delegateAddr || !account) return;
@@ -560,7 +565,16 @@ const Governance: React.FC = () => {
       await tx.wait();
       const voteLabel = support === 1 ? 'For' : support === 0 ? 'Against' : 'Abstain';
       setStatus({ type: 'success', message: `Vote cast: ${voteLabel}` });
-      await loadProposals();
+      // Use a fresh provider to bypass ethers / MetaMask caching so
+      // updated vote tallies are returned immediately.
+      const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
+      const freshGov = new ethers.Contract(
+        activeGovernor.target as string, GOVERNOR_ABI, freshProvider);
+      try {
+        setProposals(await fetchProposals(freshGov));
+      } finally {
+        freshProvider.destroy();
+      }
     } catch (e: any) {
       setStatus({ type: 'error', message: decodeGovernanceError(e) });
     } finally {

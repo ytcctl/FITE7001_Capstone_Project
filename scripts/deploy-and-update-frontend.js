@@ -151,6 +151,24 @@ async function main() {
   const seller    = signers.length > 3 ? signers[3] : deployer;
   const buyer     = signers.length > 4 ? signers[4] : deployer;
 
+  // Auto-fund dev accounts when deploying to external Anvil (accounts start with 0 ETH)
+  const deployerBal = await ethers.provider.getBalance(deployer.address);
+  if (deployerBal === 0n) {
+    console.log("Funding dev accounts from Anvil default account...");
+    const ANVIL_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    const funder = new ethers.Wallet(ANVIL_KEY, ethers.provider);
+    const devAddrs = [deployer, operator, agent, seller, buyer].map(s => s.address);
+    // Also fund the known investor test address
+    devAddrs.push("0xe8564b67f8a638971ab2A519e786f9ce1182c86f");
+    let nonce = await ethers.provider.getTransactionCount(funder.address);
+    for (const addr of devAddrs) {
+      const tx = await funder.sendTransaction({ to: addr, value: ethers.parseEther("1000"), nonce });
+      await tx.wait();
+      nonce++;
+    }
+    console.log(`     Funded ${devAddrs.length} accounts with 1000 ETH each\n`);
+  }
+
   console.log("Deploying with account:", deployer.address);
   console.log("Operator :", operator.address);
   console.log("Agent    :", agent.address);
