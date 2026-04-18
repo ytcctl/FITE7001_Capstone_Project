@@ -1210,6 +1210,116 @@ The Investor Portal has **321 documented functional test cases** (160 positive +
 
 ## 9  Deployment
 
+### Local PC — VS Code (Step-by-Step)
+
+Follow these steps to run the full platform on your own machine using VS Code.
+
+#### Prerequisites
+
+| Requirement | Version | Check |
+|---|---|---|
+| **Node.js** | ≥ 18 | `node -v` |
+| **npm** | ≥ 9 | `npm -v` |
+| **Git** | Any | `git --version` |
+| **VS Code** | Latest | — |
+| **MetaMask** *(optional)* | Browser extension | Chain ID **31337**, RPC `http://127.0.0.1:8545` |
+
+> **No Docker required** — Hardhat Network runs natively on Node.js.
+
+#### Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/ytcctl/FITE7001_Capstone_Project.git
+cd FITE7001_Capstone_Project
+```
+
+#### Step 2 — Install Dependencies
+
+```bash
+# Root (smart contracts + Hardhat)
+npm install
+
+# Frontend (React + Vite)
+cd frontend
+npm install
+cd ..
+```
+
+#### Step 3 — Compile Contracts
+
+```bash
+npx hardhat compile
+```
+
+#### Step 4 — Start the Hardhat Node
+
+Open a **new terminal** in VS Code (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd>) and leave it running:
+
+```bash
+npx hardhat node
+```
+
+This starts a local Ethereum node on `http://127.0.0.1:8545` with Chain ID **31337** and five pre-funded dev accounts (1,000,000 ETH each).
+
+#### Step 5 — Deploy All Contracts + Seed Data
+
+Open a **second terminal** and run:
+
+```bash
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
+```
+
+This single command:
+1. Deploys all **18 contracts**
+2. Configures all roles and safe-lists
+3. Seeds **Investor1** with identity, KYC claims, 10,000 HKSAT + 5,000,000 THKD
+4. **Auto-updates** `frontend/src/config/contracts.ts` with all deployed addresses
+
+> **No manual address copy-paste needed.**
+
+#### Step 6 — Start the Frontend
+
+Open a **third terminal**:
+
+```bash
+cd frontend
+npm run dev
+```
+
+The Vite dev server starts at **http://localhost:3000**. Open this URL in your browser.
+
+#### Step 7 — Connect a Wallet
+
+**Option A — Built-in Test Accounts (no MetaMask needed):**
+1. Click **Connect Wallet** in the sidebar
+2. Select a test account from the dropdown (Admin, Operator, Agent, Investor, etc.)
+
+**Option B — MetaMask:**
+1. Add a custom network: RPC URL = `http://127.0.0.1:8545`, Chain ID = `31337`
+2. Import a dev account private key (see table below)
+3. Connect to the dApp
+
+#### Quick Reference — Terminal Layout
+
+| Terminal | Command | Stays Running? |
+|----------|---------|:--------------:|
+| Terminal 1 | `npx hardhat node` | ✅ Yes |
+| Terminal 2 | `npx hardhat run scripts/deploy-and-update-frontend.js --network localhost` | Exits after deploy |
+| Terminal 3 | `cd frontend && npm run dev` | ✅ Yes |
+
+#### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `npx hardhat` not found | Run `npm install` in the project root |
+| Port 8545 already in use | Kill the old process: `npx kill-port 8545` or `lsof -ti:8545 \| xargs kill` |
+| Port 3000 already in use | Kill the old process: `npx kill-port 3000` or `lsof -ti:3000 \| xargs kill` |
+| MetaMask nonce errors after restart | MetaMask → Settings → Advanced → **Clear activity tab data** |
+| Contract addresses mismatch | Re-run `deploy-and-update-frontend.js` — it overwrites the frontend config |
+| `npm install` fails on Windows | Use **Git Bash** or **WSL** instead of CMD/PowerShell |
+
+---
+
 ### Local Hardhat Network (Recommended for Development)
 
 Hardhat Network is the recommended development blockchain — it auto-mines transactions instantly, pre-funds dev accounts with 1,000,000 ETH each, and requires zero external dependencies (no Docker).
