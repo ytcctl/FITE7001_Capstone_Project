@@ -1,8 +1,5 @@
-nohup: ignoring input
 
-  VITE v5.4.21  ready in 306 ms
+  VITE v5.4.21  ready in 1233 ms
 
   ➜  Local:   http://localhost:3000/
-  ➜  Network: http://10.0.2.109:3000/
-3:25:00 AM [vite] vite.config.ts changed, restarting server...
-3:25:00 AM [vite] server restarted.
+  ➜  Network: http://10.0.2.30:3000/
