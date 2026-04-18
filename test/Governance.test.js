@@ -29,8 +29,9 @@ describe("Governance", function () {
   const SMALL_AMOUNT = ethers.parseUnits("100", 18);
 
   // Governance params (test-friendly values, not production)
-  const VOTING_DELAY = 1;      // 1 block  (production: 14400)
-  const VOTING_PERIOD = 50;    // 50 blocks (production: 50400)
+  // NOTE: clock is now timestamp-based (ERC-6372). Values are in seconds.
+  const VOTING_DELAY = 1;      // 1 second  (production: 172800)
+  const VOTING_PERIOD = 50;    // 50 seconds (production: 604800)
   const QUORUM_PERCENT = 10;   // 10%
   const PROPOSAL_THRESHOLD = ethers.parseUnits("200", 18); // 1% of 20000 total
   const TIMELOCK_DELAY = 1;    // 1 second (production: 172800)
@@ -52,11 +53,10 @@ describe("Governance", function () {
     Executed: 7,
   };
 
-  /** Helper: mine N blocks */
+  /** Helper: advance time by N seconds and mine 1 block (timestamp-based clock) */
   async function mineBlocks(n) {
-    for (let i = 0; i < n; i++) {
-      await ethers.provider.send("evm_mine", []);
-    }
+    await ethers.provider.send("evm_increaseTime", [n]);
+    await ethers.provider.send("evm_mine", []);
   }
 
   /** Helper: register + verify an address with full KYC claims */

@@ -287,8 +287,8 @@ async function main() {
 
   // 10. Governor (on-chain governance with snapshot voting)
   console.log("10/17 Deploying HKSTPGovernor...");
-  const VOTING_DELAY  = 14400;  // ~48 hours at 12s/block
-  const VOTING_PERIOD = 50400;  // ~7 days at 12s/block
+  const VOTING_DELAY  = 172800; // 48 hours in seconds (timestamp-based clock)
+  const VOTING_PERIOD = 604800; // 7 days in seconds  (timestamp-based clock)
   const QUORUM_PCT    = 10;     // 10% of total supply
   // Proposal threshold = 1% of anticipated total supply (e.g. 1 000 000 tokens → 10 000)
   const PROPOSAL_THRESHOLD = ethers.parseEther("10000"); // 1% of 1M supply
@@ -778,7 +778,7 @@ async function main() {
     `║ Cap. 622 Shareholder Cap : 50 (identity-based)                ║`
   );
   console.log(
-    `║ Governance: delay=${VOTING_DELAY}blk period=${VOTING_PERIOD}blk quorum=${QUORUM_PCT}%   ║`
+    `║ Governance: delay=${VOTING_DELAY}s period=${VOTING_PERIOD}s quorum=${QUORUM_PCT}%       ║`
   );
   console.log(
     `║ Proposal threshold: ${ethers.formatEther(PROPOSAL_THRESHOLD)} tokens (1%)              ║`

@@ -72,6 +72,25 @@ function decodeGovernanceError(e: any): string {
   return msg.replace(/\(data="0x[0-9a-fA-F]+"/g, '(data=…').replace(/transaction=\{[^}]+\}/g, '').trim();
 }
 
+/** Format seconds into human-readable duration (e.g. "48 hrs", "7 days"). */
+function formatDuration(seconds: bigint | number): string {
+  const s = Number(seconds);
+  if (s <= 0) return '0s';
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  if (s < 86400) return `${+(s / 3600).toFixed(1)} hrs`;
+  const days = s / 86400;
+  if (days === Math.floor(days)) return `${days} days`;
+  return `${+days.toFixed(1)} days`;
+}
+
+/** Format a unix timestamp to a readable date string. */
+function formatTimestamp(ts: bigint | number): string {
+  const n = Number(ts);
+  if (n === 0) return '—';
+  return new Date(n * 1000).toLocaleString();
+}
+
 /** Format a raw wei bigint as a clean token string (no trailing decimals). */
 function formatTokenAmount(wei: bigint): string {
   const raw = ethers.formatEther(wei);
@@ -564,7 +583,13 @@ const Governance: React.FC = () => {
             setVoting(null);
             return;
           }
-          // Delegated but after snapshot — warn, don't block
+          // Delegated but after snapshot — warn user that vote will have 0 weight
+          setStatus({
+            type: 'error',
+            message: 'Warning: You delegated AFTER this proposal was created. Your vote will be recorded but with 0 weight. For future proposals, delegate first.',
+          });
+          setVoting(null);
+          return;
         }
       }
 
@@ -573,31 +598,9 @@ const Governance: React.FC = () => {
       const voteLabel = support === 1 ? 'For' : support === 0 ? 'Against' : 'Abstain';
       setStatus({ type: 'success', message: `✓ Vote cast: ${voteLabel}` });
 
-      // Re-read only the changed proposal's vote tally via raw RPC to
-      // guarantee we bypass every layer of caching (MetaMask, ethers,
-      // BrowserProvider).  Updating just the one proposal in state is
-      // faster and avoids re-querying all events.
-      try {
-        const iface = new ethers.Interface(GOVERNOR_ABI);
-        const govAddr = activeGovernor.target as string;
-        const callVotes = iface.encodeFunctionData('proposalVotes', [proposalId]);
-        const callState = iface.encodeFunctionData('state', [proposalId]);
-        const [votesHex, stateHex] = await Promise.all([
-          rawRpc('eth_call', [{ to: govAddr, data: callVotes }, 'latest']),
-          rawRpc('eth_call', [{ to: govAddr, data: callState }, 'latest']),
-        ]);
-        const [againstVotes, forVotes, abstainVotes] = iface.decodeFunctionResult('proposalVotes', votesHex);
-        const [stateNum] = iface.decodeFunctionResult('state', stateHex);
-        setProposals((prev) =>
-          prev.map((p) =>
-            p.id === proposalId
-              ? { ...p, forVotes, againstVotes, abstainVotes, state: Number(stateNum), stateName: PROPOSAL_STATES[Number(stateNum)] || 'Unknown' }
-              : p
-          )
-        );
-      } catch (refreshErr) {
-        console.warn('Post-vote refresh failed:', refreshErr);
-      }
+      // Refresh all proposals via a fresh JsonRpcProvider to ensure
+      // vote tallies and state are fully up-to-date (bypasses all caching).
+      await loadProposals();
     } catch (e: any) {
       setStatus({ type: 'error', message: decodeGovernanceError(e) });
     } finally {
@@ -659,45 +662,48 @@ const Governance: React.FC = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
     });
-    const json = await res.json();
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`RPC request failed (${res.status}): ${text.slice(0, 200) || res.statusText}`);
+    }
+    const text = await res.text();
+    if (!text) throw new Error('RPC returned empty response — is Anvil running?');
+    let json: any;
+    try { json = JSON.parse(text); } catch { throw new Error(`RPC returned non-JSON: ${text.slice(0, 200)}`); }
     if (json.error) throw new Error(json.error.message);
     return json.result;
   };
 
-  const handleFastForward = async (blocks: number, label: string, alsoAdvanceTime?: number, targetBlock?: bigint) => {
+  const handleFastForward = async (label: string, advanceSeconds?: number, targetTimestamp?: bigint) => {
     if (!activeGovernor) return;
     setFastForwarding(true);
     setStatus(null);
     try {
-      // If a target block (snapshot / deadline) is provided, compute the
-      // exact number of blocks we still need instead of the caller's guess.
-      let toMine = blocks;
-      if (targetBlock !== undefined) {
-        const freshReader = new ethers.JsonRpcProvider(rpcUrlForBrowser());
-        const freshGovReader = new ethers.Contract(
-          activeGovernor.target as string, GOVERNOR_ABI, freshReader);
-        const currentClock = BigInt(await freshGovReader.clock());
-        freshReader.destroy();
-        const remaining = Number(targetBlock - currentClock) + 1; // +1 to pass it
-        toMine = remaining > 0 ? remaining : 1;
+      // Compute how many seconds to advance
+      let secondsToAdvance = advanceSeconds ?? 0;
+      if (targetTimestamp !== undefined) {
+        // Read current clock() via raw RPC (timestamp-based)
+        const iface = new ethers.Interface(GOVERNOR_ABI);
+        const govAddr = activeGovernor.target as string;
+        const callData = iface.encodeFunctionData('clock');
+        const clockHex = await rawRpc('eth_call', [{ to: govAddr, data: callData }, 'latest']);
+        const currentClock = BigInt(clockHex);
+        const remaining = Number(targetTimestamp - currentClock) + 1; // +1 to pass it
+        secondsToAdvance = remaining > 0 ? remaining : 1;
       }
 
-      // 1. Mine / time-travel via raw fetch so the RPC bypasses MetaMask
-      //    and ethers' internal request queue entirely.
-      //    Pass interval=0 so Anvil doesn't generate unique timestamps per
-      //    block, making large batch mining significantly faster.
-      if (alsoAdvanceTime) {
-        await rawRpc('evm_increaseTime', ['0x' + alsoAdvanceTime.toString(16)]);
+      // Time-travel via evm_increaseTime + mine 1 block (instant!)
+      if (secondsToAdvance > 0) {
+        await rawRpc('evm_increaseTime', ['0x' + secondsToAdvance.toString(16)]);
       }
-      await rawRpc('hardhat_mine', ['0x' + toMine.toString(16), '0x0']);
+      await rawRpc('evm_mine', []);
 
-      setStatus({ type: 'success', message: `⏩ Mined ${toMine.toLocaleString()} blocks (${label}). Refreshing…` });
+      setStatus({ type: 'success', message: `⏩ Advanced ${secondsToAdvance.toLocaleString()}s (${label}). Refreshing…` });
 
-      // 2. Query updated proposal state through a FRESH provider so we
-      //    avoid any stale cache in the existing provider / MetaMask.
+      // Re-fetch proposals via fresh provider (needed for event query)
+      const govAddr2 = activeGovernor.target as string;
       const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
-      const govAddr = activeGovernor.target as string;
-      const freshGov = new ethers.Contract(govAddr, GOVERNOR_ABI, freshProvider);
+      const freshGov = new ethers.Contract(govAddr2, GOVERNOR_ABI, freshProvider);
       try {
         setProposals(await fetchProposals(freshGov));
       } finally {
@@ -778,8 +784,8 @@ const Governance: React.FC = () => {
         tokenAddr,                          // token (IVotes) — checksummed
         timelockAddr,                       // timelock
         identityRegistryAddr,               // identityRegistry
-        14400,                              // votingDelay ~48 hours at 12s/block
-        50400,                              // votingPeriod ~7 days at 12s/block
+        172800,                             // votingDelay  48 hours (timestamp-based)
+        604800,                             // votingPeriod 7 days  (timestamp-based)
         ethers.parseEther('10000'),         // proposalThreshold = 1% of 1M supply
         10,                                 // quorum = 10% of supply
         { nonce: nonce++ }
@@ -905,8 +911,8 @@ const Governance: React.FC = () => {
       {/* Governor Config Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard icon={<Shield size={20} />} label="Governor" value={govName || '—'} accent="purple" />
-        <StatCard icon={<Clock size={20} />} label="Voting Delay" value={`${votingDelay.toString()} blocks`} accent="cyan" />
-        <StatCard icon={<Timer size={20} />} label="Voting Period" value={`${votingPeriod.toString()} blocks`} accent="amber" />
+        <StatCard icon={<Clock size={20} />} label="Voting Delay" value={formatDuration(votingDelay)} accent="cyan" />
+        <StatCard icon={<Timer size={20} />} label="Voting Period" value={formatDuration(votingPeriod)} accent="amber" />
         <StatCard icon={<Users size={20} />} label="Quorum" value={`${quorumPct.toString()}% of supply`} accent="emerald" />
         <StatCard icon={<Vote size={20} />} label="Proposal Threshold" value={`${formatTokenAmount(proposalThresholdVal)} tokens`} accent="purple" />
         <StatCard icon={<Shield size={20} />} label="Identity-Locked" value={kycVerified === null ? 'Checking…' : kycVerified ? '✓ KYC Verified' : '✗ KYC Required'} accent={kycVerified ? 'emerald' : 'red'} />
@@ -1215,7 +1221,7 @@ const Governance: React.FC = () => {
                           Execute
                         </button>
                         <button
-                          onClick={() => handleFastForward(1, 'skip timelock delay', 60)}
+                          onClick={() => handleFastForward('skip timelock delay', 172800)}
                           disabled={fastForwarding}
                           className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                         >
@@ -1227,7 +1233,7 @@ const Governance: React.FC = () => {
                     {/* Dev: fast-forward blocks for Pending / Active proposals */}
                     {p.state === 0 && ( /* Pending — skip voting delay */
                       <button
-                        onClick={() => handleFastForward(50, 'skip voting delay', undefined, p.snapshot)}
+                        onClick={() => handleFastForward('skip voting delay', undefined, p.snapshot)}
                         disabled={fastForwarding}
                         className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                       >
@@ -1237,7 +1243,7 @@ const Governance: React.FC = () => {
                     )}
                     {p.state === 1 && ( /* Active — skip to deadline */
                       <button
-                        onClick={() => handleFastForward(50, 'skip voting period', undefined, p.deadline)}
+                        onClick={() => handleFastForward('skip voting period', undefined, p.deadline)}
                         disabled={fastForwarding}
                         className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20 flex items-center gap-1"
                       >
@@ -1251,8 +1257,8 @@ const Governance: React.FC = () => {
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
                       <DetailRow label="Proposer" value={p.proposer} mono />
-                      <DetailRow label="Snapshot Block" value={p.snapshot.toString()} />
-                      <DetailRow label="Deadline Block" value={p.deadline.toString()} />
+                      <DetailRow label="Voting Start" value={`${formatTimestamp(p.snapshot)} (${p.snapshot.toString()})`} />
+                      <DetailRow label="Voting End" value={`${formatTimestamp(p.deadline)} (${p.deadline.toString()})`} />
                       <DetailRow label="Target(s)" value={p.targets.join(', ')} mono />
                     </div>
                   )}

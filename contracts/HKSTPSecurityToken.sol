@@ -680,6 +680,23 @@ contract HKSTPSecurityToken is ERC20, ERC20Permit, ERC20Votes, AccessControl, Pa
     }
 
     // -------------------------------------------------------------------------
+    // ERC-6372: Timestamp-based clock (enables instant governance fast-forward)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @dev Use block.timestamp instead of block.number for vote checkpoints.
+     *      This allows governance voting periods to be expressed in seconds
+     *      and fast-forwarded via evm_increaseTime (no need to mine blocks).
+     */
+    function clock() public view override returns (uint48) {
+        return uint48(block.timestamp);
+    }
+
+    function CLOCK_MODE() public pure override returns (string memory) {
+        return "mode=timestamp";
+    }
+
+    // -------------------------------------------------------------------------
     // ERC-165 support + ERC20Permit/Nonces override resolution
     // -------------------------------------------------------------------------
 

@@ -37,11 +37,13 @@ interface IIdentityRegistryGov {
  * └──────────────────────────────────────────────────────────────────┘
  *
  * Production governance parameters (passed at deployment):
- *   - Voting delay:        14400 blocks  (~2 days at 12s/block)
- *   - Voting period:       50400 blocks  (~7 days at 12s/block)
+ *   - Voting delay:        172800 seconds (48 hours)
+ *   - Voting period:       604800 seconds (7 days)
  *   - Proposal threshold:  1% of total supply
  *   - Quorum:              10% of total supply
  *   - Timelock delay:      172800 seconds (48 hours)
+ *
+ * Clock mode: timestamp-based (ERC-6372) — inherited from token.
  */
 contract HKSTPGovernor is
     Governor,
@@ -130,13 +132,13 @@ contract HKSTPGovernor is
         return super.votingPeriod();
     }
 
-    function quorum(uint256 blockNumber)
+    function quorum(uint256 timepoint)
         public
         view
         override(Governor, GovernorVotesQuorumFraction)
         returns (uint256)
     {
-        return super.quorum(blockNumber);
+        return super.quorum(timepoint);
     }
 
     function state(uint256 proposalId)

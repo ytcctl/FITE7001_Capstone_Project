@@ -54,6 +54,7 @@ export default defineConfig({
         target: 'http://127.0.0.1:8545',
         changeOrigin: true,
         rewrite: () => '/',
+        timeout: 300000,       // 5 min — large hardhat_mine calls can be slow
       },
     },
   },
