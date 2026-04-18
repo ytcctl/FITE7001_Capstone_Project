@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
-import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI } from '../config/contracts';
+import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI, rpcUrlForBrowser } from '../config/contracts';
 import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer, Rocket } from 'lucide-react';
 
 // ─── Human-readable error decoder for Governor / Timelock custom errors ───
@@ -337,52 +337,61 @@ const Governance: React.FC = () => {
   }, [activeToken, account, contracts]);
 
   // ─── Load proposals from events ───────────────────────────
+  /**
+   * Fetch all proposals from a governor contract instance.
+   * Extracted so handleFastForward can pass a fresh-provider governor
+   * to avoid stale MetaMask / ethers caching after mining.
+   */
+  const fetchProposals = async (gov: ethers.Contract): Promise<ProposalInfo[]> => {
+    const filter = gov.filters.ProposalCreated();
+    const events = await gov.queryFilter(filter, 0, 'latest');
+    const proposalInfos: ProposalInfo[] = [];
+
+    for (const event of events) {
+      const log = event as ethers.EventLog;
+      const args = log.args;
+      const proposalId = args[0].toString();
+      const proposer = args[1];
+      const targets = args[2];
+      const values = args[3];
+      const calldatas = args[5];
+      const description = args[8];
+
+      try {
+        const [stateNum, snapshot, deadline, votes] = await Promise.all([
+          gov.state(proposalId),
+          gov.proposalSnapshot(proposalId),
+          gov.proposalDeadline(proposalId),
+          gov.proposalVotes(proposalId),
+        ]);
+
+        proposalInfos.push({
+          id: proposalId,
+          proposer,
+          state: Number(stateNum),
+          stateName: PROPOSAL_STATES[Number(stateNum)] || 'Unknown',
+          snapshot,
+          deadline,
+          forVotes: votes[1],
+          againstVotes: votes[0],
+          abstainVotes: votes[2],
+          description,
+          targets,
+          values,
+          calldatas,
+        });
+      } catch {
+        // Skip proposals that can't be queried
+      }
+    }
+
+    return proposalInfos.reverse(); // newest first
+  };
+
   const loadProposals = useCallback(async () => {
     if (!activeGovernor) return;
     try {
-      const filter = activeGovernor.filters.ProposalCreated();
-      const events = await activeGovernor.queryFilter(filter, 0, 'latest');
-      const proposalInfos: ProposalInfo[] = [];
-
-      for (const event of events) {
-        const log = event as ethers.EventLog;
-        const args = log.args;
-        const proposalId = args[0].toString();
-        const proposer = args[1];
-        const targets = args[2];
-        const values = args[3];
-        const calldatas = args[5];
-        const description = args[8];
-
-        try {
-          const [stateNum, snapshot, deadline, votes] = await Promise.all([
-            activeGovernor.state(proposalId),
-            activeGovernor.proposalSnapshot(proposalId),
-            activeGovernor.proposalDeadline(proposalId),
-            activeGovernor.proposalVotes(proposalId),
-          ]);
-
-          proposalInfos.push({
-            id: proposalId,
-            proposer,
-            state: Number(stateNum),
-            stateName: PROPOSAL_STATES[Number(stateNum)] || 'Unknown',
-            snapshot,
-            deadline,
-            forVotes: votes[1],
-            againstVotes: votes[0],
-            abstainVotes: votes[2],
-            description,
-            targets,
-            values,
-            calldatas,
-          });
-        } catch {
-          // Skip proposals that can't be queried
-        }
-      }
-
-      setProposals(proposalInfos.reverse()); // newest first
+      setProposals(await fetchProposals(activeGovernor));
     } catch (e) {
       console.error('Failed to load proposals:', e);
     }
@@ -568,16 +577,19 @@ const Governance: React.FC = () => {
     }
   };
 
-  // ─── Fast-forward blocks (dev only – Hardhat) ─────────────
+  // ─── Fast-forward blocks (dev only – Hardhat / Anvil) ──────
   const [fastForwarding, setFastForwarding] = useState(false);
-  const rpcFetch = async (method: string, params: any[] = []) => {
-    const rpcUrl = window.location.hostname === 'localhost'
-      ? 'http://127.0.0.1:8545'
-      : `${window.location.protocol}//${window.location.hostname.replace(/^(\d+)-/, '8545-')}`;
+
+  /**
+   * Send a raw JSON-RPC call directly to Anvil / Hardhat, bypassing
+   * both MetaMask and the ethers provider cache.
+   */
+  const rawRpc = async (method: string, params: any[] = []) => {
+    const rpcUrl = rpcUrlForBrowser();
     const res = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
     });
     const json = await res.json();
     if (json.error) throw new Error(json.error.message);
@@ -585,15 +597,29 @@ const Governance: React.FC = () => {
   };
 
   const handleFastForward = async (blocks: number, label: string, alsoAdvanceTime?: number) => {
+    if (!activeGovernor) return;
     setFastForwarding(true);
     setStatus(null);
     try {
+      // 1. Mine / time-travel via raw fetch so the RPC bypasses MetaMask
+      //    and ethers' internal request queue entirely.
       if (alsoAdvanceTime) {
-        await rpcFetch('evm_increaseTime', ['0x' + alsoAdvanceTime.toString(16)]);
+        await rawRpc('evm_increaseTime', ['0x' + alsoAdvanceTime.toString(16)]);
       }
-      await rpcFetch('hardhat_mine', ['0x' + blocks.toString(16)]);
+      await rawRpc('hardhat_mine', ['0x' + blocks.toString(16)]);
+
       setStatus({ type: 'success', message: `⏩ Mined ${blocks.toLocaleString()} blocks (${label}). Refreshing…` });
-      await loadProposals();
+
+      // 2. Query updated proposal state through a FRESH provider so we
+      //    avoid any stale cache in the existing provider / MetaMask.
+      const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
+      const govAddr = activeGovernor.target as string;
+      const freshGov = new ethers.Contract(govAddr, GOVERNOR_ABI, freshProvider);
+      try {
+        setProposals(await fetchProposals(freshGov));
+      } finally {
+        freshProvider.destroy();
+      }
     } catch (e: any) {
       setStatus({ type: 'error', message: 'Fast-forward failed: ' + (e.message || e) });
     } finally {
@@ -682,12 +708,19 @@ const Governance: React.FC = () => {
       const timelockContract = new ethers.Contract(timelockAddr, timelockArtifact.abi, signer);
       const PROPOSER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('PROPOSER_ROLE'));
       const CANCELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('CANCELLER_ROLE'));
-      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/4)' });
+      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/5)' });
       await (await timelockContract.grantRole(PROPOSER_ROLE, governorAddr, { nonce: nonce++ })).wait();
       await (await timelockContract.grantRole(CANCELLER_ROLE, governorAddr, { nonce: nonce++ })).wait();
 
-      // 4. Register in GovernorFactory
-      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (4/4)' });
+      // 4. Grant TIMELOCK_MINTER_ROLE to the Timelock on the security token
+      //    so governance-approved large mints (above mintThreshold) can execute.
+      const tokenContract = new ethers.Contract(tokenAddr, SECURITY_TOKEN_ABI, signer);
+      const TIMELOCK_MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('TIMELOCK_MINTER_ROLE'));
+      setStatus({ type: 'info', message: 'Granting TIMELOCK_MINTER_ROLE on token… (4/5)' });
+      await (await tokenContract.grantRole(TIMELOCK_MINTER_ROLE, timelockAddr, { nonce: nonce++ })).wait();
+
+      // 5. Register in GovernorFactory
+      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (5/5)' });
       const tx = await contracts.governorFactory.registerGovernance(
         tokenAddr,
         governorAddr,
