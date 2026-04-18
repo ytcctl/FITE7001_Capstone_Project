@@ -32,7 +32,7 @@ function decodeGovernanceError(e: any): string {
         return `Proposal is currently "${STATES[Number(decoded[1])] || decoded[1]}" — cannot perform this action.`;
       }
       // GovernorAlreadyCastVote(address voter)
-      if (sel === '0x45c4b9e6') {
+      if (sel === '0x71c6af49') {
         return 'You have already voted on this proposal.';
       }
       // GovernorNonexistentProposal(uint256 proposalId)
@@ -389,8 +389,8 @@ const Governance: React.FC = () => {
           values,
           calldatas,
         });
-      } catch {
-        // Skip proposals that can't be queried
+      } catch (err) {
+        console.warn('fetchProposals: skipping proposal', proposalId.slice(0, 12), err);
       }
     }
 
@@ -399,10 +399,17 @@ const Governance: React.FC = () => {
 
   const loadProposals = useCallback(async () => {
     if (!activeGovernor) return;
+    // Always use a fresh JsonRpcProvider so we bypass MetaMask / ethers
+    // BrowserProvider caching and get the true on-chain vote tallies.
+    const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
+    const freshGov = new ethers.Contract(
+      activeGovernor.target as string, GOVERNOR_ABI, freshProvider);
     try {
-      setProposals(await fetchProposals(activeGovernor));
+      setProposals(await fetchProposals(freshGov));
     } catch (e) {
       console.error('Failed to load proposals:', e);
+    } finally {
+      freshProvider.destroy();
     }
   }, [activeGovernor]);
 
@@ -564,16 +571,32 @@ const Governance: React.FC = () => {
       const tx = await activeGovernor.castVote(proposalId, support);
       await tx.wait();
       const voteLabel = support === 1 ? 'For' : support === 0 ? 'Against' : 'Abstain';
-      setStatus({ type: 'success', message: `Vote cast: ${voteLabel}` });
-      // Use a fresh provider to bypass ethers / MetaMask caching so
-      // updated vote tallies are returned immediately.
-      const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
-      const freshGov = new ethers.Contract(
-        activeGovernor.target as string, GOVERNOR_ABI, freshProvider);
+      setStatus({ type: 'success', message: `✓ Vote cast: ${voteLabel}` });
+
+      // Re-read only the changed proposal's vote tally via raw RPC to
+      // guarantee we bypass every layer of caching (MetaMask, ethers,
+      // BrowserProvider).  Updating just the one proposal in state is
+      // faster and avoids re-querying all events.
       try {
-        setProposals(await fetchProposals(freshGov));
-      } finally {
-        freshProvider.destroy();
+        const iface = new ethers.Interface(GOVERNOR_ABI);
+        const govAddr = activeGovernor.target as string;
+        const callVotes = iface.encodeFunctionData('proposalVotes', [proposalId]);
+        const callState = iface.encodeFunctionData('state', [proposalId]);
+        const [votesHex, stateHex] = await Promise.all([
+          rawRpc('eth_call', [{ to: govAddr, data: callVotes }, 'latest']),
+          rawRpc('eth_call', [{ to: govAddr, data: callState }, 'latest']),
+        ]);
+        const [againstVotes, forVotes, abstainVotes] = iface.decodeFunctionResult('proposalVotes', votesHex);
+        const [stateNum] = iface.decodeFunctionResult('state', stateHex);
+        setProposals((prev) =>
+          prev.map((p) =>
+            p.id === proposalId
+              ? { ...p, forVotes, againstVotes, abstainVotes, state: Number(stateNum), stateName: PROPOSAL_STATES[Number(stateNum)] || 'Unknown' }
+              : p
+          )
+        );
+      } catch (refreshErr) {
+        console.warn('Post-vote refresh failed:', refreshErr);
       }
     } catch (e: any) {
       setStatus({ type: 'error', message: decodeGovernanceError(e) });
@@ -755,8 +778,8 @@ const Governance: React.FC = () => {
         tokenAddr,                          // token (IVotes) — checksummed
         timelockAddr,                       // timelock
         identityRegistryAddr,               // identityRegistry
-        10,                                 // votingDelay = 10 blocks (dev); prod: 14400
-        20,                                 // votingPeriod = 20 blocks (dev); prod: 50400
+        14400,                              // votingDelay ~48 hours at 12s/block
+        50400,                              // votingPeriod ~7 days at 12s/block
         ethers.parseEther('10000'),         // proposalThreshold = 1% of 1M supply
         10,                                 // quorum = 10% of supply
         { nonce: nonce++ }
