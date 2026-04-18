@@ -4,6 +4,17 @@ import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI, rpcUrlForBrowser } from '../config/contracts';
 import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer, Rocket } from 'lucide-react';
 
+/** Check if an error contains the ERC20InsufficientBalance custom error (selector 0xe450d38c). */
+function isInsufficientBalanceError(e: any): boolean {
+  const revertData: string | undefined =
+    e.data ?? e.error?.data ?? e.info?.error?.data?.data ?? e.info?.error?.data ?? e.revert?.data;
+  if (revertData && typeof revertData === 'string') {
+    return revertData.includes('e450d38c');
+  }
+  const msg: string = e.shortMessage || e.message || e.reason || '';
+  return /insufficient.?balance/i.test(msg) || /ERC20InsufficientBalance/i.test(msg);
+}
+
 // ─── Human-readable error decoder for Governor / Timelock custom errors ───
 function decodeGovernanceError(e: any): string {
   // ethers v6 sometimes populates e.reason
@@ -50,6 +61,14 @@ function decodeGovernanceError(e: any): string {
       // TimelockInsufficientDelay(uint256 delay, uint256 minDelay)
       if (sel === '0x547f2829') {
         return 'Timelock delay has not been met. Click "⏩ Skip Timelock" to advance time.';
+      }
+      // ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)
+      if (sel === '0xe450d38c') {
+        const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+          ['address', 'uint256', 'uint256'], '0x' + revertData.slice(10));
+        const balance = Number(ethers.formatUnits(decoded[1], 18));
+        const needed = Number(ethers.formatUnits(decoded[2], 18));
+        return `Insufficient token balance: account holds ${balance.toLocaleString()} tokens but ${needed.toLocaleString()} required.`;
       }
     } catch { /* ignore decode failures */ }
   }
@@ -202,6 +221,9 @@ const Governance: React.FC = () => {
   // ─── Track which tokens have no governance yet ─────────
   const [noGovTokens, setNoGovTokens] = useState<Set<string>>(new Set());
   const [deployingGov, setDeployingGov] = useState(false);
+
+  // ─── Track proposals defeated due to execution failure (e.g. insufficient balance) ──
+  const [defeatedProposals, setDefeatedProposals] = useState<Map<string, string>>(new Map()); // proposalId → reason
 
   // ─── Load governed tokens from GovernorFactory + both TokenFactories ──
   const loadGovernanceSuites = useCallback(async () => {
@@ -644,6 +666,27 @@ const Governance: React.FC = () => {
       setStatus({ type: 'success', message: 'Proposal executed!' });
       await loadProposals();
     } catch (e: any) {
+      // Detect burn-related insufficient balance: cancel the proposal and
+      // mark it as "Defeated" so the UI banner + state badge update clearly.
+      if (isInsufficientBalanceError(e)) {
+        const reason = decodeGovernanceError(e);
+        try {
+          const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
+          const cancelTx = await activeGovernor.cancel(
+            [...proposal.targets],
+            [...proposal.values],
+            [...proposal.calldatas],
+            descHash
+          );
+          await cancelTx.wait();
+        } catch {
+          // Cancel may fail if caller is not the proposer — that's OK
+        }
+        setDefeatedProposals((prev) => new Map(prev).set(proposal.id, reason));
+        setStatus({ type: 'error', message: `✗ Proposal Defeated — ${reason}` });
+        await loadProposals();
+        return;
+      }
       setStatus({ type: 'error', message: decodeGovernanceError(e) });
     }
   };
@@ -1146,13 +1189,25 @@ const Governance: React.FC = () => {
               const abstainPct = totalVotes > 0n ? Number((p.abstainVotes * 100n) / totalVotes) : 0;
               const isExpanded = expandedProposal === p.id;
 
+              // Override display state for proposals defeated due to execution failure
+              const isDefeatedBurn = defeatedProposals.has(p.id);
+              const displayState = isDefeatedBurn ? 3 : p.state;           // 3 = Defeated
+              const displayStateName = isDefeatedBurn ? 'Defeated' : p.stateName;
+
               return (
                 <div key={p.id} className="p-6 hover:bg-white/5 transition-colors">
+                  {/* Insufficient balance banner for defeated burn proposals */}
+                  {isDefeatedBurn && (
+                    <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2">
+                      <XCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
+                      <span className="text-sm text-red-300">{defeatedProposals.get(p.id)}</span>
+                    </div>
+                  )}
                   {/* Header row */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATE_COLORS[p.state] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
-                        {p.stateName}
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATE_COLORS[displayState] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
+                        {displayStateName}
                       </span>
                       <span className="text-sm text-gray-500 font-mono">
                         #{p.id.slice(0, 12)}…
