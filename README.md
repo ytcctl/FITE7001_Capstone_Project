@@ -1499,6 +1499,95 @@ After deployment, the script also:
 - Seeds **Investor1** with identity, KYC claims, 10,000 HKSAT + 5,000,000 THKD
 - Auto-updates `frontend/src/config/contracts.ts`
 
+### Local PC with Anvil Persistence (Recommended for Demos)
+
+Anvil (from Foundry) supports `--dump-state` / `--load-state` to persist all blockchain state — contracts, KYC status, orders, balances — across restarts. This means you deploy once, and everything survives PC reboots.
+
+#### Prerequisites (in addition to the base requirements above)
+
+| Requirement | Version | Check |
+|---|---|---|
+| **Foundry (Anvil)** | Nightly | `anvil --version` |
+
+**Install Foundry on Windows** (one-time):
+
+Download and extract the latest nightly binary:
+
+```powershell
+$outDir = "$env:USERPROFILE\.foundry\bin"
+New-Item -Path $outDir -ItemType Directory -Force | Out-Null
+$url = "https://github.com/foundry-rs/foundry/releases/download/nightly/foundry_nightly_win32_amd64.zip"
+$zipFile = "$env:TEMP\foundry.zip"
+(New-Object System.Net.WebClient).DownloadFile($url, $zipFile)
+Expand-Archive -Path $zipFile -DestinationPath $outDir -Force
+Remove-Item $zipFile
+```
+
+Add Foundry to your PATH (run once per terminal session, or add to your PowerShell profile):
+
+```powershell
+$env:Path = "$env:USERPROFILE\.foundry\bin;$env:Path"
+```
+
+#### First-Time Setup
+
+**Terminal 1** — Start Anvil with state persistence:
+
+```powershell
+$env:Path = "$env:USERPROFILE\.foundry\bin;$env:Path"
+anvil --host 0.0.0.0 --port 8545 --dump-state anvil-state.json
+```
+
+**Terminal 2** — Fund dev accounts, deploy, and seed:
+
+```powershell
+# Fund the Besu-style dev accounts on Anvil
+$addrs = @("0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73","0x627306090abaB3A6e1400e9345bC60c78a8BEf57","0xf17f52151EbEF6C7334FAD080c5704D77216b732","0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef","0x821aEa9a577a9b44299B9c15c88cf3087F3b5544")
+foreach ($a in $addrs) {
+  $b = '{"jsonrpc":"2.0","method":"anvil_setBalance","params":["' + $a + '","0xD3C21BCECCEDA1000000"],"id":1}'
+  Invoke-RestMethod -Uri "http://127.0.0.1:8545" -Method POST -ContentType "application/json" -Body $b | Out-Null
+}
+
+# Deploy all contracts + seed Investor1 + auto-update frontend config
+npx hardhat run scripts/deploy-and-update-frontend.js --network localhost
+
+# Seed additional test data (Investor2, Investor3, orders, delegations)
+npx hardhat run scripts/seed-all-testdata.js --network localhost
+```
+
+**Terminal 3** — Start the frontend:
+
+```powershell
+cd frontend
+npx vite --host 0.0.0.0 --port 3000
+```
+
+When done, stop Anvil with <kbd>Ctrl</kbd>+<kbd>C</kbd> — it writes all state to `anvil-state.json`.
+
+#### Restart After PC Reboot
+
+Only **2 commands** are needed — no redeploy or reseed required:
+
+**Terminal 1** — Restore and start Anvil:
+
+```powershell
+$env:Path = "$env:USERPROFILE\.foundry\bin;$env:Path"
+anvil --host 0.0.0.0 --port 8545 --dump-state anvil-state.json --load-state anvil-state.json
+```
+
+**Terminal 2** — Start the frontend:
+
+```powershell
+cd frontend
+npx vite --host 0.0.0.0 --port 3000
+```
+
+All contracts, KYC status, orders, and account balances are restored from the state file.
+
+> **⚠️ Important:** Always stop Anvil with <kbd>Ctrl</kbd>+<kbd>C</kbd> (graceful shutdown). Force-killing the process will **not** write the state file and all changes since the last save will be lost.
+
+---
+
 ### Post-Deployment Steps
 
 1. Grant `TOKEN_ROLE` on `HKSTPCompliance` to `HKSTPSecurityToken`
