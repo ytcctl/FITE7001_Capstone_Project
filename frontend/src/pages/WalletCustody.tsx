@@ -573,10 +573,10 @@ const WalletCustody: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Vault size={32} className="text-purple-400" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+            <Vault size={32} className="text-purple-400 shrink-0" />
             Wallet Custody (98/2 Rule)
           </h1>
           <p className="text-gray-400 mt-1">
@@ -789,7 +789,7 @@ const WalletCustody: React.FC = () => {
                     value={newWalletAddr}
                     onChange={(e) => setNewWalletAddr(e.target.value)}
                     placeholder="0x… wallet address"
-                    className="flex-1 min-w-[300px] px-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm font-mono"
+                    className="flex-1 min-w-0 px-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm font-mono"
                   />
                   <select
                     value={newWalletTier}
@@ -805,7 +805,7 @@ const WalletCustody: React.FC = () => {
                     value={newWalletLabel}
                     onChange={(e) => setNewWalletLabel(e.target.value)}
                     placeholder="Label (e.g. Hot-FPS-1)"
-                    className="flex-1 min-w-[200px] px-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
+                    className="flex-1 min-w-0 px-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
                   />
                   <button
                     onClick={handleRegisterWallet}
@@ -858,7 +858,7 @@ const WalletCustody: React.FC = () => {
                   </p>
                 )}
                 <div className="flex flex-wrap gap-3 items-end">
-                  <div className="flex-1 min-w-[200px]">
+                  <div className="flex-1 min-w-0">
                     <label className="text-xs text-gray-500 mb-1 block">Add New Signer</label>
                     <div className="flex gap-2">
                       <input

@@ -128,8 +128,8 @@ const OracleCommittee: React.FC = () => {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <ShieldAlert className="text-orange-400" size={32} />
+        <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+          <ShieldAlert className="text-orange-400 shrink-0" size={32} />
           Oracle Committee
         </h1>
         <p className="text-gray-400 mt-2">
@@ -205,13 +205,13 @@ const OracleCommittee: React.FC = () => {
             {members.map((member, index) => (
               <div
                 key={member}
-                className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3"
+                className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-3 md:px-4 py-3 gap-2"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-xs font-bold">
                     {index + 1}
                   </div>
-                  <span className="font-mono text-white text-sm">{member}</span>
+                  <span className="font-mono text-white text-sm truncate max-w-[200px] md:max-w-none">{member}</span>
                   {member.toLowerCase() === account?.toLowerCase() && (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400">
                       YOU

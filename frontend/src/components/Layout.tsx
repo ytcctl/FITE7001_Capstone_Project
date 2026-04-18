@@ -12,7 +12,7 @@ import {
   Sparkles,
   LogOut,
   Wallet,
-  Lock,
+  Shield,
   Vote,
   Vault,
   BarChart3,
@@ -23,6 +23,7 @@ import {
   UserPlus,
   ShieldAlert,
   Snowflake,
+  Menu,
 } from 'lucide-react';
 import { useWeb3, TEST_ACCOUNTS, getSavedAccounts, removeSavedAccount } from '../context/Web3Context';
 import type { SavedAccount } from '../context/Web3Context';
@@ -64,6 +65,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [customLabel, setCustomLabel] = useState('');
   const [keyError, setKeyError] = useState('');
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Auto-close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   // Load saved accounts from localStorage when menu opens
   useEffect(() => {
@@ -122,8 +129,111 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className={`min-h-screen flex ${bannerOffset}`}>
+      {/* ── Mobile top bar ── */}
+      <div className={`md:hidden fixed ${wrongNetwork ? 'top-12' : 'top-0'} left-0 right-0 z-[60] flex items-center gap-2 px-2 py-2 bg-black/40 backdrop-blur border-b border-white/10`}>
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 rounded-lg text-white"
+          aria-label="Open menu"
+        >
+          <Menu size={22} />
+        </button>
+        <span className="text-white font-bold text-sm flex-1">TokenHub</span>
+        {!account && (
+          <button
+            onClick={() => setShowWalletMenu((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-300 bg-purple-500/20 rounded-lg border border-purple-500/30"
+          >
+            <Wallet size={14} />
+            Connect
+          </button>
+        )}
+        {account && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 truncate max-w-[100px]">{shortAddr}</span>
+            <button
+              onClick={disconnect}
+              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+              aria-label="Disconnect"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Mobile wallet dropdown (top-right, below top bar) ── */}
+      {showWalletMenu && !account && (
+        <>
+          <div className="md:hidden fixed inset-0 z-[70]" onClick={() => setShowWalletMenu(false)} />
+          <div className={`md:hidden fixed right-2 ${wrongNetwork ? 'top-[4.5rem]' : 'top-12'} w-72 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-y-auto max-h-[80vh] z-[80]`}>
+            {/* MetaMask option */}
+            {typeof window !== 'undefined' && !!(window as unknown as { ethereum?: unknown }).ethereum && (
+              <button
+                onClick={() => { setShowWalletMenu(false); connect(); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 transition-colors border-b border-white/5"
+              >
+                <Wallet size={16} className="text-orange-400" />
+                MetaMask
+              </button>
+            )}
+            {/* Test accounts */}
+            <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Built-in Test Accounts</div>
+            {TEST_ACCOUNTS.map((ta) => (
+              <button key={ta.address} onClick={() => handleTestAccount(ta.key)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 transition-colors">
+                <Key size={14} className="text-green-400 shrink-0" />
+                <div className="text-left min-w-0">
+                  <div className="truncate">{ta.label}</div>
+                  <div className="text-[10px] text-gray-500 truncate">{ta.address}</div>
+                </div>
+              </button>
+            ))}
+            {/* Saved accounts */}
+            {savedAccounts.length > 0 && (
+              <>
+                <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-t border-white/5">Saved Accounts</div>
+                {savedAccounts.map((sa) => (
+                  <button key={sa.address} onClick={() => handleSavedAccount(sa)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 transition-colors group">
+                    <UserPlus size={14} className="text-cyan-400 shrink-0" />
+                    <div className="text-left min-w-0 flex-1">
+                      <div className="truncate">{sa.label}</div>
+                      <div className="text-[10px] text-gray-500 truncate">{sa.address}</div>
+                    </div>
+                    <span role="button" onClick={(e) => handleRemoveSaved(e, sa.address)} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all p-1" title="Remove saved account"><X size={12} /></span>
+                  </button>
+                ))}
+              </>
+            )}
+            {/* Custom key */}
+            <div className="border-t border-white/5">
+              <button onClick={() => setShowCustomKey(!showCustomKey)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 hover:bg-white/5 transition-colors">
+                <Key size={14} className="text-purple-400" />
+                Custom Private Key
+                <ChevronDown size={12} className={`ml-auto transition-transform ${showCustomKey ? 'rotate-180' : ''}`} />
+              </button>
+              {showCustomKey && (
+                <div className="px-4 pb-3 space-y-2">
+                  <input type="text" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="Label (e.g. Investor2)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500" />
+                  <input type="password" value={customKey} onChange={(e) => { setCustomKey(e.target.value); setKeyError(''); }} placeholder="0x..." className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500" />
+                  {keyError && <p className="text-[10px] text-red-400">{keyError}</p>}
+                  <button onClick={handleCustomKey} className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-lg transition-colors font-medium">Connect & Save</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Backdrop (mobile) ── */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Sidebar ── */}
-      <aside className={`w-64 bg-black/20 backdrop-blur-xl border-r border-white/10 h-screen flex flex-col fixed left-0 ${wrongNetwork ? 'top-12' : 'top-0'} z-50`}>
+      <aside className={`w-64 bg-black/20 backdrop-blur-xl border-r border-white/10 h-screen flex flex-col fixed left-0 ${wrongNetwork ? 'top-12' : 'top-0'} z-50 transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         {/* Brand */}
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
           <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-900/20">
@@ -135,8 +245,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1.5 mt-2 overflow-y-auto">
+        {/* Scrollable body (nav + wallet) */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1.5 mt-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to;
@@ -162,8 +273,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <Icon size={20} className={isActive ? 'text-purple-400' : 'text-gray-500'} />
                 {item.label}
-                {isRestricted && (
-                  <Lock size={12} className="ml-auto text-yellow-500/60" />
+                {item.adminOnly && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-yellow-400/70">
+                    <Shield size={10} />
+                    Admin
+                  </span>
+                )}
+                {item.adminOrAgent && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-orange-400/70">
+                    <Shield size={10} />
+                    Staff
+                  </span>
+                )}
+                {item.privileged && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-green-400/70">
+                    <Shield size={10} />
+                    Privileged
+                  </span>
                 )}
               </NavLink>
             );
@@ -171,7 +297,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </nav>
 
         {/* Bottom */}
-        <div className="p-4 border-t border-white/10 space-y-2">
+        <div className="shrink-0 p-4 border-t border-white/10 space-y-2">
           {account && (
             <div className="px-4 py-2 text-xs text-gray-400">
               <span className="block text-gray-500 mb-0.5">
@@ -212,7 +338,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
 
               {showWalletMenu && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100]">
+                <div className="hidden md:block absolute bottom-full left-0 right-0 mb-2 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-y-auto max-h-[70vh] z-[100]">
                   {/* MetaMask option */}
                   {typeof window !== 'undefined' && !!(window as unknown as { ethereum?: unknown }).ethereum && (
                     <button
@@ -313,10 +439,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
           )}
         </div>
+        </div>{/* end scrollable body */}
       </aside>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 min-w-0 ml-0 md:ml-64 p-3 pt-14 md:p-8 md:pt-8 overflow-x-hidden">
         <div className="max-w-7xl mx-auto">{children}</div>
       </main>
     </div>

@@ -443,9 +443,9 @@ const Settlement: React.FC = () => {
 
   if (!account) {
     return (
-      <div className="glass-card p-12 text-center">
+      <div className="glass-card p-6 md:p-12 text-center">
         <ArrowRightLeft size={48} className="mx-auto mb-4 text-purple-400" />
-        <h2 className="text-2xl font-bold text-white mb-2">DvP Settlement</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-2">DvP Settlement</h2>
         <p className="text-gray-400">Connect your wallet to create and execute atomic DvP settlements.</p>
       </div>
     );
@@ -453,10 +453,10 @@ const Settlement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">DvP Settlement</h2>
-          <p className="text-gray-400">Atomic delivery-versus-payment settlement of security tokens for cash.</p>
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-xl md:text-2xl font-bold text-white">DvP Settlement</h2>
+          <p className="text-gray-400 text-sm">Atomic delivery-versus-payment settlement of security tokens for cash.</p>
         </div>
         <button onClick={loadSettlements} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Refresh">
           <RefreshCw size={18} className="text-gray-400" />
@@ -559,7 +559,7 @@ const Settlement: React.FC = () => {
 
       {/* Batch Execute Bar */}
       {pendingIds.length > 0 && (
-        <div className="glass-card px-6 py-3 flex items-center justify-between">
+        <div className="glass-card px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <CheckSquare size={18} className="text-purple-400" />
             <span className="text-sm text-gray-300">
@@ -590,7 +590,7 @@ const Settlement: React.FC = () => {
             <table className="w-full">
               <thead className="bg-white/5 text-xs text-gray-400 text-left">
                 <tr>
-                  <th className="px-4 py-3 font-medium w-10">
+                  <th className="px-3 md:px-6 py-3 font-medium w-10">
                     {pendingIds.length > 0 && (
                       <input
                         type="checkbox"

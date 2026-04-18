@@ -12,7 +12,7 @@ interface TokenOption {
 }
 
 const TokenMinting: React.FC = () => {
-  const { account, contracts, provider } = useWeb3();
+  const { account, contracts, provider, signer } = useWeb3();
 
   // Available tokens from factory
   const [tokenOptions, setTokenOptions] = useState<TokenOption[]>([]);
@@ -55,15 +55,14 @@ const TokenMinting: React.FC = () => {
 
   /** Helper: get a signer-backed security token contract for the selected address */
   const getSelectedTokenContract = useCallback(() => {
-    if (!provider || !selectedTokenAddr || selectedTokenAddr === '') return null;
+    if (!signer || !selectedTokenAddr || selectedTokenAddr === '') return null;
     // If it's the default security token, use the one from context
     if (contracts && selectedTokenAddr === (contracts.securityToken as ethers.Contract).target) {
       return contracts.securityToken;
     }
     // Otherwise, create a new contract instance for a factory-deployed token
-    const signer = (provider as ethers.BrowserProvider).getSigner();
-    return signer.then(s => new ethers.Contract(selectedTokenAddr, SECURITY_TOKEN_ABI, s));
-  }, [provider, selectedTokenAddr, contracts]);
+    return new ethers.Contract(selectedTokenAddr, SECURITY_TOKEN_ABI, signer);
+  }, [signer, selectedTokenAddr, contracts]);
 
   /** Load the list of factory-deployed tokens + the default security token */
   const loadTokenOptions = useCallback(async () => {

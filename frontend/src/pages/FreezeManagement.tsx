@@ -59,8 +59,8 @@ const FreezeManagement: React.FC = () => {
     <div className="space-y-8 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-2">
-        <Snowflake className="text-blue-400" size={28} />
-        <h2 className="text-2xl font-bold text-white">Freeze Management</h2>
+        <Snowflake className="text-blue-400 shrink-0" size={28} />
+        <h2 className="text-xl md:text-2xl font-bold text-white">Freeze Management</h2>
       </div>
       <p className="text-gray-400 text-sm -mt-4">
         Freeze or unfreeze investor addresses. A frozen address <strong>cannot send or receive</strong> any tokens until unfrozen.

@@ -603,9 +603,9 @@ const Governance: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="glass-card p-12 text-center">
+      <div className="glass-card p-6 md:p-12 text-center">
         <Loader2 size={48} className="mx-auto mb-4 text-purple-400 animate-spin" />
-        <h2 className="text-2xl font-bold text-white mb-2">Governance</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-2">Governance</h2>
         <p className="text-gray-400">Loading governance data…</p>
       </div>
     );
@@ -613,9 +613,9 @@ const Governance: React.FC = () => {
 
   if (!account) {
     return (
-      <div className="glass-card p-12 text-center">
+      <div className="glass-card p-6 md:p-12 text-center">
         <Shield size={48} className="mx-auto mb-4 text-purple-400" />
-        <h2 className="text-2xl font-bold text-white mb-2">Governance</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-2">Governance</h2>
         <p className="text-gray-400">Connect your wallet to participate in on-chain governance.</p>
       </div>
     );
@@ -720,9 +720,9 @@ const Governance: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Governance</h2>
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-xl md:text-2xl font-bold text-white">Governance</h2>
           <p className="text-gray-400">On-chain voting with snapshot-based governance ({govName}).</p>
         </div>
         <button onClick={refreshAll} className="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Refresh">
