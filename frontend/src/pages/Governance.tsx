@@ -237,7 +237,21 @@ const Governance: React.FC = () => {
   const [deployingGov, setDeployingGov] = useState(false);
 
   // ─── Track proposals defeated due to execution failure (e.g. insufficient balance) ──
-  const [defeatedProposals, setDefeatedProposals] = useState<Map<string, string>>(new Map()); // proposalId → reason
+  // Persisted to localStorage so defeated status survives page refreshes.
+  const [defeatedProposals, setDefeatedProposals] = useState<Map<string, string>>(() => {
+    try {
+      const stored = localStorage.getItem('tokenhub_defeatedProposals');
+      if (stored) return new Map(JSON.parse(stored));
+    } catch {}
+    return new Map();
+  });
+
+  // Sync to localStorage whenever defeatedProposals changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('tokenhub_defeatedProposals', JSON.stringify([...defeatedProposals.entries()]));
+    } catch {}
+  }, [defeatedProposals]);
 
   // ─── Track proposals the current user has already voted on ──
   const [votedProposals, setVotedProposals] = useState<Set<string>>(new Set());
