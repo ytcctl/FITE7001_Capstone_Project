@@ -409,8 +409,12 @@ const Settlement: React.FC = () => {
       const dvpAddr = await contracts.dvpSettlement.getAddress();
       const signer = (contracts.dvpSettlement as any).runner as ethers.Signer;
       const me = (await signer.getAddress()).toLowerCase();
+      const meChecksum = await signer.getAddress();
 
-      // Approve all tokens the connected user owes across selected settlements
+      // Aggregate total amounts needed per token across all selected settlements
+      const secNeeded: Record<string, bigint> = {};   // securityToken address → total
+      const cashNeeded: Record<string, bigint> = {};   // cashToken address → total
+
       for (const id of ids) {
         const s = await contracts.dvpSettlement.settlements(id);
         // Creator cannot execute their own settlement — must be counterparty
@@ -420,25 +424,42 @@ const Settlement: React.FC = () => {
           return;
         }
         if (me === s.seller.toLowerCase()) {
-          const secToken = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, signer);
-          const allowance: bigint = await secToken.allowance(await signer.getAddress(), dvpAddr);
-          if (allowance < s.tokenAmount) {
-            const appTx = await secToken.approve(dvpAddr, s.tokenAmount);
-            await appTx.wait();
-          }
+          const key = s.securityToken.toLowerCase();
+          secNeeded[key] = (secNeeded[key] ?? 0n) + s.tokenAmount;
         }
         if (me === s.buyer.toLowerCase()) {
-          const cashToken = new ethers.Contract(s.cashToken, CASH_TOKEN_ABI, signer);
-          const allowance: bigint = await cashToken.allowance(await signer.getAddress(), dvpAddr);
-          if (allowance < s.cashAmount) {
-            const appTx = await cashToken.approve(dvpAddr, s.cashAmount);
-            await appTx.wait();
-          }
+          const key = s.cashToken.toLowerCase();
+          cashNeeded[key] = (cashNeeded[key] ?? 0n) + s.cashAmount;
+        }
+      }
+
+      // Approve aggregated security token totals
+      for (const [tokenAddr, totalNeeded] of Object.entries(secNeeded)) {
+        const secToken = new ethers.Contract(tokenAddr, SECURITY_TOKEN_ABI, signer);
+        const allowance: bigint = await secToken.allowance(meChecksum, dvpAddr);
+        if (allowance < totalNeeded) {
+          const appTx = await secToken.approve(dvpAddr, totalNeeded);
+          await appTx.wait();
+        }
+      }
+
+      // Approve aggregated cash token totals
+      for (const [tokenAddr, totalNeeded] of Object.entries(cashNeeded)) {
+        const cashToken = new ethers.Contract(tokenAddr, CASH_TOKEN_ABI, signer);
+        const allowance: bigint = await cashToken.allowance(meChecksum, dvpAddr);
+        if (allowance < totalNeeded) {
+          const appTx = await cashToken.approve(dvpAddr, totalNeeded);
+          await appTx.wait();
         }
       }
 
       setTxStatus(`Batch executing ${ids.length} settlement(s)…`);
-      const tx = await contracts.dvpSettlement.executeBatchSettlement(ids, false);
+      // Each settlement requires ~500-700k gas for identity verification,
+      // compliance checks, and ERC20Votes checkpoint updates.
+      // Ethers.js auto-estimate is too low because it simulates a partial-
+      // success scenario. Override with a generous per-settlement allowance.
+      const gasLimit = ids.length * 800_000 + 200_000;
+      const tx = await contracts.dvpSettlement.executeBatchSettlement(ids, false, { gasLimit });
       const receipt = await tx.wait();
       setTxStatus(`✓ Batch execute complete — ${ids.length} settlement(s) processed`);
       setSelectedIds(new Set());
