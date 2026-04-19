@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { CLAIM_TOPICS, CONTRACT_ADDRESSES, IDENTITY_ABI, ORDER_BOOK_ABI, GOVERNOR_ABI, GOVERNOR_FACTORY_ABI,
-  DVP_SETTLEMENT_ABI, SECURITY_TOKEN_ABI, rpcUrlForBrowser } from '../config/contracts';
+  DVP_SETTLEMENT_ABI, SECURITY_TOKEN_ABI, TOKEN_FACTORY_ABI, TOKEN_FACTORY_V2_ABI, CASH_TOKEN_ABI, rpcUrlForBrowser } from '../config/contracts';
 import { ethers } from 'ethers';
-import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
 
 const KYCManagement: React.FC = () => {
   const { account, signer, contracts, roles } = useWeb3();
@@ -38,12 +38,32 @@ const KYCManagement: React.FC = () => {
   const [pendingMintProposals, setPendingMintProposals] = useState<
     { id: string; govAddr: string; tokenName: string; description: string; targets: string[]; values: bigint[]; calldatas: string[] }[]
   >([]);
+  // Outstanding trade orders on the order book for the non-compliant address
+  const [pendingTradeOrders, setPendingTradeOrders] = useState<
+    { orderId: number; marketName: string; obAddr: string; side: string; price: string; quantity: string; filled: string; status: string }[]
+  >([]);
   // Pending DvP settlements involving the non-compliant address
   const [pendingSettlements, setPendingSettlements] = useState<
-    { id: number; buyer: string; seller: string; tokenAmount: string; cashAmount: string }[]
+    { id: number; buyer: string; seller: string; tokenLabel: string; tokenAddr: string; tokenAmount: string; cashAmount: string }[]
   >([]);
   const [cancellingProposal, setCancellingProposal] = useState<string | null>(null);
   const [cancellingSettlement, setCancellingSettlement] = useState<number | null>(null);
+  const [cancellingTradeOrder, setCancellingTradeOrder] = useState<number | null>(null);
+
+  // ─── History / Audit Trail state ──
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyTransfers, setHistoryTransfers] = useState<
+    { tokenLabel: string; from: string; to: string; amount: string; block: number }[]
+  >([]);
+  const [historyOrders, setHistoryOrders] = useState<
+    { orderId: number; marketName: string; side: string; price: string; quantity: string; filled: string; status: string }[]
+  >([]);
+  const [historySettlements, setHistorySettlements] = useState<
+    { id: number; buyer: string; seller: string; tokenLabel: string; tokenAmount: string; cashAmount: string; status: string }[]
+  >([]);
+  const [historyProposals, setHistoryProposals] = useState<
+    { id: string; tokenName: string; description: string; state: string }[]
+  >([]);
 
   // ─── Force Cancel: scan for non-compliant investor ──
   const handleScanNonCompliant = useCallback(async () => {
@@ -53,25 +73,55 @@ const KYCManagement: React.FC = () => {
     setForceCancelling(true);
     setForceCancelStatus('Scanning orders, governance proposals, and settlements…');
     setPendingMintProposals([]);
+    setPendingTradeOrders([]);
     setPendingSettlements([]);
+    setHistoryTransfers([]);
+    setHistoryOrders([]);
+    setHistorySettlements([]);
+    setHistoryProposals([]);
+    setShowHistory(false);
 
     try {
-      // 1. Cancel all open orders across all markets
-      let ordersCancelled = 0;
+      // 1. Scan all orders across all markets (pending + history)
+      const tradeOrders: typeof pendingTradeOrders = [];
+      const completedOrders: typeof historyOrders = [];
       try {
         const markets = await contracts.orderBookFactory.activeMarkets();
         for (const mkt of markets) {
           const ob = new ethers.Contract(mkt.orderBook, ORDER_BOOK_ABI, contracts.securityToken.runner);
           try {
-            const tx = await ob.cancelOrdersForNonCompliant(addr);
-            await tx.wait();
-            ordersCancelled++;
-          } catch { /* no open orders or already cancelled */ }
+            const orderIds: bigint[] = await ob.getTraderOrders(addr);
+            if (orderIds.length === 0) continue;
+            const orders = await ob.getOrdersBatch([...orderIds]);
+            const STATUS_LABELS = ['Open', 'PartiallyFilled', 'Filled', 'Cancelled'];
+            for (const o of orders) {
+              const status = Number(o.status);
+              const row = {
+                orderId: Number(o.id),
+                marketName: `${mkt.name} (${mkt.symbol})`,
+                obAddr: mkt.orderBook,
+                side: Number(o.side) === 0 ? 'BUY' : 'SELL',
+                price: Number(ethers.formatUnits(o.price, 6)).toLocaleString(),
+                quantity: Number(ethers.formatEther(o.quantity)).toLocaleString(),
+                filled: Number(ethers.formatEther(o.filled)).toLocaleString(),
+                status: STATUS_LABELS[status] || String(status),
+              };
+              if (status === 0 || status === 1) {
+                tradeOrders.push(row);
+              } else {
+                completedOrders.push(row);
+              }
+            }
+          } catch (e) { console.warn(`Order scan for ${mkt.symbol}:`, e); }
         }
       } catch (e) { console.warn('Order scan:', e); }
+      setPendingTradeOrders(tradeOrders);
+      setHistoryOrders(completedOrders);
 
-      // 2. Scan governance proposals for pending mint proposals targeting this address
+      // 2. Scan governance proposals for mint proposals targeting this address (pending + history)
       const mintProposals: typeof pendingMintProposals = [];
+      const completedProposals: typeof historyProposals = [];
+      const GOV_STATE_LABELS: Record<number, string> = { 0: 'Pending', 1: 'Active', 2: 'Canceled', 3: 'Defeated', 4: 'Succeeded', 5: 'Queued', 6: 'Expired', 7: 'Executed' };
       try {
         const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
         const suites = await contracts.governorFactory.allGovernanceSuites();
@@ -85,10 +135,8 @@ const KYCManagement: React.FC = () => {
             const proposalId = args[0].toString();
             const calldatas: string[] = args[5];
             const description: string = args[8];
-            // Check if active/pending/queued/succeeded (states 0,1,4,5)
             const stateNum = Number(await gov.state(proposalId));
-            if (stateNum !== 0 && stateNum !== 1 && stateNum !== 4 && stateNum !== 5) continue;
-            // Check if it's a mint targeting the non-compliant address
+            // Check if it's a mint targeting the address
             if (calldatas?.length === 1 && calldatas[0].length >= 10 && calldatas[0].slice(0, 10) === '0x40c10f19') {
               try {
                 const decoded = iface.decodeFunctionData('mint', calldatas[0]);
@@ -99,15 +147,26 @@ const KYCManagement: React.FC = () => {
                     const [n, s] = await Promise.all([token.name(), token.symbol()]);
                     tokenName = `${n} (${s})`;
                   } catch {}
-                  mintProposals.push({
-                    id: proposalId,
-                    govAddr: suite.governor,
-                    tokenName,
-                    description,
-                    targets: args[2],
-                    values: args[3],
-                    calldatas,
-                  });
+                  if (stateNum === 0 || stateNum === 1 || stateNum === 4 || stateNum === 5) {
+                    // Pending/Active/Succeeded/Queued — actionable
+                    mintProposals.push({
+                      id: proposalId,
+                      govAddr: suite.governor,
+                      tokenName,
+                      description,
+                      targets: args[2],
+                      values: args[3],
+                      calldatas,
+                    });
+                  } else {
+                    // Canceled(2)/Defeated(3)/Expired(6)/Executed(7) — history
+                    completedProposals.push({
+                      id: proposalId,
+                      tokenName,
+                      description,
+                      state: GOV_STATE_LABELS[stateNum] || String(stateNum),
+                    });
+                  }
                 }
               } catch {}
             }
@@ -116,35 +175,123 @@ const KYCManagement: React.FC = () => {
         freshProvider.destroy();
       } catch (e) { console.warn('Governance scan:', e); }
       setPendingMintProposals(mintProposals);
+      setHistoryProposals(completedProposals);
 
-      // 3. Scan DvP settlements for pending settlements involving this address
+      // 3. Scan DvP settlements involving this address (pending + history)
       const settlements: typeof pendingSettlements = [];
+      const completedSettlements: typeof historySettlements = [];
+      const DVP_STATUS_LABELS: Record<number, string> = { 0: 'Pending', 1: 'Settled', 2: 'Failed', 3: 'Cancelled' };
       try {
         const dvp = contracts.dvpSettlement;
         const count = Number(await dvp.settlementCount());
         for (let i = 1; i <= count; i++) {
           try {
             const s = await dvp.settlements(i);
-            // status 0 = Pending
-            if (Number(s.status) !== 0) continue;
-            if (s.buyer.toLowerCase() === addr.toLowerCase() || s.seller.toLowerCase() === addr.toLowerCase()) {
+            if (s.buyer.toLowerCase() !== addr.toLowerCase() && s.seller.toLowerCase() !== addr.toLowerCase()) continue;
+            let tokenLabel = s.securityToken.slice(0, 6) + '…' + s.securityToken.slice(-4);
+            try {
+              const tok = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
+              const [n, sym] = await Promise.all([tok.name(), tok.symbol()]);
+              tokenLabel = `${n} (${sym})`;
+            } catch {}
+            const statusNum = Number(s.status);
+            if (statusNum === 0) {
               settlements.push({
                 id: i,
                 buyer: s.buyer,
                 seller: s.seller,
+                tokenLabel,
+                tokenAddr: s.securityToken,
                 tokenAmount: Number(ethers.formatEther(s.tokenAmount)).toLocaleString(),
                 cashAmount: Number(ethers.formatUnits(s.cashAmount, 6)).toLocaleString(),
+              });
+            } else {
+              completedSettlements.push({
+                id: i,
+                buyer: s.buyer,
+                seller: s.seller,
+                tokenLabel,
+                tokenAmount: Number(ethers.formatEther(s.tokenAmount)).toLocaleString(),
+                cashAmount: Number(ethers.formatUnits(s.cashAmount, 6)).toLocaleString(),
+                status: DVP_STATUS_LABELS[statusNum] || String(statusNum),
               });
             }
           } catch {}
         }
       } catch (e) { console.warn('Settlement scan:', e); }
       setPendingSettlements(settlements);
+      setHistorySettlements(completedSettlements);
 
-      const parts = [`✓ Orders: cancelled across ${ordersCancelled} market(s)`];
+      // 4. Scan token transfer history involving this address
+      const transfers: typeof historyTransfers = [];
+      try {
+        const tokenAddrs: { addr: string; label: string }[] = [];
+        // Gather all security tokens from both factories
+        try {
+          const v1Tokens = await contracts.tokenFactory.allTokens();
+          for (const t of v1Tokens) tokenAddrs.push({ addr: t.tokenAddress, label: `${t.name} (${t.symbol})` });
+        } catch {}
+        try {
+          const v2Tokens = await contracts.tokenFactoryV2.allTokens();
+          for (const t of v2Tokens) tokenAddrs.push({ addr: t.proxyAddress, label: `${t.name} (${t.symbol})` });
+        } catch {}
+        // Add default security token if not already included
+        const secAddr = await contracts.securityToken.getAddress();
+        if (!tokenAddrs.some(t => t.addr.toLowerCase() === secAddr.toLowerCase())) {
+          try {
+            const [n, sym] = await Promise.all([contracts.securityToken.name(), contracts.securityToken.symbol()]);
+            tokenAddrs.push({ addr: secAddr, label: `${n} (${sym})` });
+          } catch {}
+        }
+        // Add cash token
+        const cashAddr = await contracts.cashToken.getAddress();
+        try {
+          const [n, sym] = await Promise.all([contracts.cashToken.name(), contracts.cashToken.symbol()]);
+          tokenAddrs.push({ addr: cashAddr, label: `${n} (${sym})` });
+        } catch { tokenAddrs.push({ addr: cashAddr, label: 'THKD' }); }
+
+        for (const { addr: tAddr, label } of tokenAddrs) {
+          try {
+            const tok = new ethers.Contract(tAddr, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
+            const [sentLogs, recvLogs] = await Promise.all([
+              tok.queryFilter(tok.filters.Transfer(addr, null), 0, 'latest'),
+              tok.queryFilter(tok.filters.Transfer(null, addr), 0, 'latest'),
+            ]);
+            const all = [...sentLogs, ...recvLogs];
+            // deduplicate by tx hash + log index
+            const seen = new Set<string>();
+            for (const log of all) {
+              const key = `${log.transactionHash}-${log.index}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              const parsed = tok.interface.parseLog({ topics: [...log.topics], data: log.data });
+              if (!parsed) continue;
+              const decimals = label.includes('THKD') || tAddr.toLowerCase() === cashAddr.toLowerCase() ? 6 : 18;
+              transfers.push({
+                tokenLabel: label,
+                from: parsed.args.from as string,
+                to: parsed.args.to as string,
+                amount: Number(ethers.formatUnits(parsed.args.value, decimals)).toLocaleString(),
+                block: log.blockNumber,
+              });
+            }
+          } catch (e) { console.warn(`Transfer scan for ${label}:`, e); }
+        }
+        transfers.sort((a, b) => b.block - a.block);
+      } catch (e) { console.warn('Transfer history scan:', e); }
+      setHistoryTransfers(transfers);
+
+      const parts: string[] = [];
+      if (tradeOrders.length > 0) parts.push(`Found ${tradeOrders.length} outstanding trade order(s) — cancel below`);
       if (mintProposals.length > 0) parts.push(`Found ${mintProposals.length} pending mint proposal(s) — cancel below`);
       if (settlements.length > 0) parts.push(`Found ${settlements.length} pending settlement(s) — cancel below`);
-      if (mintProposals.length === 0 && settlements.length === 0) parts.push('No pending mint proposals or settlements found.');
+      if (parts.length === 0) parts.push('✓ No outstanding orders, mint proposals, or settlements found.');
+      const histParts: string[] = [];
+      if (transfers.length > 0) histParts.push(`${transfers.length} transfer(s)`);
+      if (completedOrders.length > 0) histParts.push(`${completedOrders.length} completed order(s)`);
+      if (completedSettlements.length > 0) histParts.push(`${completedSettlements.length} completed settlement(s)`);
+      if (completedProposals.length > 0) histParts.push(`${completedProposals.length} completed proposal(s)`);
+      if (histParts.length > 0) parts.push(`History: ${histParts.join(', ')}`);
       setForceCancelStatus(parts.join('. '));
     } catch (e: any) {
       setForceCancelStatus(`✗ ${e?.reason || e?.message || 'Scan failed'}`);
@@ -189,6 +336,23 @@ const KYCManagement: React.FC = () => {
       setForceCancelStatus(`✗ Cancel settlement failed: ${e?.reason || e?.message || 'Unknown error'}`);
     } finally {
       setCancellingSettlement(null);
+    }
+  };
+
+  // Force-cancel a specific trade order
+  const handleCancelTradeOrder = async (order: typeof pendingTradeOrders[0]) => {
+    if (!contracts) return;
+    setCancellingTradeOrder(order.orderId);
+    try {
+      const ob = new ethers.Contract(order.obAddr, ORDER_BOOK_ABI, contracts.securityToken.runner);
+      const tx = await ob.forceCancelOrder(order.orderId, 'Non-compliant investor force cancel');
+      await tx.wait();
+      setPendingTradeOrders((prev) => prev.filter((o) => o.orderId !== order.orderId));
+      setForceCancelStatus((prev) => prev + ` | Order #${order.orderId} cancelled.`);
+    } catch (e: any) {
+      setForceCancelStatus(`✗ Cancel order #${order.orderId} failed: ${e?.reason || e?.message || 'Unknown error'}`);
+    } finally {
+      setCancellingTradeOrder(null);
     }
   };
 
@@ -763,7 +927,7 @@ const KYCManagement: React.FC = () => {
             Compliance — Force Cancel
           </h2>
           <p className="text-gray-400 text-sm mb-4">
-            Enter a non-compliant investor address to cancel all open orders, pending governance mint proposals, portfolio transfers, and DvP settlements.
+            Enter an investor address to scan for outstanding trade orders, pending governance mint proposals, and DvP settlements. Review and cancel individually below.
           </p>
           <div className="flex gap-3 items-end">
             <div className="flex-1">
@@ -782,13 +946,58 @@ const KYCManagement: React.FC = () => {
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold text-sm disabled:opacity-40 transition-colors whitespace-nowrap flex items-center gap-2"
             >
               {forceCancelling && <Loader2 size={14} className="animate-spin" />}
-              Scan &amp; Cancel Orders
+              Scan
             </button>
           </div>
           {forceCancelStatus && (
             <p className={`mt-3 text-sm ${forceCancelStatus.startsWith('✓') ? 'text-green-400' : forceCancelStatus.startsWith('✗') ? 'text-red-400' : 'text-amber-300'}`}>
               {forceCancelStatus}
             </p>
+          )}
+
+          {/* Outstanding Trade Orders */}
+          {pendingTradeOrders.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold text-red-300 mb-2">Outstanding Trade Orders</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 text-xs border-b border-white/10">
+                      <th className="text-left py-1 px-2">ID</th>
+                      <th className="text-left py-1 px-2">Market</th>
+                      <th className="text-left py-1 px-2">Side</th>
+                      <th className="text-right py-1 px-2">Price</th>
+                      <th className="text-right py-1 px-2">Qty</th>
+                      <th className="text-right py-1 px-2">Filled</th>
+                      <th className="text-left py-1 px-2">Status</th>
+                      <th className="text-center py-1 px-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingTradeOrders.map((o) => (
+                      <tr key={`${o.obAddr}-${o.orderId}`} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="py-1 px-2 text-gray-300 font-mono">#{o.orderId}</td>
+                        <td className="py-1 px-2 text-gray-400 text-xs">{o.marketName}</td>
+                        <td className={`py-1 px-2 font-semibold text-xs ${o.side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>{o.side}</td>
+                        <td className="py-1 px-2 text-right text-white">{o.price}</td>
+                        <td className="py-1 px-2 text-right text-white">{o.quantity}</td>
+                        <td className="py-1 px-2 text-right text-gray-400">{o.filled}</td>
+                        <td className="py-1 px-2 text-amber-300 text-xs">{o.status}</td>
+                        <td className="py-1 px-2 text-center">
+                          <button
+                            onClick={() => handleCancelTradeOrder(o)}
+                            disabled={cancellingTradeOrder !== null || cancellingSettlement !== null || cancellingProposal !== null}
+                            className="text-red-400 hover:text-red-300 text-xs font-semibold disabled:opacity-50"
+                          >
+                            {cancellingTradeOrder === o.orderId ? <Loader2 size={12} className="animate-spin inline" /> : 'Cancel'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
           {/* Pending Mint Proposals */}
@@ -805,7 +1014,7 @@ const KYCManagement: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleCancelProposal(p)}
-                      disabled={cancellingProposal === p.id}
+                      disabled={cancellingProposal !== null || cancellingSettlement !== null || cancellingTradeOrder !== null}
                       className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1 shrink-0"
                     >
                       {cancellingProposal === p.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
@@ -826,6 +1035,7 @@ const KYCManagement: React.FC = () => {
                   <thead>
                     <tr className="text-gray-500 text-xs border-b border-white/10">
                       <th className="text-left py-1 px-2">ID</th>
+                      <th className="text-left py-1 px-2">Token</th>
                       <th className="text-left py-1 px-2">Buyer</th>
                       <th className="text-left py-1 px-2">Seller</th>
                       <th className="text-right py-1 px-2">Tokens</th>
@@ -837,6 +1047,7 @@ const KYCManagement: React.FC = () => {
                     {pendingSettlements.map((s) => (
                       <tr key={s.id} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-1 px-2 text-gray-300 font-mono">#{s.id}</td>
+                        <td className="py-1 px-2 text-gray-400 text-xs" title={s.tokenAddr}>{s.tokenLabel}</td>
                         <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.buyer.slice(0, 6)}…{s.buyer.slice(-4)}</td>
                         <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.seller.slice(0, 6)}…{s.seller.slice(-4)}</td>
                         <td className="py-1 px-2 text-right text-white">{s.tokenAmount}</td>
@@ -844,7 +1055,7 @@ const KYCManagement: React.FC = () => {
                         <td className="py-1 px-2 text-center">
                           <button
                             onClick={() => handleCancelSettlement(s.id)}
-                            disabled={cancellingSettlement === s.id}
+                            disabled={cancellingSettlement !== null || cancellingTradeOrder !== null || cancellingProposal !== null}
                             className="text-red-400 hover:text-red-300 text-xs font-semibold disabled:opacity-50"
                           >
                             {cancellingSettlement === s.id ? <Loader2 size={12} className="animate-spin inline" /> : 'Cancel'}
@@ -855,6 +1066,153 @@ const KYCManagement: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* History / Audit Trail (collapsible) */}
+          {(historyTransfers.length > 0 || historyOrders.length > 0 || historySettlements.length > 0 || historyProposals.length > 0) && (
+            <div className="mt-6 border-t border-white/10 pt-4">
+              <button
+                onClick={() => setShowHistory((p) => !p)}
+                className="flex items-center gap-2 text-sm font-semibold text-gray-400 hover:text-gray-200 transition"
+              >
+                {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                History / Audit Trail
+              </button>
+
+              {showHistory && (
+                <div className="mt-3 space-y-4">
+                  {/* Completed Token Transfers */}
+                  {historyTransfers.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400 mb-2">Token Transfers ({historyTransfers.length})</h3>
+                      <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-[#1e1e2f]">
+                            <tr className="text-gray-500 text-xs border-b border-white/10">
+                              <th className="text-left py-1 px-2">Token</th>
+                              <th className="text-left py-1 px-2">From</th>
+                              <th className="text-left py-1 px-2">To</th>
+                              <th className="text-right py-1 px-2">Amount</th>
+                              <th className="text-right py-1 px-2">Block</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historyTransfers.map((t, i) => (
+                              <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="py-1 px-2 text-gray-400 text-xs">{t.tokenLabel}</td>
+                                <td className="py-1 px-2 text-gray-400 font-mono text-xs">{t.from.slice(0, 6)}…{t.from.slice(-4)}</td>
+                                <td className="py-1 px-2 text-gray-400 font-mono text-xs">{t.to.slice(0, 6)}…{t.to.slice(-4)}</td>
+                                <td className="py-1 px-2 text-right text-gray-300">{t.amount}</td>
+                                <td className="py-1 px-2 text-right text-gray-500 font-mono text-xs">{t.block}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completed Trade Orders */}
+                  {historyOrders.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400 mb-2">Completed / Cancelled Trade Orders ({historyOrders.length})</h3>
+                      <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-[#1e1e2f]">
+                            <tr className="text-gray-500 text-xs border-b border-white/10">
+                              <th className="text-left py-1 px-2">Order #</th>
+                              <th className="text-left py-1 px-2">Market</th>
+                              <th className="text-center py-1 px-2">Side</th>
+                              <th className="text-right py-1 px-2">Price</th>
+                              <th className="text-right py-1 px-2">Qty</th>
+                              <th className="text-right py-1 px-2">Filled</th>
+                              <th className="text-center py-1 px-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historyOrders.map((o) => (
+                              <tr key={o.orderId} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="py-1 px-2 text-gray-300 font-mono">#{o.orderId}</td>
+                                <td className="py-1 px-2 text-gray-400">{o.marketName}</td>
+                                <td className={`py-1 px-2 text-center ${o.side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>{o.side}</td>
+                                <td className="py-1 px-2 text-right text-gray-300">{o.price}</td>
+                                <td className="py-1 px-2 text-right text-gray-300">{o.quantity}</td>
+                                <td className="py-1 px-2 text-right text-gray-300">{o.filled}</td>
+                                <td className={`py-1 px-2 text-center text-xs font-semibold ${o.status === 'Filled' ? 'text-green-400' : 'text-gray-500'}`}>{o.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completed DvP Settlements */}
+                  {historySettlements.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400 mb-2">Completed DvP Settlements ({historySettlements.length})</h3>
+                      <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-[#1e1e2f]">
+                            <tr className="text-gray-500 text-xs border-b border-white/10">
+                              <th className="text-left py-1 px-2">ID</th>
+                              <th className="text-left py-1 px-2">Token</th>
+                              <th className="text-left py-1 px-2">Buyer</th>
+                              <th className="text-left py-1 px-2">Seller</th>
+                              <th className="text-right py-1 px-2">Tokens</th>
+                              <th className="text-right py-1 px-2">Cash</th>
+                              <th className="text-center py-1 px-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historySettlements.map((s) => (
+                              <tr key={s.id} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="py-1 px-2 text-gray-300 font-mono">#{s.id}</td>
+                                <td className="py-1 px-2 text-gray-400 text-xs">{s.tokenLabel}</td>
+                                <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.buyer.slice(0, 6)}…{s.buyer.slice(-4)}</td>
+                                <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.seller.slice(0, 6)}…{s.seller.slice(-4)}</td>
+                                <td className="py-1 px-2 text-right text-gray-300">{s.tokenAmount}</td>
+                                <td className="py-1 px-2 text-right text-gray-300">{s.cashAmount}</td>
+                                <td className={`py-1 px-2 text-center text-xs font-semibold ${s.status === 'Settled' ? 'text-green-400' : s.status === 'Failed' ? 'text-red-400' : 'text-gray-500'}`}>{s.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completed Governance Mint Proposals */}
+                  {historyProposals.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400 mb-2">Completed Governance Mint Proposals ({historyProposals.length})</h3>
+                      <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-[#1e1e2f]">
+                            <tr className="text-gray-500 text-xs border-b border-white/10">
+                              <th className="text-left py-1 px-2">Proposal ID</th>
+                              <th className="text-left py-1 px-2">Token</th>
+                              <th className="text-left py-1 px-2">Description</th>
+                              <th className="text-center py-1 px-2">State</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historyProposals.map((p) => (
+                              <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="py-1 px-2 text-gray-300 font-mono text-xs">{p.id.slice(0, 10)}…</td>
+                                <td className="py-1 px-2 text-gray-400 text-xs">{p.tokenName}</td>
+                                <td className="py-1 px-2 text-gray-400 text-xs truncate max-w-[200px]" title={p.description}>{p.description}</td>
+                                <td className={`py-1 px-2 text-center text-xs font-semibold ${p.state === 'Executed' ? 'text-green-400' : p.state === 'Canceled' ? 'text-yellow-400' : 'text-gray-500'}`}>{p.state}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
