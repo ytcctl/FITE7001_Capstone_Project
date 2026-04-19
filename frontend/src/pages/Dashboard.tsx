@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
-import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, ORDER_BOOK_ABI, ORDER_BOOK_FACTORY_ABI } from '../config/contracts';
-import { Coins, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2, TrendingUp, BarChart3 } from 'lucide-react';
+import { CLAIM_TOPICS, CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, CASH_TOKEN_ABI, ORDER_BOOK_ABI, ORDER_BOOK_FACTORY_ABI } from '../config/contracts';
+import { Coins, Users, AlertCircle, Activity, CheckCircle2, XCircle, RefreshCw, Loader2, TrendingUp, BarChart3, DollarSign } from 'lucide-react';
 import { ethers } from 'ethers';
 
 interface FactoryToken { name: string; symbol: string; address: string; balance: string; totalSupply: string }
@@ -24,6 +24,8 @@ const Dashboard: React.FC = () => {
   const [factoryTokens, setFactoryTokens] = useState<FactoryToken[]>([]);
   const [markets, setMarkets] = useState<MarketInfo[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, string>>({}); // tokenAddr -> last price
+  const [cashName, setCashName] = useState('Cash Token');
+  const [cashTotalSupply, setCashTotalSupply] = useState('0');
 
   // System Health state
   interface HealthResult { name: string; passed: boolean; detail: string }
@@ -69,13 +71,15 @@ const Dashboard: React.FC = () => {
     }
     setLoading(true);
     try {
-      const [name, symbol, supply, bal, cBal, cSym, verified, registered] = await Promise.all([
+      const [name, symbol, supply, bal, cBal, cSym, cName, cSupply, verified, registered] = await Promise.all([
         contracts.securityToken.name(),
         contracts.securityToken.symbol(),
         contracts.securityToken.totalSupply(),
         contracts.securityToken.balanceOf(account),
         contracts.cashToken.balanceOf(account),
         contracts.cashToken.symbol(),
+        contracts.cashToken.name(),
+        contracts.cashToken.totalSupply(),
         contracts.identityRegistry.isVerified(account),
         contracts.identityRegistry.contains(account),
       ]);
@@ -85,6 +89,8 @@ const Dashboard: React.FC = () => {
       setTokenBalance(ethers.formatUnits(bal, 18));
       setCashBalance(ethers.formatUnits(cBal, 6));
       setCashSymbol(cSym);
+      setCashName(cName);
+      setCashTotalSupply(ethers.formatUnits(cSupply, 6));
       setIsVerified(verified);
       setIsRegistered(registered);
 
@@ -221,6 +227,13 @@ const Dashboard: React.FC = () => {
               onClick={() => navigate(`/token/${ft.address}`)}
             />
           ))}
+          <StatCard
+            icon={<DollarSign size={20} />}
+            label={`${cashSymbol} Total Supply`}
+            value={Number(cashTotalSupply).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            accent="emerald"
+            onClick={() => navigate('/cash-token')}
+          />
         </div>
       )}
 
@@ -250,9 +263,12 @@ const Dashboard: React.FC = () => {
             )}
             {/* Cash Token */}
             {Number(cashBalance) > 0 && (
-            <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+            <div
+              className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3 cursor-pointer hover:border-purple-500/30 transition-colors"
+              onClick={() => navigate('/cash-token')}
+            >
               <div>
-                <p className="text-sm text-gray-400">Cash Token</p>
+                <p className="text-sm text-gray-400">{cashName}</p>
                 <p className="text-xs text-gray-500">{cashSymbol}</p>
               </div>
               <p className="text-lg font-bold text-white">

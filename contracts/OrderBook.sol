@@ -646,12 +646,12 @@ contract OrderBook is ReentrancyGuard, Pausable, AccessControl {
         uint256 price = orders[orderId].price;
         uint256 len = arr.length;
 
-        // Find insertion index
+        // Find insertion index (use <= / >= to maintain FIFO within same price)
         uint256 i = 0;
         if (descending) {
-            while (i < len && orders[arr[i]].price > price) i++;
+            while (i < len && orders[arr[i]].price >= price) i++;
         } else {
-            while (i < len && orders[arr[i]].price < price) i++;
+            while (i < len && orders[arr[i]].price <= price) i++;
         }
 
         // Push a dummy element and shift right

@@ -15,6 +15,7 @@ import MarketManagement from './pages/MarketManagement';
 import OracleCommittee from './pages/OracleCommittee';
 import TokenDetail from './pages/TokenDetail';
 import TokenComplianceDetail from './pages/TokenComplianceDetail';
+import CashTokenDetail from './pages/CashTokenDetail';
 import FreezeManagement from './pages/FreezeManagement';
 import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
@@ -89,6 +90,7 @@ const App: React.FC = () => {
           <Route path="/freeze" element={<AdminRoute><FreezeManagement /></AdminRoute>} />
           <Route path="/markets" element={<AdminOnlyRoute><MarketManagement /></AdminOnlyRoute>} />
           <Route path="/token/:address" element={<AdminOnlyRoute><TokenDetail /></AdminOnlyRoute>} />
+          <Route path="/cash-token" element={<CashTokenDetail />} />
           <Route path="/compliance/:address" element={<AdminOnlyRoute><TokenComplianceDetail /></AdminOnlyRoute>} />
           {/* Public routes */}
           <Route path="/settlement" element={<Settlement />} />
