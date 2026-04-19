@@ -62,6 +62,18 @@ function decodeGovernanceError(e: any): string {
       if (sel === '0x547f2829') {
         return 'Timelock delay has not been met. Click "⏩ Skip Timelock" to advance time.';
       }
+      // AccessControlUnauthorizedAccount(address account, bytes32 role)
+      if (sel === '0xe2517d3f') {
+        const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+          ['address', 'bytes32'], '0x' + revertData.slice(10));
+        const KNOWN_ROLES: Record<string, string> = {
+          '0x0000000000000000000000000000000000000000000000000000000000000000': 'DEFAULT_ADMIN_ROLE',
+          [ethers.keccak256(ethers.toUtf8Bytes('AGENT_ROLE'))]: 'AGENT_ROLE',
+          [ethers.keccak256(ethers.toUtf8Bytes('TIMELOCK_MINTER_ROLE'))]: 'TIMELOCK_MINTER_ROLE',
+        };
+        const roleName = KNOWN_ROLES[decoded[1]] || decoded[1].slice(0, 18) + '…';
+        return `Access denied: account ${decoded[0].slice(0,10)}… is missing role ${roleName}. The Timelock may need this role granted on the token contract.`;
+      }
       // ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)
       if (sel === '0xe450d38c') {
         const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
@@ -156,6 +168,8 @@ interface ProposalInfo {
   targets: string[];
   values: bigint[];
   calldatas: string[];
+  quorumRequired?: bigint; // quorum at snapshot (fetched for defeated proposals)
+  defeatedReason?: string; // human-readable reason for defeat
 }
 
 interface GovernanceSuite {
@@ -224,6 +238,9 @@ const Governance: React.FC = () => {
 
   // ─── Track proposals defeated due to execution failure (e.g. insufficient balance) ──
   const [defeatedProposals, setDefeatedProposals] = useState<Map<string, string>>(new Map()); // proposalId → reason
+
+  // ─── Track proposals the current user has already voted on ──
+  const [votedProposals, setVotedProposals] = useState<Set<string>>(new Set());
 
   // ─── Load governed tokens from GovernorFactory + both TokenFactories ──
   const loadGovernanceSuites = useCallback(async () => {
@@ -415,7 +432,7 @@ const Governance: React.FC = () => {
           gov.proposalVotes(proposalId),
         ]);
 
-        proposalInfos.push({
+        const info: ProposalInfo = {
           id: proposalId,
           proposer,
           state: Number(stateNum),
@@ -429,7 +446,25 @@ const Governance: React.FC = () => {
           targets,
           values,
           calldatas,
-        });
+        };
+
+        // For defeated proposals, determine the reason
+        if (Number(stateNum) === 3) {
+          try {
+            const quorumNeeded: bigint = await gov.quorum(snapshot);
+            info.quorumRequired = quorumNeeded;
+            const totalFor = votes[1] + votes[2]; // For + Abstain count toward quorum in OZ Governor
+            if (totalFor < quorumNeeded) {
+              info.defeatedReason = `Quorum not reached — needed ${Number(ethers.formatEther(quorumNeeded)).toLocaleString()} votes, got ${Number(ethers.formatEther(totalFor)).toLocaleString()}.`;
+            } else if (votes[0] >= votes[1]) { // againstVotes >= forVotes
+              info.defeatedReason = `Against votes (${Number(ethers.formatEther(votes[0])).toLocaleString()}) exceeded For votes (${Number(ethers.formatEther(votes[1])).toLocaleString()}).`;
+            } else {
+              info.defeatedReason = 'Proposal did not meet the required approval criteria.';
+            }
+          } catch { info.defeatedReason = 'Proposal was defeated.'; }
+        }
+
+        proposalInfos.push(info);
       } catch (err) {
         console.warn('fetchProposals: skipping proposal', proposalId.slice(0, 12), err);
       }
@@ -446,13 +481,27 @@ const Governance: React.FC = () => {
     const freshGov = new ethers.Contract(
       activeGovernor.target as string, GOVERNOR_ABI, freshProvider);
     try {
-      setProposals(await fetchProposals(freshGov));
+      const fetched = await fetchProposals(freshGov);
+      setProposals(fetched);
+      // Check which proposals the current user has already voted on
+      if (account) {
+        const voted = new Set<string>();
+        await Promise.all(
+          fetched.filter(p => p.state === 1).map(async (p) => {
+            try {
+              const has = await freshGov.hasVoted(p.id, account);
+              if (has) voted.add(p.id);
+            } catch {}
+          })
+        );
+        setVotedProposals(voted);
+      }
     } catch (e) {
       console.error('Failed to load proposals:', e);
     } finally {
       freshProvider.destroy();
     }
-  }, [activeGovernor]);
+  }, [activeGovernor, account]);
 
   // ─── Load governance suites on mount ──────────────────────
   useEffect(() => {
@@ -520,6 +569,18 @@ const Governance: React.FC = () => {
           case 'mint': {
             if (!actionParam1 || !actionParam2) throw new Error('Recipient address and amount are required');
             const to = ethers.getAddress(actionParam1.trim());
+            // Regulatory check: recipient must be registered and KYC-verified
+            if (contracts) {
+              const [isRegistered, isVerifiedAddr] = await Promise.all([
+                contracts.identityRegistry.contains(to).catch(() => false),
+                contracts.identityRegistry.isVerified(to).catch(() => false),
+              ]);
+              if (!isRegistered || !isVerifiedAddr) {
+                setStatus({ type: 'error', message: 'Proposal creation is not allowed. For further enquiry, please contact our staff.' });
+                setProposing(false);
+                return;
+              }
+            }
             const amount = ethers.parseEther(actionParam2);
             calldata = iface.encodeFunctionData('mint', [to, amount]);
             break;
@@ -619,6 +680,7 @@ const Governance: React.FC = () => {
       await tx.wait();
       const voteLabel = support === 1 ? 'For' : support === 0 ? 'Against' : 'Abstain';
       setStatus({ type: 'success', message: `✓ Vote cast: ${voteLabel}` });
+      setVotedProposals((prev) => new Set(prev).add(proposalId));
 
       // Refresh all proposals via a fresh JsonRpcProvider to ensure
       // vote tallies and state are fully up-to-date (bypasses all caching).
@@ -654,6 +716,43 @@ const Governance: React.FC = () => {
   const handleExecute = async (proposal: ProposalInfo) => {
     if (!activeGovernor) return;
     setStatus(null);
+
+    // Pre-check: if this is a mint proposal, verify recipient is still registered & KYC-verified.
+    // Admin may have revoked KYC during the voting period.
+    if (contracts && proposal.calldatas?.length === 1 && proposal.calldatas[0].length >= 10) {
+      const selector = proposal.calldatas[0].slice(0, 10);
+      // mint(address,uint256) selector = 0x40c10f19
+      if (selector === '0x40c10f19') {
+        try {
+          const iface = new ethers.Interface(SECURITY_TOKEN_ABI);
+          const decoded = iface.decodeFunctionData('mint', proposal.calldatas[0]);
+          const recipient = decoded[0] as string;
+          const [isRegistered, isVerifiedAddr] = await Promise.all([
+            contracts.identityRegistry.contains(recipient).catch(() => false),
+            contracts.identityRegistry.isVerified(recipient).catch(() => false),
+          ]);
+          if (!isRegistered || !isVerifiedAddr) {
+            const reason = 'Proposal execution is failed. For further enquiry, please contact our staff.';
+            // Attempt to cancel the proposal
+            try {
+              const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
+              const cancelTx = await activeGovernor.cancel(
+                [...proposal.targets],
+                [...proposal.values],
+                [...proposal.calldatas],
+                descHash
+              );
+              await cancelTx.wait();
+            } catch { /* Cancel may fail if caller is not the proposer */ }
+            setDefeatedProposals((prev) => new Map(prev).set(proposal.id, reason));
+            setStatus({ type: 'error', message: `✗ Proposal Defeated — ${reason}` });
+            await loadProposals();
+            return;
+          }
+        } catch { /* If decode fails, proceed to on-chain execution */ }
+      }
+    }
+
     try {
       const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
       const tx = await activeGovernor.execute(
@@ -804,7 +903,7 @@ const Governance: React.FC = () => {
         timelockArtifact.bytecode,
         signer
       );
-      setStatus({ type: 'info', message: 'Deploying Timelock… (1/6)' });
+      setStatus({ type: 'info', message: 'Deploying Timelock… (1/7)' });
       const timelock = await timelockFactory.deploy(
         1,                                  // minDelay = 1s (dev mode)
         [],                                 // proposers — will be granted to Governor after
@@ -822,7 +921,7 @@ const Governance: React.FC = () => {
         governorArtifact.bytecode,
         signer
       );
-      setStatus({ type: 'info', message: 'Deploying Governor… (2/6)' });
+      setStatus({ type: 'info', message: 'Deploying Governor… (2/7)' });
       const governor = await governorFactory.deploy(
         tokenAddr,                          // token (IVotes) — checksummed
         timelockAddr,                       // timelock
@@ -840,23 +939,26 @@ const Governance: React.FC = () => {
       const timelockContract = new ethers.Contract(timelockAddr, timelockArtifact.abi, signer);
       const PROPOSER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('PROPOSER_ROLE'));
       const CANCELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('CANCELLER_ROLE'));
-      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/6)' });
+      setStatus({ type: 'info', message: 'Granting Timelock roles… (3/7)' });
       await (await timelockContract.grantRole(PROPOSER_ROLE, governorAddr, { nonce: nonce++ })).wait();
       await (await timelockContract.grantRole(CANCELLER_ROLE, governorAddr, { nonce: nonce++ })).wait();
 
-      // 4. Grant AGENT_ROLE + TIMELOCK_MINTER_ROLE to the Timelock on the
-      //    security token so governance-approved mints can execute.
-      //    AGENT_ROLE is needed for mints ≤ mintThreshold;
-      //    TIMELOCK_MINTER_ROLE is needed for large mints above the threshold.
+      // 4. Grant DEFAULT_ADMIN_ROLE + AGENT_ROLE + TIMELOCK_MINTER_ROLE to the
+      //    Timelock on the security token so governance proposals can execute:
+      //    DEFAULT_ADMIN_ROLE  — setMaxSupply, setMintThreshold, pause, unpause
+      //    AGENT_ROLE          — mints ≤ mintThreshold, burn, freeze
+      //    TIMELOCK_MINTER_ROLE — large mints above the threshold
       const tokenContract = new ethers.Contract(tokenAddr, SECURITY_TOKEN_ABI, signer);
+      const DEFAULT_ADMIN_ROLE_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
       const AGENT_ROLE_HASH = ethers.keccak256(ethers.toUtf8Bytes('AGENT_ROLE'));
       const TIMELOCK_MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('TIMELOCK_MINTER_ROLE'));
-      setStatus({ type: 'info', message: 'Granting AGENT_ROLE + TIMELOCK_MINTER_ROLE on token… (4/6)' });
+      setStatus({ type: 'info', message: 'Granting token roles to Timelock… (4/7)' });
+      await (await tokenContract.grantRole(DEFAULT_ADMIN_ROLE_HASH, timelockAddr, { nonce: nonce++ })).wait();
       await (await tokenContract.grantRole(AGENT_ROLE_HASH, timelockAddr, { nonce: nonce++ })).wait();
       await (await tokenContract.grantRole(TIMELOCK_MINTER_ROLE, timelockAddr, { nonce: nonce++ })).wait();
 
       // 5. Register in GovernorFactory
-      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (5/6)' });
+      setStatus({ type: 'info', message: 'Registering in GovernorFactory… (5/7)' });
       const tx = await contracts.governorFactory.registerGovernance(
         tokenAddr,
         governorAddr,
@@ -1203,6 +1305,13 @@ const Governance: React.FC = () => {
                       <span className="text-sm text-red-300">{defeatedProposals.get(p.id)}</span>
                     </div>
                   )}
+                  {/* Defeated reason banner for natively defeated proposals */}
+                  {!isDefeatedBurn && p.state === 3 && p.defeatedReason && (
+                    <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2">
+                      <XCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
+                      <span className="text-sm text-red-300">Defeated: {p.defeatedReason}</span>
+                    </div>
+                  )}
                   {/* Header row */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -1233,7 +1342,7 @@ const Governance: React.FC = () => {
 
                   {/* Action buttons based on state */}
                   <div className="flex gap-2 flex-wrap">
-                    {p.state === 1 && ( /* Active */
+                    {p.state === 1 && !votedProposals.has(p.id) && ( /* Active & not yet voted */
                       <>
                         <button
                           onClick={() => handleVote(p.id, 1)}
@@ -1261,6 +1370,12 @@ const Governance: React.FC = () => {
                         </button>
                       </>
                     )}
+                    {p.state === 1 && votedProposals.has(p.id) && (
+                      <span className="text-xs text-gray-400 italic flex items-center gap-1">
+                        <CheckCircle size={12} className="text-emerald-400" />
+                        You have already voted
+                      </span>
+                    )}
                     {p.state === 4 && ( /* Succeeded */
                       <button
                         onClick={() => handleQueue(p)}
@@ -1270,7 +1385,7 @@ const Governance: React.FC = () => {
                         Queue for Execution
                       </button>
                     )}
-                    {p.state === 5 && ( /* Queued */
+                    {p.state === 5 && !isDefeatedBurn && ( /* Queued (not defeated) */
                       <>
                         <button
                           onClick={() => handleExecute(p)}

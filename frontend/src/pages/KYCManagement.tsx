@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { CLAIM_TOPICS, CONTRACT_ADDRESSES, IDENTITY_ABI } from '../config/contracts';
+import { CLAIM_TOPICS, CONTRACT_ADDRESSES, IDENTITY_ABI, ORDER_BOOK_ABI, GOVERNOR_ABI, GOVERNOR_FACTORY_ABI,
+  DVP_SETTLEMENT_ABI, SECURITY_TOKEN_ABI, rpcUrlForBrowser } from '../config/contracts';
 import { ethers } from 'ethers';
-import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle, ShieldAlert } from 'lucide-react';
 
 const KYCManagement: React.FC = () => {
-  const { account, signer, contracts } = useWeb3();
+  const { account, signer, contracts, roles } = useWeb3();
   // Register Identity
   const [regAddress, setRegAddress] = useState('');
   const [regCountry, setRegCountry] = useState('HK');
@@ -28,6 +29,168 @@ const KYCManagement: React.FC = () => {
   // Status
   const [txStatus, setTxStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ─── Compliance Force Cancel state ──
+  const [forceCancelAddr, setForceCancelAddr] = useState('');
+  const [forceCancelStatus, setForceCancelStatus] = useState('');
+  const [forceCancelling, setForceCancelling] = useState(false);
+  // Active governance proposals that target the non-compliant address (mint)
+  const [pendingMintProposals, setPendingMintProposals] = useState<
+    { id: string; govAddr: string; tokenName: string; description: string; targets: string[]; values: bigint[]; calldatas: string[] }[]
+  >([]);
+  // Pending DvP settlements involving the non-compliant address
+  const [pendingSettlements, setPendingSettlements] = useState<
+    { id: number; buyer: string; seller: string; tokenAmount: string; cashAmount: string }[]
+  >([]);
+  const [cancellingProposal, setCancellingProposal] = useState<string | null>(null);
+  const [cancellingSettlement, setCancellingSettlement] = useState<number | null>(null);
+
+  // ─── Force Cancel: scan for non-compliant investor ──
+  const handleScanNonCompliant = useCallback(async () => {
+    if (!contracts || !forceCancelAddr.trim()) return;
+    let addr: string;
+    try { addr = ethers.getAddress(forceCancelAddr.trim()); } catch { setForceCancelStatus('✗ Invalid Ethereum address'); return; }
+    setForceCancelling(true);
+    setForceCancelStatus('Scanning orders, governance proposals, and settlements…');
+    setPendingMintProposals([]);
+    setPendingSettlements([]);
+
+    try {
+      // 1. Cancel all open orders across all markets
+      let ordersCancelled = 0;
+      try {
+        const markets = await contracts.orderBookFactory.activeMarkets();
+        for (const mkt of markets) {
+          const ob = new ethers.Contract(mkt.orderBook, ORDER_BOOK_ABI, contracts.securityToken.runner);
+          try {
+            const tx = await ob.cancelOrdersForNonCompliant(addr);
+            await tx.wait();
+            ordersCancelled++;
+          } catch { /* no open orders or already cancelled */ }
+        }
+      } catch (e) { console.warn('Order scan:', e); }
+
+      // 2. Scan governance proposals for pending mint proposals targeting this address
+      const mintProposals: typeof pendingMintProposals = [];
+      try {
+        const freshProvider = new ethers.JsonRpcProvider(rpcUrlForBrowser());
+        const suites = await contracts.governorFactory.allGovernanceSuites();
+        const iface = new ethers.Interface(SECURITY_TOKEN_ABI);
+        for (const suite of suites) {
+          const gov = new ethers.Contract(suite.governor, GOVERNOR_ABI, freshProvider);
+          const events = await gov.queryFilter(gov.filters.ProposalCreated(), 0, 'latest');
+          for (const event of events) {
+            const log = event as ethers.EventLog;
+            const args = log.args;
+            const proposalId = args[0].toString();
+            const calldatas: string[] = args[5];
+            const description: string = args[8];
+            // Check if active/pending/queued/succeeded (states 0,1,4,5)
+            const stateNum = Number(await gov.state(proposalId));
+            if (stateNum !== 0 && stateNum !== 1 && stateNum !== 4 && stateNum !== 5) continue;
+            // Check if it's a mint targeting the non-compliant address
+            if (calldatas?.length === 1 && calldatas[0].length >= 10 && calldatas[0].slice(0, 10) === '0x40c10f19') {
+              try {
+                const decoded = iface.decodeFunctionData('mint', calldatas[0]);
+                if (decoded[0].toLowerCase() === addr.toLowerCase()) {
+                  let tokenName = suite.token.slice(0, 10) + '…';
+                  try {
+                    const token = new ethers.Contract(suite.token, SECURITY_TOKEN_ABI, freshProvider);
+                    const [n, s] = await Promise.all([token.name(), token.symbol()]);
+                    tokenName = `${n} (${s})`;
+                  } catch {}
+                  mintProposals.push({
+                    id: proposalId,
+                    govAddr: suite.governor,
+                    tokenName,
+                    description,
+                    targets: args[2],
+                    values: args[3],
+                    calldatas,
+                  });
+                }
+              } catch {}
+            }
+          }
+        }
+        freshProvider.destroy();
+      } catch (e) { console.warn('Governance scan:', e); }
+      setPendingMintProposals(mintProposals);
+
+      // 3. Scan DvP settlements for pending settlements involving this address
+      const settlements: typeof pendingSettlements = [];
+      try {
+        const dvp = contracts.dvpSettlement;
+        const count = Number(await dvp.settlementCount());
+        for (let i = 1; i <= count; i++) {
+          try {
+            const s = await dvp.settlements(i);
+            // status 0 = Pending
+            if (Number(s.status) !== 0) continue;
+            if (s.buyer.toLowerCase() === addr.toLowerCase() || s.seller.toLowerCase() === addr.toLowerCase()) {
+              settlements.push({
+                id: i,
+                buyer: s.buyer,
+                seller: s.seller,
+                tokenAmount: Number(ethers.formatEther(s.tokenAmount)).toLocaleString(),
+                cashAmount: Number(ethers.formatUnits(s.cashAmount, 6)).toLocaleString(),
+              });
+            }
+          } catch {}
+        }
+      } catch (e) { console.warn('Settlement scan:', e); }
+      setPendingSettlements(settlements);
+
+      const parts = [`✓ Orders: cancelled across ${ordersCancelled} market(s)`];
+      if (mintProposals.length > 0) parts.push(`Found ${mintProposals.length} pending mint proposal(s) — cancel below`);
+      if (settlements.length > 0) parts.push(`Found ${settlements.length} pending settlement(s) — cancel below`);
+      if (mintProposals.length === 0 && settlements.length === 0) parts.push('No pending mint proposals or settlements found.');
+      setForceCancelStatus(parts.join('. '));
+    } catch (e: any) {
+      setForceCancelStatus(`✗ ${e?.reason || e?.message || 'Scan failed'}`);
+    } finally {
+      setForceCancelling(false);
+    }
+  }, [contracts, forceCancelAddr]);
+
+  // Cancel a specific governance proposal
+  const handleCancelProposal = async (proposal: typeof pendingMintProposals[0]) => {
+    if (!contracts) return;
+    setCancellingProposal(proposal.id);
+    try {
+      const gov = new ethers.Contract(proposal.govAddr, GOVERNOR_ABI, contracts.securityToken.runner);
+      const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
+      const tx = await gov.cancel(
+        [...proposal.targets],
+        [...proposal.values],
+        [...proposal.calldatas],
+        descHash
+      );
+      await tx.wait();
+      setPendingMintProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+      setForceCancelStatus((prev) => prev + ` | Proposal #${proposal.id.slice(0, 8)}… cancelled.`);
+    } catch (e: any) {
+      setForceCancelStatus(`✗ Cancel proposal failed: ${e?.reason || e?.message || 'Unknown error'}`);
+    } finally {
+      setCancellingProposal(null);
+    }
+  };
+
+  // Cancel a specific DvP settlement
+  const handleCancelSettlement = async (settlementId: number) => {
+    if (!contracts) return;
+    setCancellingSettlement(settlementId);
+    try {
+      const tx = await contracts.dvpSettlement.cancelSettlement(settlementId);
+      await tx.wait();
+      setPendingSettlements((prev) => prev.filter((s) => s.id !== settlementId));
+      setForceCancelStatus((prev) => prev + ` | Settlement #${settlementId} cancelled.`);
+    } catch (e: any) {
+      setForceCancelStatus(`✗ Cancel settlement failed: ${e?.reason || e?.message || 'Unknown error'}`);
+    } finally {
+      setCancellingSettlement(null);
+    }
+  };
 
   const handleRegister = async () => {
     if (!contracts || !regAddress) return;
@@ -585,6 +748,111 @@ const KYCManagement: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── Compliance — Force Cancel (Admin/Agent only) ── */}
+      {(roles.isAdmin || roles.isAgent) && (
+        <div className="bg-red-950/30 rounded-2xl border border-red-500/30 p-6">
+          <h2 className="text-lg font-semibold text-red-400 mb-2 flex items-center gap-2">
+            <ShieldAlert size={20} />
+            Compliance — Force Cancel
+          </h2>
+          <p className="text-gray-400 text-sm mb-4">
+            Enter a non-compliant investor address to cancel all open orders, pending governance mint proposals, portfolio transfers, and DvP settlements.
+          </p>
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 mb-1 block">Investor Address</label>
+              <input
+                type="text"
+                value={forceCancelAddr}
+                onChange={(e) => { setForceCancelAddr(e.target.value); setForceCancelStatus(''); }}
+                placeholder="0x…"
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50"
+              />
+            </div>
+            <button
+              onClick={handleScanNonCompliant}
+              disabled={!forceCancelAddr.trim() || forceCancelling}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold text-sm disabled:opacity-40 transition-colors whitespace-nowrap flex items-center gap-2"
+            >
+              {forceCancelling && <Loader2 size={14} className="animate-spin" />}
+              Scan &amp; Cancel Orders
+            </button>
+          </div>
+          {forceCancelStatus && (
+            <p className={`mt-3 text-sm ${forceCancelStatus.startsWith('✓') ? 'text-green-400' : forceCancelStatus.startsWith('✗') ? 'text-red-400' : 'text-amber-300'}`}>
+              {forceCancelStatus}
+            </p>
+          )}
+
+          {/* Pending Mint Proposals */}
+          {pendingMintProposals.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold text-red-300 mb-2">Pending Mint Proposals (Governance)</h3>
+              <div className="space-y-2">
+                {pendingMintProposals.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between bg-black/30 rounded-lg px-4 py-3 border border-white/5">
+                    <div className="min-w-0 flex-1 mr-3">
+                      <div className="text-xs text-gray-500 font-mono">#{p.id.slice(0, 16)}…</div>
+                      <div className="text-sm text-white truncate">{p.description}</div>
+                      <div className="text-xs text-gray-400">{p.tokenName}</div>
+                    </div>
+                    <button
+                      onClick={() => handleCancelProposal(p)}
+                      disabled={cancellingProposal === p.id}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1 shrink-0"
+                    >
+                      {cancellingProposal === p.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+                      Cancel Proposal
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending DvP Settlements */}
+          {pendingSettlements.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold text-red-300 mb-2">Pending DvP Settlements</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 text-xs border-b border-white/10">
+                      <th className="text-left py-1 px-2">ID</th>
+                      <th className="text-left py-1 px-2">Buyer</th>
+                      <th className="text-left py-1 px-2">Seller</th>
+                      <th className="text-right py-1 px-2">Tokens</th>
+                      <th className="text-right py-1 px-2">Cash</th>
+                      <th className="text-center py-1 px-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingSettlements.map((s) => (
+                      <tr key={s.id} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="py-1 px-2 text-gray-300 font-mono">#{s.id}</td>
+                        <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.buyer.slice(0, 6)}…{s.buyer.slice(-4)}</td>
+                        <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.seller.slice(0, 6)}…{s.seller.slice(-4)}</td>
+                        <td className="py-1 px-2 text-right text-white">{s.tokenAmount}</td>
+                        <td className="py-1 px-2 text-right text-gray-300">{s.cashAmount}</td>
+                        <td className="py-1 px-2 text-center">
+                          <button
+                            onClick={() => handleCancelSettlement(s.id)}
+                            disabled={cancellingSettlement === s.id}
+                            className="text-red-400 hover:text-red-300 text-xs font-semibold disabled:opacity-50"
+                          >
+                            {cancellingSettlement === s.id ? <Loader2 size={12} className="animate-spin inline" /> : 'Cancel'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
