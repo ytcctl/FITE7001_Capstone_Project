@@ -303,25 +303,40 @@ const Settlement: React.FC = () => {
       const me = await signer.getAddress();
       const meLower = me.toLowerCase();
 
-      // Check & approve security token (seller → DvP)
-      if (meLower === s.seller.toLowerCase()) {
-        const secToken = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, signer);
-        const allowanceSec: bigint = await secToken.allowance(me, dvpAddr);
-        if (allowanceSec < s.tokenAmount) {
+      // ── Pre-check: both parties must have sufficient allowances ──
+      // Seller must have approved security tokens to DvP
+      const secToken = new ethers.Contract(s.securityToken, SECURITY_TOKEN_ABI, signer);
+      const sellerAllowance: bigint = await secToken.allowance(s.seller, dvpAddr);
+      if (sellerAllowance < s.tokenAmount) {
+        if (meLower === s.seller.toLowerCase()) {
+          // We are the seller — approve now
           setTxStatus(`Approving security token for settlement #${id}…`);
           const appTx = await secToken.approve(dvpAddr, s.tokenAmount);
           await appTx.wait();
+        } else {
+          // We are not the seller — cannot approve on their behalf
+          const sellerShort = `${s.seller.slice(0, 6)}…${s.seller.slice(-4)}`;
+          setTxStatus(`✗ Seller (${sellerShort}) has not approved security tokens to the DvP contract. The seller must connect their wallet and approve before this settlement can be executed.`);
+          setIsSubmitting(false);
+          return;
         }
       }
 
-      // Check & approve cash token (buyer → DvP)
-      if (meLower === s.buyer.toLowerCase()) {
-        const cashToken = new ethers.Contract(s.cashToken, CASH_TOKEN_ABI, signer);
-        const allowanceCash: bigint = await cashToken.allowance(me, dvpAddr);
-        if (allowanceCash < s.cashAmount) {
+      // Buyer must have approved cash tokens to DvP
+      const cashTokenContract = new ethers.Contract(s.cashToken, CASH_TOKEN_ABI, signer);
+      const buyerAllowance: bigint = await cashTokenContract.allowance(s.buyer, dvpAddr);
+      if (buyerAllowance < s.cashAmount) {
+        if (meLower === s.buyer.toLowerCase()) {
+          // We are the buyer — approve now
           setTxStatus(`Approving cash token for settlement #${id}…`);
-          const appTx = await cashToken.approve(dvpAddr, s.cashAmount);
+          const appTx = await cashTokenContract.approve(dvpAddr, s.cashAmount);
           await appTx.wait();
+        } else {
+          // We are not the buyer — cannot approve on their behalf
+          const buyerShort = `${s.buyer.slice(0, 6)}…${s.buyer.slice(-4)}`;
+          setTxStatus(`✗ Buyer (${buyerShort}) has not approved cash tokens to the DvP contract. The buyer must connect their wallet and approve before this settlement can be executed.`);
+          setIsSubmitting(false);
+          return;
         }
       }
 
@@ -404,7 +419,7 @@ const Settlement: React.FC = () => {
     if (!contracts || selectedIds.size === 0) return;
     setIsSubmitting(true);
     const ids = Array.from(selectedIds);
-    setTxStatus(`Batch executing ${ids.length} settlement(s)… approving tokens…`);
+    setTxStatus(`Batch executing ${ids.length} settlement(s)… checking approvals…`);
     try {
       const dvpAddr = await contracts.dvpSettlement.getAddress();
       const signer = (contracts.dvpSettlement as any).runner as ethers.Signer;
@@ -412,8 +427,12 @@ const Settlement: React.FC = () => {
       const meChecksum = await signer.getAddress();
 
       // Aggregate total amounts needed per token across all selected settlements
-      const secNeeded: Record<string, bigint> = {};   // securityToken address → total
-      const cashNeeded: Record<string, bigint> = {};   // cashToken address → total
+      // Track both our own needs AND counterparty needs for pre-check
+      const secNeeded: Record<string, bigint> = {};   // securityToken address → total (our side)
+      const cashNeeded: Record<string, bigint> = {};   // cashToken address → total (our side)
+      // Counterparty allowance tracking: { tokenAddr → { party → totalNeeded } }
+      const sellerSecNeeded: Record<string, Record<string, bigint>> = {};
+      const buyerCashNeeded: Record<string, Record<string, bigint>> = {};
 
       for (const id of ids) {
         const s = await contracts.dvpSettlement.settlements(id);
@@ -423,17 +442,59 @@ const Settlement: React.FC = () => {
           setIsSubmitting(false);
           return;
         }
-        if (me === s.seller.toLowerCase()) {
-          const key = s.securityToken.toLowerCase();
-          secNeeded[key] = (secNeeded[key] ?? 0n) + s.tokenAmount;
+
+        // Track seller security token needs
+        const secKey = s.securityToken.toLowerCase();
+        const sellerKey = s.seller.toLowerCase();
+        if (!sellerSecNeeded[secKey]) sellerSecNeeded[secKey] = {};
+        sellerSecNeeded[secKey][sellerKey] = (sellerSecNeeded[secKey][sellerKey] ?? 0n) + s.tokenAmount;
+
+        // Track buyer cash token needs
+        const cashKey = s.cashToken.toLowerCase();
+        const buyerKey = s.buyer.toLowerCase();
+        if (!buyerCashNeeded[cashKey]) buyerCashNeeded[cashKey] = {};
+        buyerCashNeeded[cashKey][buyerKey] = (buyerCashNeeded[cashKey][buyerKey] ?? 0n) + s.cashAmount;
+
+        // Track our own approval needs
+        if (me === sellerKey) {
+          secNeeded[secKey] = (secNeeded[secKey] ?? 0n) + s.tokenAmount;
         }
-        if (me === s.buyer.toLowerCase()) {
-          const key = s.cashToken.toLowerCase();
-          cashNeeded[key] = (cashNeeded[key] ?? 0n) + s.cashAmount;
+        if (me === buyerKey) {
+          cashNeeded[cashKey] = (cashNeeded[cashKey] ?? 0n) + s.cashAmount;
         }
       }
 
-      // Approve aggregated security token totals
+      // Pre-check: verify all counterparties have sufficient allowances
+      for (const [tokenAddr, parties] of Object.entries(sellerSecNeeded)) {
+        const secToken = new ethers.Contract(tokenAddr, SECURITY_TOKEN_ABI, signer);
+        for (const [partyAddr, needed] of Object.entries(parties)) {
+          if (partyAddr === me) continue; // we'll approve our own below
+          const allowance: bigint = await secToken.allowance(partyAddr, dvpAddr);
+          if (allowance < needed) {
+            const short = `${partyAddr.slice(0, 6)}…${partyAddr.slice(-4)}`;
+            setTxStatus(`✗ Seller (${short}) has not approved sufficient security tokens to the DvP contract. The seller must connect their wallet and approve before batch execution.`);
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+      for (const [tokenAddr, parties] of Object.entries(buyerCashNeeded)) {
+        const cashToken = new ethers.Contract(tokenAddr, CASH_TOKEN_ABI, signer);
+        for (const [partyAddr, needed] of Object.entries(parties)) {
+          if (partyAddr === me) continue;
+          const allowance: bigint = await cashToken.allowance(partyAddr, dvpAddr);
+          if (allowance < needed) {
+            const short = `${partyAddr.slice(0, 6)}…${partyAddr.slice(-4)}`;
+            setTxStatus(`✗ Buyer (${short}) has not approved sufficient cash tokens to the DvP contract. The buyer must connect their wallet and approve before batch execution.`);
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
+      setTxStatus(`Batch executing ${ids.length} settlement(s)… approving tokens…`);
+
+      // Approve aggregated security token totals (our side)
       for (const [tokenAddr, totalNeeded] of Object.entries(secNeeded)) {
         const secToken = new ethers.Contract(tokenAddr, SECURITY_TOKEN_ABI, signer);
         const allowance: bigint = await secToken.allowance(meChecksum, dvpAddr);
@@ -443,7 +504,7 @@ const Settlement: React.FC = () => {
         }
       }
 
-      // Approve aggregated cash token totals
+      // Approve aggregated cash token totals (our side)
       for (const [tokenAddr, totalNeeded] of Object.entries(cashNeeded)) {
         const cashToken = new ethers.Contract(tokenAddr, CASH_TOKEN_ABI, signer);
         const allowance: bigint = await cashToken.allowance(meChecksum, dvpAddr);
