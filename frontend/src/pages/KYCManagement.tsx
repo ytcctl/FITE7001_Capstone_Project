@@ -452,6 +452,12 @@ const KYCManagement: React.FC = () => {
           } catch {
             claims[t] = false;
           }
+          // Fallback: if ONCHAINID validation did not find a valid signed claim,
+          // also check the boolean claim flag (e.g. topic set via setClaim but
+          // never issued as a signed ERC-735 claim on the Identity contract).
+          if (!claims[t]) {
+            try { claims[t] = await contracts.identityRegistry.hasClaim(addr, t); } catch {}
+          }
         }
       } else {
         // Fallback: boolean claim check
