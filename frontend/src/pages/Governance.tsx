@@ -576,7 +576,7 @@ const Governance: React.FC = () => {
                 contracts.identityRegistry.isVerified(to).catch(() => false),
               ]);
               if (!isRegistered || !isVerifiedAddr) {
-                setStatus({ type: 'error', message: 'Proposal creation is not allowed. For further enquiry, please contact our staff.' });
+                setStatus({ type: 'error', message: 'Proposal creation is unavailable. Your KYC verification has not been completed. For further assistance, please contact our support team.' });
                 setProposing(false);
                 return;
               }
@@ -732,7 +732,7 @@ const Governance: React.FC = () => {
             contracts.identityRegistry.isVerified(recipient).catch(() => false),
           ]);
           if (!isRegistered || !isVerifiedAddr) {
-            const reason = 'Proposal execution is failed. For further enquiry, please contact our staff.';
+            const reason = 'Proposal execution has failed. Your KYC verification has not been completed. For further assistance, please contact our support team.';
             // Attempt to cancel the proposal
             try {
               const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
