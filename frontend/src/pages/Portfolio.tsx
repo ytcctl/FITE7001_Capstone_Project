@@ -50,13 +50,15 @@ const Portfolio: React.FC = () => {
       setIsVerified(verified);
       setIsRegistered(registered);
       setCountry(ctry);
-      setIsFrozen(frozen);
+      // Start with the default token's frozen flag; will be overridden below if any factory token is also frozen
+      let anyFrozen = !!frozen;
 
       const c: Record<number, boolean> = {};
       for (const t of Object.keys(CLAIM_TOPICS).map(Number)) {
         c[t] = await contracts.identityRegistry.hasClaim(account, t);
       }
       setClaims(c);
+      setIsFrozen(anyFrozen);
     } catch (e) {
       console.error('Portfolio load error:', e);
     }
@@ -76,7 +78,8 @@ const Portfolio: React.FC = () => {
           seen.add(addr);
           try {
             const tok = new ethers.Contract(t[addrField], SECURITY_TOKEN_ABI, provider);
-            const b = await tok.balanceOf(account);
+            const [b, f] = await Promise.all([tok.balanceOf(account), tok.frozen(account).catch(() => false)]);
+            if (f) setIsFrozen(true);
             if (b > 0n) {
               holdings.push({ name: t.name, symbol: t.symbol, address: t[addrField], balance: ethers.formatUnits(b, 18), decimals: 18 });
             }

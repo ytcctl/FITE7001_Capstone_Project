@@ -594,6 +594,16 @@ const Governance: React.FC = () => {
                 setProposing(false);
                 return;
               }
+              // Frozen check: block minting to a frozen address
+              try {
+                const tokenC = activeToken || contracts.securityToken;
+                const recipientFrozen = await tokenC.frozen(to);
+                if (recipientFrozen) {
+                  setStatus({ type: 'error', message: 'Proposal creation is unavailable. The recipient address is frozen by the compliance administrator. Minting to frozen accounts is not permitted.' });
+                  setProposing(false);
+                  return;
+                }
+              } catch { /* frozen() not available — skip pre-check */ }
             }
             const amount = ethers.parseEther(actionParam2);
             calldata = iface.encodeFunctionData('mint', [to, amount]);
@@ -763,6 +773,30 @@ const Governance: React.FC = () => {
             await loadProposals();
             return;
           }
+          // Frozen check: block minting to a frozen address
+          try {
+            const tokenTarget = proposal.targets?.[0];
+            const signer = (activeGovernor as any).runner as ethers.Signer;
+            const tokenC = tokenTarget ? new ethers.Contract(tokenTarget, SECURITY_TOKEN_ABI, signer) : contracts.securityToken;
+            const recipientFrozen = await tokenC.frozen(recipient);
+            if (recipientFrozen) {
+              const reason = 'Proposal execution has failed. The recipient address is frozen by the compliance administrator. Minting to frozen accounts is not permitted.';
+              try {
+                const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
+                const cancelTx = await activeGovernor.cancel(
+                  [...proposal.targets],
+                  [...proposal.values],
+                  [...proposal.calldatas],
+                  descHash
+                );
+                await cancelTx.wait();
+              } catch { /* Cancel may fail if caller is not the proposer */ }
+              setDefeatedProposals((prev) => new Map(prev).set(proposal.id, reason));
+              setStatus({ type: 'error', message: `✗ Proposal Defeated — ${reason}` });
+              await loadProposals();
+              return;
+            }
+          } catch { /* frozen() not available — skip pre-check */ }
         } catch { /* If decode fails, proceed to on-chain execution */ }
       }
     }

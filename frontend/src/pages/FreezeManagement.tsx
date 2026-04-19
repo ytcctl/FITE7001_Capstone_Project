@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
+import { SECURITY_TOKEN_ABI } from '../config/contracts';
 import { ethers } from 'ethers';
 import { Snowflake, Search, Loader2, CheckCircle, XCircle } from 'lucide-react';
+
+interface TokenFreezeStatus { name: string; symbol: string; address: string; frozen: boolean }
 
 const FreezeManagement: React.FC = () => {
   const { contracts } = useWeb3();
@@ -14,23 +17,73 @@ const FreezeManagement: React.FC = () => {
   // Lookup
   const [lookupAddress, setLookupAddress] = useState('');
   const [lookupResult, setLookupResult] = useState<null | { frozen: boolean }>(null);
+  const [lookupDetails, setLookupDetails] = useState<TokenFreezeStatus[]>([]);
   const [isLooking, setIsLooking] = useState(false);
+
+  /** Collect all token contracts (default + V1 factory + V2 factory). */
+  const getAllTokenContracts = async (): Promise<{ name: string; symbol: string; address: string; contract: ethers.Contract }[]> => {
+    if (!contracts) return [];
+    const signer = (contracts.securityToken as any).runner as ethers.Signer;
+    const defaultAddr = await contracts.securityToken.getAddress();
+    const defaultSym = await contracts.securityToken.symbol().catch(() => 'HKSAT');
+    const defaultName = await contracts.securityToken.name().catch(() => 'Default Token');
+    const tokens: { name: string; symbol: string; address: string; contract: ethers.Contract }[] = [
+      { name: defaultName, symbol: defaultSym, address: defaultAddr, contract: contracts.securityToken },
+    ];
+    const seen = new Set<string>([defaultAddr.toLowerCase()]);
+
+    // V1 factory tokens
+    try {
+      const v1Tokens = await contracts.tokenFactory.allTokens();
+      for (const t of v1Tokens) {
+        const a = (t.tokenAddress as string).toLowerCase();
+        if (seen.has(a) || !t.active) continue;
+        seen.add(a);
+        tokens.push({ name: t.name, symbol: t.symbol, address: t.tokenAddress, contract: new ethers.Contract(t.tokenAddress, SECURITY_TOKEN_ABI, signer) });
+      }
+    } catch { /* V1 factory not available */ }
+
+    // V2 factory tokens
+    try {
+      const v2Tokens = await contracts.tokenFactoryV2.allTokens();
+      for (const t of v2Tokens) {
+        const a = (t.proxyAddress as string).toLowerCase();
+        if (seen.has(a) || !t.active) continue;
+        seen.add(a);
+        tokens.push({ name: t.name, symbol: t.symbol, address: t.proxyAddress, contract: new ethers.Contract(t.proxyAddress, SECURITY_TOKEN_ABI, signer) });
+      }
+    } catch { /* V2 factory not available */ }
+
+    return tokens;
+  };
 
   const handleFreeze = async (freeze: boolean) => {
     if (!contracts || !targetAddress) return;
     let addr: string;
     try { addr = ethers.getAddress(targetAddress.trim()); } catch { setTxStatus('✗ Invalid Ethereum address'); return; }
     setIsSubmitting(true);
-    setTxStatus(freeze ? 'Freezing address…' : 'Unfreezing address…');
+    setTxStatus(freeze ? 'Freezing address on all tokens…' : 'Unfreezing address on all tokens…');
     try {
-      const tx = await contracts.securityToken.setAddressFrozen(addr, freeze);
-      setTxStatus('Transaction submitted. Waiting for confirmation…');
-      await tx.wait();
-      setTxStatus(`✓ Address ${freeze ? 'frozen' : 'unfrozen'} successfully.`);
+      const allTokens = await getAllTokenContracts();
+      const results: string[] = [];
+      let anyFailed = false;
+      for (const tok of allTokens) {
+        try {
+          const tx = await tok.contract.setAddressFrozen(addr, freeze);
+          await tx.wait();
+          results.push(`✓ ${tok.symbol}`);
+        } catch (e: any) {
+          anyFailed = true;
+          results.push(`✗ ${tok.symbol}: ${e?.reason || 'failed'}`);
+        }
+      }
+      const summary = results.join('  •  ');
+      setTxStatus(`${anyFailed ? '⚠' : '✓'} ${freeze ? 'Frozen' : 'Unfrozen'} on ${allTokens.length} token(s): ${summary}`);
       setTargetAddress('');
       // Refresh lookup if it matches
       if (lookupResult && lookupAddress.trim().toLowerCase() === addr.toLowerCase()) {
         setLookupResult({ frozen: freeze });
+        setLookupDetails(allTokens.map(t => ({ name: t.name, symbol: t.symbol, address: t.address, frozen: freeze })));
       }
     } catch (e: any) {
       setTxStatus(`✗ ${e?.reason || e?.message || 'Transaction failed'}`);
@@ -45,11 +98,24 @@ const FreezeManagement: React.FC = () => {
     try { addr = ethers.getAddress(lookupAddress.trim()); } catch { setTxStatus('✗ Invalid lookup address'); return; }
     setIsLooking(true);
     try {
-      const frozen = await contracts.securityToken.frozen(addr);
-      setLookupResult({ frozen });
+      const allTokens = await getAllTokenContracts();
+      const details: TokenFreezeStatus[] = [];
+      let anyFrozen = false;
+      for (const tok of allTokens) {
+        try {
+          const f = await tok.contract.frozen(addr);
+          details.push({ name: tok.name, symbol: tok.symbol, address: tok.address, frozen: !!f });
+          if (f) anyFrozen = true;
+        } catch {
+          details.push({ name: tok.name, symbol: tok.symbol, address: tok.address, frozen: false });
+        }
+      }
+      setLookupResult({ frozen: anyFrozen });
+      setLookupDetails(details);
     } catch (e: any) {
       setTxStatus(`✗ Lookup failed: ${e?.reason || e?.message || 'Error'}`);
       setLookupResult(null);
+      setLookupDetails([]);
     } finally {
       setIsLooking(false);
     }
@@ -131,17 +197,33 @@ const FreezeManagement: React.FC = () => {
         </div>
 
         {lookupResult && (
-          <div className="flex items-center gap-3 mt-2">
-            {lookupResult.frozen ? (
-              <>
-                <XCircle className="text-red-400" size={20} />
-                <span className="text-red-400 font-medium">Address is FROZEN — all transfers blocked</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle className="text-emerald-400" size={20} />
-                <span className="text-emerald-400 font-medium">Address is NOT frozen — transfers allowed</span>
-              </>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center gap-3">
+              {lookupResult.frozen ? (
+                <>
+                  <XCircle className="text-red-400" size={20} />
+                  <span className="text-red-400 font-medium">Address is FROZEN on one or more tokens</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="text-emerald-400" size={20} />
+                  <span className="text-emerald-400 font-medium">Address is NOT frozen on any token</span>
+                </>
+              )}
+            </div>
+            {lookupDetails.length > 1 && (
+              <div className="ml-7 space-y-1">
+                {lookupDetails.map(d => (
+                  <div key={d.address} className="flex items-center gap-2 text-sm">
+                    {d.frozen
+                      ? <XCircle className="text-red-400 shrink-0" size={14} />
+                      : <CheckCircle className="text-emerald-400 shrink-0" size={14} />}
+                    <span className={d.frozen ? 'text-red-400' : 'text-gray-400'}>
+                      {d.symbol} — {d.frozen ? 'FROZEN' : 'Not frozen'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
