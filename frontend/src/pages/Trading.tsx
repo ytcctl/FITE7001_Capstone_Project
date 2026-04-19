@@ -320,27 +320,19 @@ const Trading: React.FC = () => {
         setSellOrders([]);
       }
 
+      let activeOrders: OrderData[] = [];
       if (traderIds.length > 0) {
         const raw = await obContract.getOrdersBatch([...traderIds]) as OrderData[];
-        const activeOrders = raw.map(toPlainOrder);
-        // Merge: keep locally-cancelled orders so the user sees the status change
-        setMyOrders(prev => {
-          const cancelled = prev.filter(o => Number(o.status) === OrderStatus.Cancelled);
-          const activeIds = new Set(activeOrders.map(o => o.id.toString()));
-          const kept = cancelled.filter(o => !activeIds.has(o.id.toString()));
-          return [...activeOrders, ...kept];
-        });
-      } else {
-        // Preserve any locally-cancelled orders
-        setMyOrders(prev => prev.filter(o => Number(o.status) === OrderStatus.Cancelled));
+        activeOrders = raw.map(toPlainOrder);
       }
 
       const tradeTotal = Number(tc);
+      let tradeBatch: TradeData[] = [];
       if (tradeTotal > 0) {
         // Fetch last 20 trades for the Recent Trades panel
         const from = Math.max(0, tradeTotal - 20);
-        const batch = await obContract.getTradesBatch(from, tradeTotal) as TradeData[];
-        const sortedDesc = batch.slice().reverse();
+        tradeBatch = await obContract.getTradesBatch(from, tradeTotal) as TradeData[];
+        const sortedDesc = tradeBatch.slice().reverse();
         setRecentTrades(sortedDesc);
 
         // ── Last Traded Price ──
@@ -353,7 +345,7 @@ const Trading: React.FC = () => {
         const oneDayAgo = now - 86_400;
 
         // We already have the last 20; fetch more if the oldest one is still < 24 h old
-        let allRecent = batch.slice(); // ascending order (oldest→newest)
+        let allRecent = tradeBatch.slice(); // ascending order (oldest→newest)
         if (allRecent.length > 0 && Number(allRecent[0].timestamp) > oneDayAgo && from > 0) {
           // Need older trades — fetch the rest (up to 200 max for gas/perf)
           const olderFrom = Math.max(0, from - 200);
@@ -386,6 +378,40 @@ const Trading: React.FC = () => {
         setLastTradePrice(0n);
         setDailyChange(null);
       }
+
+      // ── Merge filled orders from trades into My Orders ──
+      // When an order is instantly matched, the contract removes it from
+      // getTraderOrders(). Recover those by scanning recent trades.
+      const activeIds = new Set(activeOrders.map(o => o.id.toString()));
+      const filledOrderIds: bigint[] = [];
+      for (const t of tradeBatch) {
+        if (t.buyer.toLowerCase() === account.toLowerCase() && !activeIds.has(t.buyOrderId.toString())) {
+          filledOrderIds.push(t.buyOrderId);
+        }
+        if (t.seller.toLowerCase() === account.toLowerCase() && !activeIds.has(t.sellOrderId.toString())) {
+          filledOrderIds.push(t.sellOrderId);
+        }
+      }
+      // Deduplicate
+      const uniqueFilledIds = [...new Set(filledOrderIds.map(id => id.toString()))].map(BigInt);
+
+      let filledOrders: OrderData[] = [];
+      if (uniqueFilledIds.length > 0) {
+        const raw = await obContract.getOrdersBatch(uniqueFilledIds) as OrderData[];
+        filledOrders = raw.map(toPlainOrder);
+      }
+
+      // Combine active + filled + locally-cancelled, sorted by timestamp desc
+      setMyOrders(prev => {
+        const cancelled = prev.filter(o => Number(o.status) === OrderStatus.Cancelled);
+        const allIds = new Set([
+          ...activeOrders.map(o => o.id.toString()),
+          ...filledOrders.map(o => o.id.toString()),
+        ]);
+        const kept = cancelled.filter(o => !allIds.has(o.id.toString()));
+        return [...activeOrders, ...filledOrders, ...kept]
+          .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+      });
 
     } catch (err) {
       console.error('[Trading] fetchData error:', err);
@@ -448,6 +474,7 @@ const Trading: React.FC = () => {
       const obAddr = await obContract.getAddress();
       const priceBN = ethers.parseUnits(price, 6);
       const qtyBN = ethers.parseUnits(quantity, 18);
+      const tradeCountBefore = Number(await obContract.tradeCount());
 
       if (side === 'buy') {
         const cashNeeded = (priceBN * qtyBN) / ethers.parseUnits('1', 18);
@@ -458,7 +485,13 @@ const Trading: React.FC = () => {
         }
         const tx = await obContract.placeBuyOrder(priceBN, qtyBN);
         await tx.wait();
-        setFormSuccess(`Buy order placed for ${selectedMarket.symbol}! Tx: ${tx.hash.slice(0, 10)}…`);
+
+        const tradeCountAfter = Number(await obContract.tradeCount());
+        if (tradeCountAfter > tradeCountBefore) {
+          setFormSuccess(`Buy order matched instantly! ${tradeCountAfter - tradeCountBefore} trade(s) executed. See "My Orders" and "My Trade History" below.`);
+        } else {
+          setFormSuccess(`Buy order placed for ${selectedMarket.symbol}! Tx: ${tx.hash.slice(0, 10)}…`);
+        }
       } else {
         const currentAllowance = await secTokenContract.allowance(account, obAddr);
         if (currentAllowance < qtyBN) {
@@ -467,7 +500,13 @@ const Trading: React.FC = () => {
         }
         const tx = await obContract.placeSellOrder(priceBN, qtyBN);
         await tx.wait();
-        setFormSuccess(`Sell order placed for ${selectedMarket.symbol}! Tx: ${tx.hash.slice(0, 10)}…`);
+
+        const tradeCountAfter = Number(await obContract.tradeCount());
+        if (tradeCountAfter > tradeCountBefore) {
+          setFormSuccess(`Sell order matched instantly! ${tradeCountAfter - tradeCountBefore} trade(s) executed. See "My Orders" and "My Trade History" below.`);
+        } else {
+          setFormSuccess(`Sell order placed for ${selectedMarket.symbol}! Tx: ${tx.hash.slice(0, 10)}…`);
+        }
       }
 
       setPrice('');
@@ -926,10 +965,10 @@ const Trading: React.FC = () => {
 
           {/* ── My Orders ── */}
           <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">My Active Orders — {tokenSymbol}</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">My Orders — {tokenSymbol}</h2>
 
             {myOrders.length === 0 ? (
-              <p className="text-center text-gray-600 text-sm py-6">No active orders</p>
+              <p className="text-center text-gray-600 text-sm py-6">No orders</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -958,9 +997,17 @@ const Trading: React.FC = () => {
                         <td className="py-2 px-3 text-right text-gray-300 font-mono">{fmtSec(o.quantity)}</td>
                         <td className="py-2 px-3 text-right text-gray-400 font-mono">{fmtSec(o.filled)}</td>
                         <td className="py-2 px-3 text-center">
-                          <span className={`text-xs font-semibold ${STATUS_COLORS[Number(o.status)]}`}>
-                            {STATUS_LABELS[Number(o.status)]}
-                          </span>
+                          {(() => {
+                            // If filled >= quantity, show Filled regardless of on-chain status
+                            const effectiveStatus = (o.filled >= o.quantity && o.quantity > 0n)
+                              ? OrderStatus.Filled
+                              : Number(o.status);
+                            return (
+                              <span className={`text-xs font-semibold ${STATUS_COLORS[effectiveStatus]}`}>
+                                {STATUS_LABELS[effectiveStatus]}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="py-2 px-3 text-right text-gray-500 text-xs">{timeAgo(o.timestamp)}</td>
                         <td className="py-2 px-3 text-center">
