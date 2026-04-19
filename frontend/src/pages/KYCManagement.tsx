@@ -53,16 +53,16 @@ const KYCManagement: React.FC = () => {
   // ─── History / Audit Trail state ──
   const [showHistory, setShowHistory] = useState(false);
   const [historyTransfers, setHistoryTransfers] = useState<
-    { tokenLabel: string; from: string; to: string; amount: string; block: number }[]
+    { tokenLabel: string; from: string; to: string; amount: string; block: number; date: string; status: string }[]
   >([]);
   const [historyOrders, setHistoryOrders] = useState<
-    { orderId: number; marketName: string; side: string; price: string; quantity: string; filled: string; status: string }[]
+    { orderId: number; marketName: string; side: string; price: string; quantity: string; filled: string; status: string; block: number; date: string }[]
   >([]);
   const [historySettlements, setHistorySettlements] = useState<
-    { id: number; buyer: string; seller: string; tokenLabel: string; tokenAmount: string; cashAmount: string; status: string }[]
+    { id: number; buyer: string; seller: string; tokenLabel: string; tokenAmount: string; cashAmount: string; status: string; block: number; date: string }[]
   >([]);
   const [historyProposals, setHistoryProposals] = useState<
-    { id: string; tokenName: string; description: string; state: string }[]
+    { id: string; tokenName: string; description: string; state: string; block: number; date: string }[]
   >([]);
 
   // ─── Force Cancel: scan for non-compliant investor ──
@@ -93,6 +93,10 @@ const KYCManagement: React.FC = () => {
             const orderIds: bigint[] = await ob.getTraderOrders(addr);
             if (orderIds.length === 0) continue;
             const orders = await ob.getOrdersBatch([...orderIds]);
+            // Query OrderPlaced events for block numbers
+            const placedEvents = await ob.queryFilter(ob.filters.OrderPlaced(null, addr), 0, 'latest');
+            const orderBlockMap = new Map<number, number>();
+            for (const ev of placedEvents) orderBlockMap.set(Number((ev as ethers.EventLog).args[0]), ev.blockNumber);
             const STATUS_LABELS = ['Open', 'PartiallyFilled', 'Filled', 'Cancelled'];
             for (const o of orders) {
               const status = Number(o.status);
@@ -105,6 +109,8 @@ const KYCManagement: React.FC = () => {
                 quantity: Number(ethers.formatEther(o.quantity)).toLocaleString(),
                 filled: Number(ethers.formatEther(o.filled)).toLocaleString(),
                 status: STATUS_LABELS[status] || String(status),
+                block: orderBlockMap.get(Number(o.id)) || 0,
+                date: '',
               };
               if (status === 0 || status === 1) {
                 tradeOrders.push(row);
@@ -165,6 +171,8 @@ const KYCManagement: React.FC = () => {
                       tokenName,
                       description,
                       state: GOV_STATE_LABELS[stateNum] || String(stateNum),
+                      block: log.blockNumber,
+                      date: '',
                     });
                   }
                 }
@@ -184,6 +192,10 @@ const KYCManagement: React.FC = () => {
       try {
         const dvp = contracts.dvpSettlement;
         const count = Number(await dvp.settlementCount());
+        // Query all SettlementCreated events for block numbers
+        const settleCreatedEvents = await dvp.queryFilter(dvp.filters.SettlementCreated(), 0, 'latest');
+        const settleBlockMap = new Map<number, number>();
+        for (const ev of settleCreatedEvents) settleBlockMap.set(Number((ev as ethers.EventLog).args[0]), ev.blockNumber);
         for (let i = 1; i <= count; i++) {
           try {
             const s = await dvp.settlements(i);
@@ -214,6 +226,8 @@ const KYCManagement: React.FC = () => {
                 tokenAmount: Number(ethers.formatEther(s.tokenAmount)).toLocaleString(),
                 cashAmount: Number(ethers.formatUnits(s.cashAmount, 6)).toLocaleString(),
                 status: DVP_STATUS_LABELS[statusNum] || String(statusNum),
+                block: settleBlockMap.get(i) || 0,
+                date: '',
               });
             }
           } catch {}
@@ -267,18 +281,46 @@ const KYCManagement: React.FC = () => {
               const parsed = tok.interface.parseLog({ topics: [...log.topics], data: log.data });
               if (!parsed) continue;
               const decimals = label.includes('THKD') || tAddr.toLowerCase() === cashAddr.toLowerCase() ? 6 : 18;
+              const fromAddr = parsed.args.from as string;
+              const toAddr = parsed.args.to as string;
               transfers.push({
                 tokenLabel: label,
-                from: parsed.args.from as string,
-                to: parsed.args.to as string,
+                from: fromAddr,
+                to: toAddr,
                 amount: Number(ethers.formatUnits(parsed.args.value, decimals)).toLocaleString(),
                 block: log.blockNumber,
+                date: '',
+                status: fromAddr.toLowerCase() === addr.toLowerCase() ? 'Sent' : 'Received',
               });
             }
           } catch (e) { console.warn(`Transfer scan for ${label}:`, e); }
         }
         transfers.sort((a, b) => b.block - a.block);
       } catch (e) { console.warn('Transfer history scan:', e); }
+
+      // 5. Batch-resolve block timestamps to dates
+      const allBlockNums = new Set<number>();
+      for (const t of transfers) if (t.block) allBlockNums.add(t.block);
+      for (const o of completedOrders) if (o.block) allBlockNums.add(o.block);
+      for (const s of completedSettlements) if (s.block) allBlockNums.add(s.block);
+      for (const p of completedProposals) if (p.block) allBlockNums.add(p.block);
+      const blockDateMap = new Map<number, string>();
+      try {
+        const provider = contracts.securityToken.runner?.provider;
+        if (provider) {
+          await Promise.all([...allBlockNums].map(async (bn) => {
+            try {
+              const b = await (provider as ethers.Provider).getBlock(bn);
+              if (b) blockDateMap.set(bn, new Date(Number(b.timestamp) * 1000).toLocaleString());
+            } catch {}
+          }));
+        }
+      } catch {}
+      for (const t of transfers) t.date = blockDateMap.get(t.block) || '—';
+      for (const o of completedOrders) o.date = blockDateMap.get(o.block) || '—';
+      for (const s of completedSettlements) s.date = blockDateMap.get(s.block) || '—';
+      for (const p of completedProposals) p.date = blockDateMap.get(p.block) || '—';
+
       setHistoryTransfers(transfers);
 
       const parts: string[] = [];
@@ -1095,6 +1137,8 @@ const KYCManagement: React.FC = () => {
                               <th className="text-left py-1 px-2">To</th>
                               <th className="text-right py-1 px-2">Amount</th>
                               <th className="text-right py-1 px-2">Block</th>
+                              <th className="text-left py-1 px-2">Date</th>
+                              <th className="text-center py-1 px-2">Status</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1105,6 +1149,8 @@ const KYCManagement: React.FC = () => {
                                 <td className="py-1 px-2 text-gray-400 font-mono text-xs">{t.to.slice(0, 6)}…{t.to.slice(-4)}</td>
                                 <td className="py-1 px-2 text-right text-gray-300">{t.amount}</td>
                                 <td className="py-1 px-2 text-right text-gray-500 font-mono text-xs">{t.block}</td>
+                                <td className="py-1 px-2 text-gray-500 text-xs">{t.date}</td>
+                                <td className={`py-1 px-2 text-center text-xs font-semibold ${t.status === 'Received' ? 'text-green-400' : 'text-red-400'}`}>{t.status}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1127,6 +1173,8 @@ const KYCManagement: React.FC = () => {
                               <th className="text-right py-1 px-2">Price</th>
                               <th className="text-right py-1 px-2">Qty</th>
                               <th className="text-right py-1 px-2">Filled</th>
+                              <th className="text-right py-1 px-2">Block</th>
+                              <th className="text-left py-1 px-2">Date</th>
                               <th className="text-center py-1 px-2">Status</th>
                             </tr>
                           </thead>
@@ -1139,6 +1187,8 @@ const KYCManagement: React.FC = () => {
                                 <td className="py-1 px-2 text-right text-gray-300">{o.price}</td>
                                 <td className="py-1 px-2 text-right text-gray-300">{o.quantity}</td>
                                 <td className="py-1 px-2 text-right text-gray-300">{o.filled}</td>
+                                <td className="py-1 px-2 text-right text-gray-500 font-mono text-xs">{o.block}</td>
+                                <td className="py-1 px-2 text-gray-500 text-xs">{o.date}</td>
                                 <td className={`py-1 px-2 text-center text-xs font-semibold ${o.status === 'Filled' ? 'text-green-400' : 'text-gray-500'}`}>{o.status}</td>
                               </tr>
                             ))}
@@ -1162,6 +1212,8 @@ const KYCManagement: React.FC = () => {
                               <th className="text-left py-1 px-2">Seller</th>
                               <th className="text-right py-1 px-2">Tokens</th>
                               <th className="text-right py-1 px-2">Cash</th>
+                              <th className="text-right py-1 px-2">Block</th>
+                              <th className="text-left py-1 px-2">Date</th>
                               <th className="text-center py-1 px-2">Status</th>
                             </tr>
                           </thead>
@@ -1174,6 +1226,8 @@ const KYCManagement: React.FC = () => {
                                 <td className="py-1 px-2 text-gray-400 font-mono text-xs">{s.seller.slice(0, 6)}…{s.seller.slice(-4)}</td>
                                 <td className="py-1 px-2 text-right text-gray-300">{s.tokenAmount}</td>
                                 <td className="py-1 px-2 text-right text-gray-300">{s.cashAmount}</td>
+                                <td className="py-1 px-2 text-right text-gray-500 font-mono text-xs">{s.block}</td>
+                                <td className="py-1 px-2 text-gray-500 text-xs">{s.date}</td>
                                 <td className={`py-1 px-2 text-center text-xs font-semibold ${s.status === 'Settled' ? 'text-green-400' : s.status === 'Failed' ? 'text-red-400' : 'text-gray-500'}`}>{s.status}</td>
                               </tr>
                             ))}
@@ -1194,6 +1248,8 @@ const KYCManagement: React.FC = () => {
                               <th className="text-left py-1 px-2">Proposal ID</th>
                               <th className="text-left py-1 px-2">Token</th>
                               <th className="text-left py-1 px-2">Description</th>
+                              <th className="text-right py-1 px-2">Block</th>
+                              <th className="text-left py-1 px-2">Date</th>
                               <th className="text-center py-1 px-2">State</th>
                             </tr>
                           </thead>
@@ -1203,6 +1259,8 @@ const KYCManagement: React.FC = () => {
                                 <td className="py-1 px-2 text-gray-300 font-mono text-xs">{p.id.slice(0, 10)}…</td>
                                 <td className="py-1 px-2 text-gray-400 text-xs">{p.tokenName}</td>
                                 <td className="py-1 px-2 text-gray-400 text-xs truncate max-w-[200px]" title={p.description}>{p.description}</td>
+                                <td className="py-1 px-2 text-right text-gray-500 font-mono text-xs">{p.block}</td>
+                                <td className="py-1 px-2 text-gray-500 text-xs">{p.date}</td>
                                 <td className={`py-1 px-2 text-center text-xs font-semibold ${p.state === 'Executed' ? 'text-green-400' : p.state === 'Canceled' ? 'text-yellow-400' : 'text-gray-500'}`}>{p.state}</td>
                               </tr>
                             ))}
