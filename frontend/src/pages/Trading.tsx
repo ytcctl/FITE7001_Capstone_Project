@@ -21,7 +21,7 @@ import {
 // ---------------------------------------------------------------------------
 
 enum Side { Buy, Sell }
-enum OrderStatus { Open, Filled, PartiallyFilled, Cancelled }
+enum OrderStatus { Open, PartiallyFilled, Filled, Cancelled }
 
 interface MarketInfo {
   securityToken: string;
@@ -57,15 +57,15 @@ interface TradeData {
 
 const STATUS_LABELS: Record<number, string> = {
   0: 'Open',
-  1: 'Filled',
-  2: 'Partial',
+  1: 'Partial',
+  2: 'Filled',
   3: 'Cancelled',
 };
 
 const STATUS_COLORS: Record<number, string> = {
   0: 'text-blue-400',
-  1: 'text-green-400',
-  2: 'text-yellow-400',
+  1: 'text-yellow-400',
+  2: 'text-green-400',
   3: 'text-gray-500',
 };
 
@@ -986,6 +986,65 @@ const Trading: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* ── My Trade History ── */}
+          {(() => {
+            const myTrades = recentTrades.filter(
+              (t) =>
+                t.buyer.toLowerCase() === account?.toLowerCase() ||
+                t.seller.toLowerCase() === account?.toLowerCase()
+            );
+            return (
+              <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
+                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 size={20} className="text-cyan-400" />
+                  My Trade History — {tokenSymbol}
+                </h2>
+                {myTrades.length === 0 ? (
+                  <p className="text-center text-gray-600 text-sm py-6">No trades involving your account</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-gray-500 text-xs border-b border-white/10">
+                          <th className="text-left py-2 px-3">Trade #</th>
+                          <th className="text-center py-2 px-3">Role</th>
+                          <th className="text-left py-2 px-3">Counterparty</th>
+                          <th className="text-right py-2 px-3">Price (HKD)</th>
+                          <th className="text-right py-2 px-3">Quantity</th>
+                          <th className="text-right py-2 px-3">Total (HKD)</th>
+                          <th className="text-right py-2 px-3">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {myTrades.map((t, i) => {
+                          const isBuyer = t.buyer.toLowerCase() === account?.toLowerCase();
+                          const counterparty = isBuyer ? t.seller : t.buyer;
+                          return (
+                            <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                              <td className="py-2 px-3 text-gray-300 font-mono">#{Number(t.id)}</td>
+                              <td className="py-2 px-3 text-center">
+                                <span className={`font-semibold ${isBuyer ? 'text-green-400' : 'text-red-400'}`}>
+                                  {isBuyer ? 'BUYER' : 'SELLER'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 font-mono text-xs text-gray-400">
+                                {counterparty.slice(0, 8)}…{counterparty.slice(-4)}
+                              </td>
+                              <td className="py-2 px-3 text-right text-white font-mono">{fmtPrice(t.price)}</td>
+                              <td className="py-2 px-3 text-right text-gray-300 font-mono">{fmtSec(t.quantity)}</td>
+                              <td className="py-2 px-3 text-right text-gray-400 font-mono">{fmtCash(t.cashAmount)}</td>
+                              <td className="py-2 px-3 text-right text-gray-500 text-xs">{timeAgo(t.timestamp)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Compliance Force Cancel moved to KYC Management tab */}
         </>
