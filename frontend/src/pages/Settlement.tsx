@@ -35,8 +35,8 @@ const STATUS_COLORS = [
 ];
 const EXPIRED_COLOR = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
 
-/** Returns true if a pending settlement's deadline has passed */
-const isExpired = (s: SettlementData) => s.status === 0 && s.deadline > 0 && Date.now() / 1000 > s.deadline;
+/** Returns true if a pending settlement's deadline has passed (uses chain time) */
+const isExpired = (s: SettlementData, chainTime: number) => s.status === 0 && s.deadline > 0 && chainTime > s.deadline;
 
 const Settlement: React.FC = () => {
   const { account, contracts } = useWeb3();
@@ -59,6 +59,8 @@ const Settlement: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Batch execute
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // Chain clock (may differ from wall clock due to time-warps)
+  const [chainTime, setChainTime] = useState(Math.floor(Date.now() / 1000));
 
   // Load available security tokens from factory contracts
   const loadTokenOptions = useCallback(async () => {
@@ -120,6 +122,9 @@ const Settlement: React.FC = () => {
     try {
       const count = await contracts.dvpSettlement.settlementCount();
       const provider = (contracts.dvpSettlement.runner as ethers.Signer).provider!;
+      // Fetch chain timestamp (may be ahead of wall clock due to governance time-warps)
+      const latestBlock = await provider.getBlock('latest');
+      if (latestBlock) setChainTime(latestBlock.timestamp);
       const items: SettlementData[] = [];
       for (let i = 0; i < Number(count); i++) {
         const s = await contracts.dvpSettlement.settlements(i);
@@ -258,7 +263,11 @@ const Settlement: React.FC = () => {
       }
 
       setTxStatus('Creating settlement…');
-      const deadline = Math.floor(Date.now() / 1000) + Number(deadlineHours) * 3600;
+      // Use chain block.timestamp (may be far ahead of wall-clock due to governance time-warps)
+      const provider = (contracts.dvpSettlement as any).runner?.provider ?? contracts.dvpSettlement.runner;
+      const latestBlock = await provider.getBlock('latest');
+      const chainNow = latestBlock!.timestamp;
+      const deadline = chainNow + Number(deadlineHours) * 3600;
       const matchId = ethers.keccak256(ethers.toUtf8Bytes(`match-${Date.now()}`));
       const tx = await contracts.dvpSettlement.createSettlement(
         seller,
@@ -381,7 +390,7 @@ const Settlement: React.FC = () => {
     });
   };
 
-  const pendingIds = settlements.filter((s) => s.status === 0 && !isExpired(s)).map((s) => s.id);
+  const pendingIds = settlements.filter((s) => s.status === 0 && !isExpired(s, chainTime)).map((s) => s.id);
 
   const toggleSelectAll = () => {
     if (pendingIds.every((id) => selectedIds.has(id))) {
@@ -617,7 +626,7 @@ const Settlement: React.FC = () => {
                 {settlements.map((s) => (
                   <tr key={s.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-4">
-                      {s.status === 0 && !isExpired(s) && (
+                      {s.status === 0 && !isExpired(s, chainTime) && (
                         <input
                           type="checkbox"
                           checked={selectedIds.has(s.id)}
@@ -640,8 +649,8 @@ const Settlement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-white">{Number(s.cashAmount).toLocaleString()}</td>
                     <td className="px-6 py-4">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${isExpired(s) ? EXPIRED_COLOR : STATUS_COLORS[s.status]}`}>
-                        {isExpired(s) ? 'Expired' : STATUS_LABELS[s.status]}
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${isExpired(s, chainTime) ? EXPIRED_COLOR : STATUS_COLORS[s.status]}`}>
+                        {isExpired(s, chainTime) ? 'Expired' : STATUS_LABELS[s.status]}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-mono text-gray-300" title={s.createdBy}>
@@ -653,7 +662,7 @@ const Settlement: React.FC = () => {
                     <td className="px-6 py-4">
                       {s.status === 0 && (
                         <div className="flex gap-2">
-                          {isExpired(s) ? (
+                          {isExpired(s, chainTime) ? (
                             <button
                               onClick={() => handleMarkFailed(s.id)}
                               className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1 rounded-lg hover:bg-orange-500/30 transition-colors border border-orange-500/20"
