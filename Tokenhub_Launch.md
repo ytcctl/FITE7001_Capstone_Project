@@ -73,6 +73,25 @@ npm run dev
 
 The portal will be available at **http://localhost:3000/**.
 
+### Accessing via VS Code Dev Tunnels (Remote Access)
+
+If you need to access the portal remotely (e.g. from another machine or for demo purposes):
+
+1. In VS Code, open the **Ports** panel (View → Ports) and forward port **3000** and **8545**
+2. Set visibility to **Public** for port 3000
+3. Start the frontend with the tunnel environment variable:
+
+```powershell
+cd frontend
+$env:VITE_TUNNEL = "1"; npm run dev
+```
+
+4. Access via the tunnel URL (e.g. `https://xxxxx-3000.asse.devtunnels.ms/`)
+
+> **Why `VITE_TUNNEL`?** Without it, Vite's HMR WebSocket tries to connect back to `localhost:3000`, which fails through the tunnel proxy with *"Connection header did not include 'upgrade'"*. Setting `VITE_TUNNEL=1` tells the HMR client to connect via the tunnel's HTTPS port (443) instead.
+
+> **Note:** Restarting the frontend does **not** affect blockchain state — Anvil keeps all state in memory. You only need to reload state (`anvil_loadState`) if you restart Anvil itself.
+
 ## Important Notes
 
 ### Two Different State Formats
