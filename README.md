@@ -155,17 +155,18 @@ The smart contract explicitly rejects any transaction involving an address not m
 
 ### 2.4  Forced Transfers (`forcedTransfer()`)
 
-The `forcedTransfer()` function (EIP-1644) allows a licensed custodian or platform administrator to reallocate tokens in response to a court order, liquidator instruction, or regulatory seizure.
+The `forcedTransfer()` function (EIP-1644 inspired) allows a licensed custodian or platform administrator to reallocate tokens in response to a court order, liquidator instruction, or regulatory seizure.
 
-**Function Signature:** `forcedTransfer(address _from, address _to, uint256 _amount, bytes calldata _data, bytes calldata _operatorData)`
+**Function Signature:** `forcedTransfer(address from, address to, uint256 amount, bytes32 legalOrderHash, bytes calldata operatorData)`
 
 | Authorization | Detail |
 |--------------|--------|
-| Protected by | `onlyAgent` — assigned to licensed custodian |
-| Bypass | Skips `canTransfer()` and sender signature checks |
-| Receiver verification | Receiver must still be verified in IdentityRegistry |
-| Audit trail | Emits `ControllerTransfer` / `ForcedTransfer` event with legal reference |
-| Legal anchoring | `_operatorData` stores an IPFS CID pointing to encrypted court order / liquidator request |
+| Protected by | `AGENT_ROLE` — assigned to licensed custodian |
+| Bypass | Temporarily safe-lists both parties and unfreezes them — bypasses compliance modules, freeze status, and sender signature checks. Court order overrides administrative controls. |
+| Receiver verification | Receiver must still be verified in IdentityRegistry (`isVerified(to)` checked explicitly before transfer) |
+| Self-dealing prevention | `to != msg.sender` — agent cannot force-transfer tokens to themselves |
+| Audit trail | Emits `ForcedTransfer` event with controller address, from, to, amount, legal order hash, and operator data |
+| Legal anchoring | `legalOrderHash` (bytes32) — non-zero hash of the court order or legal instrument; `operatorData` — additional operator context (case reference, internal nonce) |
 
 ---
 
@@ -511,6 +512,7 @@ scripts/
 ├── deploy-orderbook.js           # Deploy standalone OrderBook (embedded block producer)
 ├── deploy-orderbook-factory.js   # Deploy OrderBookFactory + initial HKSTP market
 ├── seed-investor.js              # Seed test investor identities
+├── seed-all-testdata.js          # Seed multiple investors + sample orders + governance data
 ├── harden-admin.js               # Post-deploy admin hardening
 ├── burn-excess.js                # Burn excess token supply
 └── start-dev.sh                  # Quick-start dev environment (node + deploy + frontend)
@@ -553,7 +555,9 @@ frontend/
 │       ├── FreezeManagement.tsx  # Freeze/unfreeze investor addresses (Agent)
 │       ├── OracleCommittee.tsx   # Multi-oracle threshold management
 │       ├── WalletCustody.tsx     # Hot/warm/cold wallet management
-│       └── TokenDetail.tsx       # Individual token detail view
+│       ├── TokenDetail.tsx       # Individual token detail view
+│       ├── CashTokenDetail.tsx   # Cash token (THKD) detail — holders, transfers, supply
+│       └── MintETH.tsx           # Devnet utility — mint test ETH via anvil_setBalance (Admin)
 └── ...
 
 test/
@@ -695,6 +699,8 @@ npm run test:besu
 ### Frontend Functional Test Cases
 
 The Investor Portal has **321 documented functional test cases** (160 positive + 161 negative) covering all 15 frontend modules (plus the Token Compliance Detail sub-module). Full details are in [`frontend/FRONTEND-TEST-CASES.md`](frontend/FRONTEND-TEST-CASES.md) and [`frontend/FRONTEND-TEST-CASES-QMetry.csv`](frontend/FRONTEND-TEST-CASES-QMetry.csv) (QMetry import-ready).
+
+---
 
 | Test Environment | Details |
 |------------------|---------|
@@ -1834,6 +1840,7 @@ The frontend enforces four role tiers. Roles are detected automatically from on-
 | Portfolio | `/portfolio` | ✅ | ✅ | ✅ | ✅ |
 | Governance | `/governance` | ✅ | ✅ | ✅ | ✅ |
 | DvP Settlement | `/settlement` | ✅ | ✅ | ✅ | ✅ |
+| Cash Token Detail | `/cash-token` | ✅ | ✅ | ✅ | ✅ |
 | KYC Management | `/kyc` | ✅ | ✅ | ❌ | ❌ |
 | Token Minting | `/mint` | ✅ | ✅ | ❌ | ❌ |
 | Oracle Committee | `/oracle` | ✅ | ✅ | ✅ | ❌ |
@@ -1841,15 +1848,16 @@ The frontend enforces four role tiers. Roles are detected automatically from on-
 | Token Management | `/tokens` | ✅ | ❌ | ❌ | ❌ |
 | Market Management | `/markets` | ✅ | ❌ | ❌ | ❌ |
 | Wallet Custody | `/custody` | ✅ | ❌ | ❌ | ❌ |
+| Mint ETH (Devnet) | `/mint-eth` | ✅ | ❌ | ❌ | ❌ |
 
 ### Route Guards (App.tsx)
 
 | Guard | Roles Allowed | Protected Routes |
 |-------|--------------|-----------------|
-| `AdminOnlyRoute` | Admin | `/compliance`, `/tokens`, `/markets`, `/custody` |
+| `AdminOnlyRoute` | Admin | `/compliance`, `/tokens`, `/markets`, `/custody`, `/mint-eth` |
 | `AdminRoute` | Admin + Agent | `/kyc`, `/mint` |
 | `PrivilegedRoute` | Admin + Agent + Operator | `/oracle` |
-| *(none)* | All authenticated | `/`, `/trading`, `/portfolio`, `/governance`, `/settlement` |
+| *(none)* | All authenticated | `/`, `/trading`, `/portfolio`, `/governance`, `/settlement`, `/cash-token` |
 
 ### Start-Up Company Access
 
