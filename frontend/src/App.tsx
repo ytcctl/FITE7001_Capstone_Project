@@ -17,6 +17,7 @@ import TokenDetail from './pages/TokenDetail';
 import TokenComplianceDetail from './pages/TokenComplianceDetail';
 import CashTokenDetail from './pages/CashTokenDetail';
 import FreezeManagement from './pages/FreezeManagement';
+import MintETH from './pages/MintETH';
 import { useWeb3 } from './context/Web3Context';
 import { NETWORK_CONFIG } from './config/contracts';
 import { AlertTriangle } from 'lucide-react';
@@ -97,6 +98,7 @@ const App: React.FC = () => {
           <Route path="/governance" element={<Governance />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/trading" element={<Trading />} />
+          <Route path="/mint-eth" element={<AdminOnlyRoute><MintETH /></AdminOnlyRoute>} />
         </Routes>
       </Layout>
     </>

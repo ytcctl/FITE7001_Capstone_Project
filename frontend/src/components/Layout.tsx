@@ -54,6 +54,7 @@ const navItems: NavItem[] = [
   { to: '/freeze', label: 'Freeze Management', icon: Snowflake, adminOrAgent: true },
   { to: '/governance', label: 'Governance', icon: Vote },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
+  { to: '/mint-eth', label: 'Mint ETH (Test)', icon: Sparkles, adminOnly: true },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
