@@ -49,12 +49,9 @@ export default defineConfig({
     host: true,
     port: 3000,
     open: false,
-    hmr: {
-      // When accessed via VS Code Dev Tunnels / port forwarding,
-      // the tunnel URL uses HTTPS on port 443. Tell the HMR client
-      // to connect back through the tunnel instead of localhost:3000.
-      clientPort: process.env.VITE_TUNNEL ? 443 : undefined,
-    },
+    // Dev Tunnels strip WebSocket upgrade headers, breaking Vite HMR.
+    // Disable HMR when tunneling; you'll need to manually refresh.
+    hmr: process.env.VITE_TUNNEL ? false : undefined,
     proxy: {
       '/rpc': {
         target: 'http://127.0.0.1:8545',
