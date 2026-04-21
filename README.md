@@ -2068,7 +2068,99 @@ The project includes **321 documented frontend test cases** (160 positive + 161 
 
 ---
 
-## 16  Citation List
+## 16  Enhancements Beyond Specification
+
+The original HKSTP Project Plan v0.2 ("the spec") defined a baseline T-REX / ERC-3643 security-token platform. During implementation the team shipped **eleven capabilities that go beyond the spec** — they are functionally additive (i.e. they do not remove any required behaviour) and materially strengthen security, regulatory alignment, operability, and user experience. Each enhancement is summarised below and cross-referenced to the corresponding contract(s) and/or frontend module.
+
+> **Source:** Items E1–E11 correspond to the "Enhancements Beyond Spec" register in [`Alignment_Review_v2.md`](Alignment_Review_v2.md) §16.
+
+### 16.1  Enhancement Register (summary)
+
+| # | Enhancement | Primary Artefact(s) | Why it matters |
+|---|---|---|---|
+| **E1** | On-chain OrderBook + Factory | [`contracts/OrderBook.sol`](contracts/OrderBook.sol), [`contracts/OrderBookFactory.sol`](contracts/OrderBookFactory.sol) | Full limit-order matching with escrow; eliminates the need for an off-chain matching engine and a separate custodian of in-flight orders. |
+| **E2** | Multi-sig Oracle Committee | [`contracts/OracleCommittee.sol`](contracts/OracleCommittee.sol) | 2-of-3 EIP-712 attestation replaces a single-oracle trust assumption; prevents a single compromised signer from bypassing compliance. |
+| **E3** | Upgradeable Token Factory (V2) | [`contracts/TokenFactoryV2.sol`](contracts/TokenFactoryV2.sol) | ERC-1967 proxies allow post-deployment vulnerability fixes and batch upgrades gated by `UPGRADER_ROLE`. |
+| **E4** | System Health Check | [`contracts/SystemHealthCheck.sol`](contracts/SystemHealthCheck.sol) | Single-call cross-contract diagnostics (20 checks) for Ops dashboards and regulator spot-checks. |
+| **E5** | Travel Rule (FATF Rec. 16) | [`contracts/DvPSettlement.sol`](contracts/DvPSettlement.sol) | On-chain VASP identifiers and originator/beneficiary hashes embedded in each settlement. |
+| **E6** | AMLO CDD / STR anchoring | [`contracts/HKSTPIdentityRegistry.sol`](contracts/HKSTPIdentityRegistry.sol) | On-chain AML compliance records with retention tracking (AMLO s.22) and Suspicious Transaction Report filing (s.25A). |
+| **E7** | Tiered minting (governance gate) | [`contracts/HKSTPSecurityToken.sol`](contracts/HKSTPSecurityToken.sol) | `mintThreshold` + `TIMELOCK_MINTER_ROLE` force large issuances through the Governor + Timelock. |
+| **E8** | Signaling proposals | [`contracts/governance/HKSTPGovernor.sol`](contracts/governance/) + Frontend Governance page | Non-binding, on-chain sentiment polls for all token holders (no timelock execution required). |
+| **E9** | Compliance Force-Cancel | Frontend KYC / Compliance page | One-click cross-system scan that cancels every outstanding order, DvP, and proposal tied to a non-compliant investor. |
+| **E10** | Batch DvP settlement | [`contracts/DvPSettlement.sol`](contracts/DvPSettlement.sol) | Up to 50 settlements per call with per-item failure isolation — materially improves throughput for corporate-action payouts. |
+| **E11** | Per-token governance | [`contracts/governance/GovernorFactory.sol`](contracts/governance/) | Each security token can spawn its own Governor + Timelock pair, enabling per-issuer governance policies. |
+
+### 16.2  Enhancement Details
+
+#### E1 — On-chain Central Limit Order Book (CLOB)
+
+- **What:** `OrderBookFactory` deploys one `OrderBook` per token pair. Orders carry price, size, expiry and a `trader` address. Matching is performed inside the contract and the proceeds are escrowed until settlement.
+- **Beyond spec:** The spec only required an off-chain matching engine interfaced via events. TokenHub moves the book on-chain so order state, partial fills, and cancellations are auditable by the regulator.
+- **Compliance hook:** Every `placeOrder()` calls `identityRegistry.isVerified(trader)` — see Section 15.9 ("Three-Layer KYC Enforcement").
+
+#### E2 — OracleCommittee (multi-sig attestation)
+
+- **What:** Compliance attestations (`checkTransfer`, `preTradeCheck`, `travelRuleCheck`) are signed EIP-712 payloads. The committee enforces an **M-of-N threshold** (default 2-of-3) before the attestation is accepted by `HKSTPCompliance`.
+- **Beyond spec:** The spec described a single trusted oracle. `OracleCommittee.sol` introduces signer rotation, threshold updates, and replay protection via nonces.
+- **Operational impact:** Signer compromise no longer breaks compliance; keys can be rotated without redeploying the token.
+
+#### E3 — TokenFactoryV2 (upgradeable proxies)
+
+- **What:** `TokenFactoryV2` deploys each security token behind an ERC-1967 transparent proxy. A dedicated `UPGRADER_ROLE` (intended to be held by the Timelock) can upgrade the implementation for one token or batch-upgrade a set of tokens atomically.
+- **Beyond spec:** The spec assumed immutable token contracts. V2 makes emergency patches and gradual standard upgrades (e.g. future ERC-3643 revisions) possible without burning and re-issuing supply.
+- **Safeguards:** Upgrade proposals flow through the Governor (see Section 15.7) and respect the 48 h timelock.
+
+#### E4 — SystemHealthCheck
+
+- **What:** A read-only diagnostic contract that probes the full stack (Identity Registry, Compliance, Oracle Committee, Token Factory, DvP, OrderBook, Governance) in a single call and returns a structured report of 20 checks.
+- **Beyond spec:** Not mentioned in the spec. Added to support the Ops dashboard and regulator spot-checks required under SFC Circular on Tokenisation (see Section 13).
+- **Usage:** Surfaced in the frontend Admin → System Health page.
+
+#### E5 — Travel Rule (FATF Recommendation 16)
+
+- **What:** `DvPSettlement` records, for each settlement, the originator VASP ID, beneficiary VASP ID, originator-info hash and beneficiary-info hash. PII stays off-chain; only the commitment hash is anchored.
+- **Beyond spec:** The spec referenced AMLO compliance broadly; FATF Rec. 16 anchoring is additive and futureproofs the platform against cross-border VASP-to-VASP transfers.
+- **Regulatory alignment:** HK AMLO s.5A / FATF Travel Rule guidance.
+
+#### E6 — AMLO CDD / STR anchoring
+
+- **What:** `HKSTPIdentityRegistry` stores CDD review dates, retention expiry (AMLO s.22 — 6-year retention), and STR filing references (s.25A). Events are emitted on every create/update for the AML audit trail.
+- **Beyond spec:** The spec only required KYC verification flags. TokenHub extends the registry to cover the full AMLO record-keeping lifecycle.
+- **Operational impact:** Regulators can reconstruct a full KYC + AML audit trail from on-chain events alone.
+
+#### E7 — Tiered minting (governance-gated issuances)
+
+- **What:** `HKSTPSecurityToken.mint()` compares the amount against a configurable `mintThreshold`. Mints at or below the threshold can be executed by `AGENT_ROLE`; mints above it require `TIMELOCK_MINTER_ROLE` — i.e. they must pass through the Governor + 48 h Timelock.
+- **Beyond spec:** The spec gave the Agent unrestricted mint authority. The tiered model prevents an operational-key compromise from diluting existing holders.
+
+#### E8 — Signaling proposals
+
+- **What:** A dedicated Governor proposal type ("Signaling") that records a vote tally but performs no on-chain execution — used for sentiment polls and direction-setting.
+- **Beyond spec:** The spec described only binding proposals. Signaling proposals allow the community to guide the issuer without timelocks.
+- **Frontend:** Dedicated tab on the Governance page, visible to all token holders.
+
+#### E9 — Compliance Force-Cancel
+
+- **What:** A frontend workflow on the KYC / Compliance page that, when an investor is revoked or sanctioned, scans every TokenHub module (OrderBook, DvP, Governance) and cancels every outstanding item in one orchestrated flow.
+- **Beyond spec:** The spec only required freezing the wallet. Force-Cancel provides a human-auditable, cross-system revocation path required under SFC's "fit-and-proper" enforcement.
+
+#### E10 — Batch DvP settlement
+
+- **What:** `DvPSettlement.batchSettle()` accepts up to 50 settlements per transaction, isolating per-item failures so one bad leg does not revert the batch.
+- **Beyond spec:** The spec only required single-leg `settle()`. Batching materially improves throughput for coupon / dividend / corporate-action payouts.
+
+#### E11 — Per-token governance (GovernorFactory)
+
+- **What:** `GovernorFactory` spawns a dedicated Governor + Timelock pair for each security token, so each issuer can set its own voting delay, voting period, quorum and proposal threshold.
+- **Beyond spec:** The spec assumed a single platform-wide Governor. Per-token governance is required by issuers who want bespoke shareholder voting policies.
+
+### 16.3  Status & Test Coverage
+
+All eleven enhancements are backed by Hardhat test suites in [`test/`](test/) and, where applicable, frontend test cases (see Section 8). None of them introduce a misalignment with the spec — they are strictly additive. For any risks that these enhancements themselves introduce, refer to [`SLITHER-REPORT.md`](SLITHER-REPORT.md) and [`Safeguard.md`](Safeguard.md).
+
+---
+
+## 17  Citation List
 
 1. Project Plan - Tokenizing HKSTP Startups v0.2.pdf
 2. [SFC Circular on Tokenisation (2 Nov 2023)](https://apps.sfc.hk/edistributionWeb/api/circular/list-content/circular/doc?lang=EN&refNo=23EC53)
