@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { CLAIM_TOPICS, CONTRACT_ADDRESSES, IDENTITY_ABI, ORDER_BOOK_ABI, GOVERNOR_ABI, GOVERNOR_FACTORY_ABI,
   DVP_SETTLEMENT_ABI, SECURITY_TOKEN_ABI, TOKEN_FACTORY_ABI, TOKEN_FACTORY_V2_ABI, CASH_TOKEN_ABI, rpcUrlForBrowser } from '../config/contracts';
+import { createNonceManager } from '../utils/nonce';
 import { ethers } from 'ethers';
 import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -49,6 +50,14 @@ const KYCManagement: React.FC = () => {
   const [cancellingProposal, setCancellingProposal] = useState<string | null>(null);
   const [cancellingSettlement, setCancellingSettlement] = useState<number | null>(null);
   const [cancellingTradeOrder, setCancellingTradeOrder] = useState<number | null>(null);
+  // ─── Force Transfer (ERC-1644 court-order recovery) state ──
+  const [forceTransferRows, setForceTransferRows] = useState<
+    { tokenAddr: string; label: string; balance: string; balanceWei: bigint }[]
+  >([]);
+  const [forceTransferForms, setForceTransferForms] = useState<
+    Record<string, { to: string; amount: string; legalHash: string; operatorData: string }>
+  >({});
+  const [forceTransferringAddr, setForceTransferringAddr] = useState<string | null>(null);
 
   // ─── History / Audit Trail state ──
   const [showHistory, setShowHistory] = useState(false);
@@ -79,6 +88,8 @@ const KYCManagement: React.FC = () => {
     setHistoryOrders([]);
     setHistorySettlements([]);
     setHistoryProposals([]);
+    setForceTransferRows([]);
+    setForceTransferForms({});
     setShowHistory(false);
 
     try {
@@ -196,7 +207,7 @@ const KYCManagement: React.FC = () => {
         const settleCreatedEvents = await dvp.queryFilter(dvp.filters.SettlementCreated(), 0, 'latest');
         const settleBlockMap = new Map<number, number>();
         for (const ev of settleCreatedEvents) settleBlockMap.set(Number((ev as ethers.EventLog).args[0]), ev.blockNumber);
-        for (let i = 1; i <= count; i++) {
+        for (let i = 0; i < count; i++) {
           try {
             const s = await dvp.settlements(i);
             if (s.buyer.toLowerCase() !== addr.toLowerCase() && s.seller.toLowerCase() !== addr.toLowerCase()) continue;
@@ -236,35 +247,54 @@ const KYCManagement: React.FC = () => {
       setPendingSettlements(settlements);
       setHistorySettlements(completedSettlements);
 
-      // 4. Scan token transfer history involving this address
-      const transfers: typeof historyTransfers = [];
+      // 3.5. Discover all token addresses (security + cash) and scan security-token balances
+      const tokenAddrs: { addr: string; label: string; isSecurity: boolean }[] = [];
       try {
-        const tokenAddrs: { addr: string; label: string }[] = [];
-        // Gather all security tokens from both factories
-        try {
-          const v1Tokens = await contracts.tokenFactory.allTokens();
-          for (const t of v1Tokens) tokenAddrs.push({ addr: t.tokenAddress, label: `${t.name} (${t.symbol})` });
-        } catch {}
-        try {
-          const v2Tokens = await contracts.tokenFactoryV2.allTokens();
-          for (const t of v2Tokens) tokenAddrs.push({ addr: t.proxyAddress, label: `${t.name} (${t.symbol})` });
-        } catch {}
-        // Add default security token if not already included
+        const v1Tokens = await contracts.tokenFactory.allTokens();
+        for (const t of v1Tokens) tokenAddrs.push({ addr: t.tokenAddress, label: `${t.name} (${t.symbol})`, isSecurity: true });
+      } catch {}
+      try {
+        const v2Tokens = await contracts.tokenFactoryV2.allTokens();
+        for (const t of v2Tokens) tokenAddrs.push({ addr: t.proxyAddress, label: `${t.name} (${t.symbol})`, isSecurity: true });
+      } catch {}
+      try {
         const secAddr = await contracts.securityToken.getAddress();
         if (!tokenAddrs.some(t => t.addr.toLowerCase() === secAddr.toLowerCase())) {
-          try {
-            const [n, sym] = await Promise.all([contracts.securityToken.name(), contracts.securityToken.symbol()]);
-            tokenAddrs.push({ addr: secAddr, label: `${n} (${sym})` });
-          } catch {}
+          const [n, sym] = await Promise.all([contracts.securityToken.name(), contracts.securityToken.symbol()]);
+          tokenAddrs.push({ addr: secAddr, label: `${n} (${sym})`, isSecurity: true });
         }
-        // Add cash token
+      } catch {}
+      try {
         const cashAddr = await contracts.cashToken.getAddress();
         try {
           const [n, sym] = await Promise.all([contracts.cashToken.name(), contracts.cashToken.symbol()]);
-          tokenAddrs.push({ addr: cashAddr, label: `${n} (${sym})` });
-        } catch { tokenAddrs.push({ addr: cashAddr, label: 'THKD' }); }
+          tokenAddrs.push({ addr: cashAddr, label: `${n} (${sym})`, isSecurity: false });
+        } catch { tokenAddrs.push({ addr: cashAddr, label: 'THKD', isSecurity: false }); }
+      } catch {}
 
-        for (const { addr: tAddr, label } of tokenAddrs) {
+      // Scan security-token balances for the investor (eligible for force-transfer)
+      const ftRows: typeof forceTransferRows = [];
+      for (const { addr: tAddr, label, isSecurity } of tokenAddrs) {
+        if (!isSecurity) continue;
+        try {
+          const tok = new ethers.Contract(tAddr, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
+          const balWei: bigint = await tok.balanceOf(addr);
+          if (balWei > 0n) {
+            ftRows.push({
+              tokenAddr: tAddr,
+              label,
+              balance: Number(ethers.formatEther(balWei)).toLocaleString(undefined, { maximumFractionDigits: 6 }),
+              balanceWei: balWei,
+            });
+          }
+        } catch (e) { console.warn(`Balance scan for ${label}:`, e); }
+      }
+      setForceTransferRows(ftRows);
+
+      // 4. Scan token transfer history involving this address
+      const transfers: typeof historyTransfers = [];
+      try {
+        for (const { addr: tAddr, label, isSecurity } of tokenAddrs) {
           try {
             const tok = new ethers.Contract(tAddr, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
             const [sentLogs, recvLogs] = await Promise.all([
@@ -280,7 +310,7 @@ const KYCManagement: React.FC = () => {
               seen.add(key);
               const parsed = tok.interface.parseLog({ topics: [...log.topics], data: log.data });
               if (!parsed) continue;
-              const decimals = label.includes('THKD') || tAddr.toLowerCase() === cashAddr.toLowerCase() ? 6 : 18;
+              const decimals = isSecurity ? 18 : 6;
               const fromAddr = parsed.args.from as string;
               const toAddr = parsed.args.to as string;
               transfers.push({
@@ -327,7 +357,8 @@ const KYCManagement: React.FC = () => {
       if (tradeOrders.length > 0) parts.push(`Found ${tradeOrders.length} outstanding trade order(s) — cancel below`);
       if (mintProposals.length > 0) parts.push(`Found ${mintProposals.length} pending mint proposal(s) — cancel below`);
       if (settlements.length > 0) parts.push(`Found ${settlements.length} pending settlement(s) — cancel below`);
-      if (parts.length === 0) parts.push('✓ No outstanding orders, mint proposals, or settlements found.');
+      if (ftRows.length > 0) parts.push(`Found ${ftRows.length} security-token balance(s) — force-transfer below`);
+      if (parts.length === 0) parts.push('✓ No outstanding orders, proposals, settlements, or token balances found.');
       const histParts: string[] = [];
       if (transfers.length > 0) histParts.push(`${transfers.length} transfer(s)`);
       if (completedOrders.length > 0) histParts.push(`${completedOrders.length} completed order(s)`);
@@ -381,6 +412,62 @@ const KYCManagement: React.FC = () => {
     }
   };
 
+  // Force-transfer (ERC-1644) — sweep tokens from non-compliant address to recovery wallet
+  const handleForceTransfer = async (row: typeof forceTransferRows[0]) => {
+    if (!contracts) return;
+    const form = forceTransferForms[row.tokenAddr];
+    if (!form) { setForceCancelStatus('✗ Fill destination, amount, and legal order hash'); return; }
+    let toAddr: string;
+    try { toAddr = ethers.getAddress(form.to.trim()); } catch { setForceCancelStatus('✗ Invalid destination address'); return; }
+    if (account && toAddr.toLowerCase() === account.toLowerCase()) {
+      setForceCancelStatus('✗ Destination cannot be the caller (contract rejects self-dealing)'); return;
+    }
+    let amountWei: bigint;
+    try { amountWei = ethers.parseEther(form.amount.trim()); } catch { setForceCancelStatus('✗ Invalid amount'); return; }
+    if (amountWei <= 0n) { setForceCancelStatus('✗ Amount must be > 0'); return; }
+    if (amountWei > row.balanceWei) { setForceCancelStatus('✗ Amount exceeds balance'); return; }
+    const legalHash = form.legalHash.trim();
+    if (!ethers.isHexString(legalHash, 32)) { setForceCancelStatus('✗ Legal order hash must be a bytes32 hex string (0x + 64 hex chars)'); return; }
+    const operatorData = form.operatorData.trim() || '0x';
+    if (!ethers.isHexString(operatorData)) { setForceCancelStatus('✗ Operator data must be a hex string (or leave empty)'); return; }
+
+    setForceTransferringAddr(row.tokenAddr);
+    try {
+      const fromAddr = ethers.getAddress(forceCancelAddr.trim());
+      // Pre-check: recipient must be Identity-Registry verified (contract reverts otherwise)
+      try {
+        const verified: boolean = await contracts.identityRegistry.isVerified(toAddr);
+        if (!verified) {
+          setForceCancelStatus('✗ Recipient is not verified in the Identity Registry. Register + verify the recovery wallet first.');
+          return;
+        }
+      } catch (e: any) {
+        setForceCancelStatus(`✗ Could not verify recipient: ${e?.reason || e?.message || 'Identity Registry call failed'}`);
+        return;
+      }
+      const tok = new ethers.Contract(row.tokenAddr, SECURITY_TOKEN_ABI, contracts.securityToken.runner);
+      const tx = await tok.forcedTransfer(fromAddr, toAddr, amountWei, legalHash, operatorData);
+      await tx.wait();
+      const newBal: bigint = await tok.balanceOf(fromAddr);
+      setForceTransferRows((prev) => {
+        if (newBal === 0n) return prev.filter((r) => r.tokenAddr !== row.tokenAddr);
+        return prev.map((r) => r.tokenAddr === row.tokenAddr
+          ? { ...r, balance: Number(ethers.formatEther(newBal)).toLocaleString(undefined, { maximumFractionDigits: 6 }), balanceWei: newBal }
+          : r);
+      });
+      setForceTransferForms((prev) => {
+        const next = { ...prev };
+        delete next[row.tokenAddr];
+        return next;
+      });
+      setForceCancelStatus((prev) => `${prev} | Force-transferred ${form.amount} ${row.label} to ${toAddr.slice(0, 6)}…${toAddr.slice(-4)}.`);
+    } catch (e: any) {
+      setForceCancelStatus(`✗ Force transfer failed: ${e?.reason || e?.message || 'Unknown error'}`);
+    } finally {
+      setForceTransferringAddr(null);
+    }
+  };
+
   // Force-cancel a specific trade order
   const handleCancelTradeOrder = async (order: typeof pendingTradeOrders[0]) => {
     if (!contracts) return;
@@ -426,21 +513,29 @@ const KYCManagement: React.FC = () => {
       // Boolean path: temporarily clear IdentityFactory → register → restore
       try {
         const savedFactory = await contracts.identityRegistry.identityFactory();
+        const nm = signer ? await createNonceManager(signer) : null;
         if (savedFactory !== ethers.ZeroAddress) {
           setTxStatus('Step 1/3 — Temporarily clearing IdentityFactory…');
-          const tx1 = await contracts.identityRegistry.setIdentityFactory(ethers.ZeroAddress);
+          const tx1 = await contracts.identityRegistry.setIdentityFactory(
+            ethers.ZeroAddress,
+            ...(nm ? [nm.next()] : [])
+          );
           await tx1.wait();
         }
         setTxStatus('Step 2/3 — Registering identity (Boolean mode, no ONCHAINID)…');
         const tx2 = await contracts.identityRegistry.registerIdentity(
           addr,
           ethers.ZeroAddress,
-          regCountry
+          regCountry,
+          ...(nm ? [nm.next()] : [])
         );
         await tx2.wait();
         if (savedFactory !== ethers.ZeroAddress) {
           setTxStatus('Step 3/3 — Restoring IdentityFactory…');
-          const tx3 = await contracts.identityRegistry.setIdentityFactory(savedFactory);
+          const tx3 = await contracts.identityRegistry.setIdentityFactory(
+            savedFactory,
+            ...(nm ? [nm.next()] : [])
+          );
           await tx3.wait();
         }
         setTxStatus('✓ Identity registered (Boolean mode — no ONCHAINID). Use "Set Boolean Claim" to verify.');
@@ -565,24 +660,48 @@ const KYCManagement: React.FC = () => {
       setTxStatus('Please sign the revocation in MetaMask…');
       const signature = await signer.signMessage(ethers.getBytes(dataHash));
 
-      // Overwrite the claim on-chain via issueClaim (which calls Identity.addClaim)
-      setTxStatus('Submitting revocation to blockchain…');
+      // Step 1/2 — Overwrite the signed claim on-chain via issueClaim (calls Identity.addClaim).
+      // Use the nonce manager so step 2 can rely on monotonic local increments
+      // (the wallet/provider per-block cache won't see step 1 in time for step 2).
+      setTxStatus(`Step 1/2 — Submitting signed-claim revocation for "${CLAIM_TOPICS[claimTopic]}"…`);
+      const nm = await createNonceManager(signer);
       const tx = await contracts.identityRegistry.issueClaim(
         addr,
         claimTopic,
         CONTRACT_ADDRESSES.claimIssuer,
         signature,
-        data
+        data,
+        nm.next()
       );
       await tx.wait();
 
-      // Also revoke the boolean claim for consistency
+      // Step 2/2 — Clear the boolean claim store so both representations are in sync.
+      // The contract's isVerified ignores the boolean store once trusted issuers exist,
+      // but the boolean is consulted as a fallback when no signed claim has ever been
+      // issued — leaving stale `true` here would resurface as soon as the signed claim
+      // record gets removed. Surfacing failures explicitly so users see why.
+      let booleanCleared = false;
+      let booleanErr: any = null;
       try {
-        const tx2 = await contracts.identityRegistry.setClaim(addr, claimTopic, false);
+        setTxStatus(`Step 2/2 — Clearing boolean store for "${CLAIM_TOPICS[claimTopic]}"…`);
+        const tx2 = await contracts.identityRegistry.setClaim(
+          addr,
+          claimTopic,
+          false,
+          nm.next()
+        );
         await tx2.wait();
-      } catch { /* ignore if boolean revoke fails */ }
+        booleanCleared = true;
+      } catch (e: any) {
+        booleanErr = e;
+        console.warn('Boolean claim clear failed:', e);
+      }
 
-      setTxStatus(`✓ Signed claim "${CLAIM_TOPICS[claimTopic]}" revoked for ${addr.slice(0, 10)}…`);
+      if (booleanCleared) {
+        setTxStatus(`✓ "${CLAIM_TOPICS[claimTopic]}" revoked for ${addr.slice(0, 10)}… (signed claim + boolean store both cleared)`);
+      } else {
+        setTxStatus(`✓ Signed claim "${CLAIM_TOPICS[claimTopic]}" revoked for ${addr.slice(0, 10)}…  ⚠ Boolean store NOT cleared: ${booleanErr?.reason || booleanErr?.data?.message || booleanErr?.message || 'unknown error'}. Switch to Boolean mode and revoke topic ${claimTopic} manually if the dashboard still shows ✓.`);
+      }
     } catch (e: any) {
       setTxStatus(`✗ ${e?.reason || e?.data?.message || e?.message || 'Revocation failed'}`);
     } finally {
@@ -626,9 +745,10 @@ const KYCManagement: React.FC = () => {
         const idContract = new ethers.Contract(identityContract, identityAbi, provider);
 
         for (const t of Object.keys(CLAIM_TOPICS).map(Number)) {
+          let claimIds: string[] = [];
+          let topicValid = false;
           try {
-            const claimIds = await idContract.getClaimIdsByTopic(t);
-            let topicValid = false;
+            claimIds = await idContract.getClaimIdsByTopic(t);
             for (const cid of claimIds) {
               const claim = await idContract.getClaim(cid);
               // Check via ClaimIssuer.isClaimValid
@@ -654,15 +774,16 @@ const KYCManagement: React.FC = () => {
                 break;
               } catch { continue; }
             }
+          } catch { /* getClaimIdsByTopic failed — treat as no signed claims */ }
+          // Match the contract's isVerified semantics: once trusted issuers exist,
+          // the signed-claim verdict is authoritative and the boolean store is NOT
+          // consulted. Only fall back to the boolean when no signed claim has ever
+          // been issued for this topic — otherwise a properly revoked/expired
+          // signed claim would be incorrectly re-flagged true by stale boolean state.
+          if (claimIds.length === 0) {
+            try { claims[t] = await contracts.identityRegistry.hasClaim(addr, t); } catch { claims[t] = false; }
+          } else {
             claims[t] = topicValid;
-          } catch {
-            claims[t] = false;
-          }
-          // Fallback: if ONCHAINID validation did not find a valid signed claim,
-          // also check the boolean claim flag (e.g. topic set via setClaim but
-          // never issued as a signed ERC-735 claim on the Identity contract).
-          if (!claims[t]) {
-            try { claims[t] = await contracts.identityRegistry.hasClaim(addr, t); } catch {}
           }
         }
       } else {
@@ -1107,6 +1228,87 @@ const KYCManagement: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Force Transfer (ERC-1644 — Court-Order Recovery) */}
+          {forceTransferRows.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold text-red-300 mb-2">Force Transfer (ERC-1644 — Court-Order Recovery)</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Sweep tokens from the non-compliant address to a recovery wallet. Requires <span className="font-mono">AGENT_ROLE</span>;
+                recipient must be Identity-Registry verified. The legal order hash anchors the encrypted court-order document on-chain.
+              </p>
+              <div className="space-y-3">
+                {forceTransferRows.map((r) => {
+                  const form = forceTransferForms[r.tokenAddr] || { to: '', amount: '', legalHash: '', operatorData: '' };
+                  const update = (patch: Partial<typeof form>) =>
+                    setForceTransferForms((prev) => ({ ...prev, [r.tokenAddr]: { ...form, ...patch } }));
+                  return (
+                    <div key={r.tokenAddr} className="bg-black/30 rounded-lg p-3 border border-white/5">
+                      <div className="flex items-center justify-between mb-2 gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm text-white font-semibold truncate">{r.label}</div>
+                          <div className="text-xs text-gray-500 font-mono truncate" title={r.tokenAddr}>
+                            {r.tokenAddr.slice(0, 10)}…{r.tokenAddr.slice(-6)}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xs text-gray-500">Current balance</div>
+                          <div className="text-sm text-amber-300 font-semibold">{r.balance}</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={form.to}
+                          onChange={(e) => update({ to: e.target.value })}
+                          placeholder="Recipient address (0x…)"
+                          className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50"
+                        />
+                        <input
+                          type="text"
+                          value={form.amount}
+                          onChange={(e) => update({ amount: e.target.value })}
+                          placeholder={`Amount (max ${r.balance})`}
+                          className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50"
+                        />
+                        <input
+                          type="text"
+                          value={form.legalHash}
+                          onChange={(e) => update({ legalHash: e.target.value })}
+                          placeholder="Legal order hash (bytes32, 0x + 64 hex)"
+                          className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50"
+                        />
+                        <input
+                          type="text"
+                          value={form.operatorData}
+                          onChange={(e) => update({ operatorData: e.target.value })}
+                          placeholder="Operator data (optional hex, default 0x)"
+                          className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50"
+                        />
+                      </div>
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          onClick={() => handleForceTransfer(r)}
+                          disabled={
+                            forceTransferringAddr !== null ||
+                            cancellingTradeOrder !== null ||
+                            cancellingSettlement !== null ||
+                            cancellingProposal !== null
+                          }
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {forceTransferringAddr === r.tokenAddr
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <ShieldAlert size={12} />}
+                          Force Transfer
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

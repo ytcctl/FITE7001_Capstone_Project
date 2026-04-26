@@ -92,6 +92,7 @@ Investor accounts do not have access to administrative functions such as KYC man
 
 | Label | Address |
 |-------|---------|
+| investor1 | `0xe8564b67f8a638971ab2A519e786f9ce1182c86f` |
 | Seller | `0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef` |
 | Buyer | `0x821aEa9a577a9b44299B9c15c88cf3087F3b5544` |
 

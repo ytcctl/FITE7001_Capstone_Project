@@ -17,6 +17,7 @@ import {
   Send,
 } from 'lucide-react';
 import { useWeb3 } from '../context/Web3Context';
+import { createNonceManager } from '../utils/nonce';
 
 // Wallet tier enum values matching the contract
 const TIER_LABELS: Record<number, string> = {
@@ -422,7 +423,11 @@ const WalletCustody: React.FC = () => {
   const handleExecute = async (txId: number) => {
     if (!contracts) return;
     try {
-      const execTx = await contracts.multiSigWarm.executeTx(txId);
+      // Local nonce management spans executeTx + recordSweep so the second tx
+      // doesn't reuse the just-mined nonce from a stale wallet/provider cache.
+      const signer = (contracts.multiSigWarm as any).runner as ethers.Signer;
+      const nm = await createNonceManager(signer);
+      const execTx = await contracts.multiSigWarm.executeTx(txId, nm.next());
       await execTx.wait();
       // Auto-record in WalletRegistry audit trail
       try {
@@ -434,7 +439,8 @@ const WalletCustody: React.FC = () => {
             msAddr,
             txData.to,
             txData.amount,
-            txData.reason
+            txData.reason,
+            nm.next()
           );
           await recordTx.wait();
         }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, CASH_TOKEN_ABI } from '../config/contracts';
+import { createNonceManager } from '../utils/nonce';
 import { ArrowRightLeft, Plus, Play, XCircle, RefreshCw, Loader2, CheckSquare } from 'lucide-react';
 import { ethers } from 'ethers';
 
@@ -159,6 +160,21 @@ const Settlement: React.FC = () => {
     loadTokenOptions();
   }, [contracts]);
 
+  // Reset the create-settlement form whenever the connected account changes
+  // (including disconnect → reconnect with a different wallet). Counterparty
+  // addresses, amounts, and execute-id from the previous session are not
+  // meaningful for a different user and risk accidental submission.
+  useEffect(() => {
+    setSeller('');
+    setBuyer('');
+    setTokenAmount('');
+    setCashAmount('');
+    setDeadlineHours('24');
+    setExecuteId('');
+    setSelectedIds(new Set());
+    setTxStatus('');
+  }, [account]);
+
   /** Parse settlement errors into human-readable messages */
   const parseSettlementError = (e: any): string => {
     const raw = e?.reason || e?.message || '';
@@ -172,6 +188,11 @@ const Settlement: React.FC = () => {
     if (raw.includes('creator cannot execute') || raw.includes('createdBy')) {
       return 'Only the counterparty can execute this DvP settlement.';
     }
+    // Nonce out of sync — typically after an Anvil state load reset the chain
+    // but the wallet's local nonce tracker is stale.
+    if (raw.includes('nonce has already been used') || raw.includes('nonce too low') || raw.includes('NONCE_EXPIRED')) {
+      return 'Wallet nonce is out of sync with the chain (often happens after loading an Anvil snapshot). MetaMask: Settings → Advanced → "Clear activity tab data" for this account, then retry. Built-in wallet: disconnect and reconnect.';
+    }
     // Custom error selectors
     const data = typeof e?.data === 'string' ? e.data
       : typeof e?.error?.data === 'string' ? e.error.data : null;
@@ -183,6 +204,32 @@ const Settlement: React.FC = () => {
         '0x1a83e5fc': 'Token transfer failed — sender or recipient may be frozen or not KYC-verified',
       };
       if (knownErrors[selector]) return knownErrors[selector];
+      // OpenZeppelin AccessControlUnauthorizedAccount(address account, bytes32 neededRole)
+      if (selector === '0xe2517d3f' && data.length >= 138) {
+        try {
+          const [account, neededRole] = ethers.AbiCoder.defaultAbiCoder().decode(
+            ['address', 'bytes32'],
+            '0x' + data.slice(10)
+          );
+          const ROLE_NAMES: Record<string, string> = {
+            [ethers.id('OPERATOR_ROLE')]: 'OPERATOR_ROLE',
+            [ethers.id('AGENT_ROLE')]: 'AGENT_ROLE',
+            [ethers.id('TIMELOCK_MINTER_ROLE')]: 'TIMELOCK_MINTER_ROLE',
+            [ethers.id('COMPLIANCE_OFFICER_ROLE')]: 'COMPLIANCE_OFFICER_ROLE',
+            [ethers.id('MLRO_ROLE')]: 'MLRO_ROLE',
+            [ethers.id('UPGRADER_ROLE')]: 'UPGRADER_ROLE',
+            [ethers.id('ORACLE_ROLE')]: 'ORACLE_ROLE',
+            [ethers.id('PAUSER_ROLE')]: 'PAUSER_ROLE',
+            '0x0000000000000000000000000000000000000000000000000000000000000000': 'DEFAULT_ADMIN_ROLE',
+          };
+          const roleName = ROLE_NAMES[neededRole.toLowerCase()] || `role ${neededRole.slice(0, 10)}…`;
+          const acctShort = `${account.slice(0, 6)}…${account.slice(-4)}`;
+          if (roleName === 'OPERATOR_ROLE') {
+            return `Wallet ${acctShort} is missing OPERATOR_ROLE on the DvP Settlement contract. Only the matching-engine / Operator account can create or execute DvP settlements. Connect the Operator test account (or have an admin grant OPERATOR_ROLE to this wallet).`;
+          }
+          return `Wallet ${acctShort} is missing the required role ${roleName} on this contract. Connect an account that holds this role (or have an admin grant it).`;
+        } catch { /* fall through */ }
+      }
       if (selector === '0x08c379a0' && data.length >= 74) {
         try {
           const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + data.slice(10));
@@ -207,6 +254,13 @@ const Settlement: React.FC = () => {
     }
     if (!ethers.isAddress(buyer)) {
       setTxStatus('✗ Invalid buyer address. Please enter a valid Ethereum address (0x…).');
+      return;
+    }
+
+    // Only seller or buyer can place a DvP settlement instruction
+    const meAddr = account?.toLowerCase() ?? '';
+    if (meAddr !== seller.toLowerCase() && meAddr !== buyer.toLowerCase()) {
+      setTxStatus('✗ Only the seller or buyer can place a DvP settlement instruction.');
       return;
     }
 
@@ -240,15 +294,20 @@ const Settlement: React.FC = () => {
       const tokenAmountBN = ethers.parseUnits(tokenAmount, 18);
       const cashAmountBN = ethers.parseUnits(cashAmount, 6);
 
+      // Local nonce management spans approve(s) + createSettlement so the
+      // wallet/provider per-block cache can't cause a stale nonce on the next tx.
+      const provider = (contracts.dvpSettlement as any).runner?.provider ?? contracts.dvpSettlement.runner;
+      const nm = await createNonceManager(signer);
+
       // Pre-approve tokens so executeSettlement can transferFrom later.
       // The seller must approve security tokens; the buyer must approve cash tokens.
       // Only the connected wallet can approve its own tokens.
       if (me === seller.toLowerCase()) {
         setTxStatus('Approving security token for DvP…');
-        const secToken = new ethers.Contract(selectedSecurityToken, SECURITY_TOKEN_ABI, signer);
-        const allowance: bigint = await secToken.allowance(me, dvpAddr);
+        const secTokenSigner = new ethers.Contract(selectedSecurityToken, SECURITY_TOKEN_ABI, signer);
+        const allowance: bigint = await secTokenSigner.allowance(me, dvpAddr);
         if (allowance < tokenAmountBN) {
-          const appTx = await secToken.approve(dvpAddr, tokenAmountBN);
+          const appTx = await secTokenSigner.approve(dvpAddr, tokenAmountBN, nm.next());
           await appTx.wait();
         }
       }
@@ -257,14 +316,13 @@ const Settlement: React.FC = () => {
         const cashToken = new ethers.Contract(CONTRACT_ADDRESSES.cashToken, CASH_TOKEN_ABI, signer);
         const allowance: bigint = await cashToken.allowance(me, dvpAddr);
         if (allowance < cashAmountBN) {
-          const appTx = await cashToken.approve(dvpAddr, cashAmountBN);
+          const appTx = await cashToken.approve(dvpAddr, cashAmountBN, nm.next());
           await appTx.wait();
         }
       }
 
       setTxStatus('Creating settlement…');
       // Use chain block.timestamp (may be far ahead of wall-clock due to governance time-warps)
-      const provider = (contracts.dvpSettlement as any).runner?.provider ?? contracts.dvpSettlement.runner;
       const latestBlock = await provider.getBlock('latest');
       const chainNow = latestBlock!.timestamp;
       const deadline = chainNow + Number(deadlineHours) * 3600;
@@ -277,7 +335,8 @@ const Settlement: React.FC = () => {
         CONTRACT_ADDRESSES.cashToken,
         cashAmountBN,
         deadline,
-        matchId
+        matchId,
+        nm.next()
       );
       await tx.wait();
       setTxStatus('✓ Settlement created successfully');
@@ -405,7 +464,14 @@ const Settlement: React.FC = () => {
     });
   };
 
-  const pendingIds = settlements.filter((s) => s.status === 0 && !isExpired(s, chainTime)).map((s) => s.id);
+  // Only seller and buyer can view their own settlements in history
+  const visibleSettlements = settlements.filter((s) => {
+    if (!account) return false;
+    const me = account.toLowerCase();
+    return s.seller.toLowerCase() === me || s.buyer.toLowerCase() === me;
+  });
+
+  const pendingIds = visibleSettlements.filter((s) => s.status === 0 && !isExpired(s, chainTime)).map((s) => s.id);
 
   const toggleSelectAll = () => {
     if (pendingIds.every((id) => selectedIds.has(id))) {
@@ -636,16 +702,43 @@ const Settlement: React.FC = () => {
             />
           </div>
           <div className="flex items-end">
-            <button
-              onClick={handleCreate}
-              disabled={isSubmitting || !seller || !buyer || !tokenAmount || !cashAmount || !selectedSecurityToken}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-              Create Settlement
-            </button>
+            {(() => {
+              const me = account?.toLowerCase() ?? '';
+              const isPartyMatch =
+                !!me &&
+                ((!!seller && me === seller.toLowerCase()) ||
+                  (!!buyer && me === buyer.toLowerCase()));
+              const partiesEntered = !!seller && !!buyer;
+              return (
+                <button
+                  onClick={handleCreate}
+                  disabled={
+                    isSubmitting ||
+                    !seller ||
+                    !buyer ||
+                    !tokenAmount ||
+                    !cashAmount ||
+                    !selectedSecurityToken ||
+                    (partiesEntered && !isPartyMatch)
+                  }
+                  title={
+                    partiesEntered && !isPartyMatch
+                      ? 'Only the seller or buyer can place a DvP settlement instruction.'
+                      : ''
+                  }
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  Create Settlement
+                </button>
+              );
+            })()}
           </div>
         </div>
+        <p className="mt-3 text-xs text-gray-500">
+          Note: only the seller or buyer can place a DvP settlement instruction. Third parties cannot
+          create settlements on their behalf.
+        </p>
       </div>
 
       {/* Batch Execute Bar */}
@@ -674,8 +767,10 @@ const Settlement: React.FC = () => {
         <div className="p-6 border-b border-white/10">
           <h3 className="font-bold text-white">Settlement History</h3>
         </div>
-        {settlements.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">No settlements found.</div>
+        {visibleSettlements.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 text-sm">
+            No settlements found. Only the seller or buyer can view their own DvP settlement history.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -705,7 +800,7 @@ const Settlement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {settlements.map((s) => (
+                {visibleSettlements.map((s) => (
                   <tr key={s.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-4">
                       {s.status === 0 && !isExpired(s, chainTime) && (

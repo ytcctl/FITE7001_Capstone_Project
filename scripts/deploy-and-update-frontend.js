@@ -456,9 +456,11 @@ async function main() {
   await (await identityFactory.grantRole(DEPLOYER_ROLE, registryAddress)).wait();
   console.log("     DEPLOYER_ROLE granted to IdentityRegistry on IdentityFactory");
 
-  // Add ClaimIssuer as a Trusted Issuer for all 5 claim topics
-  await (await registry.addTrustedIssuer(claimIssuerAddress, [1, 2, 3, 4, 5])).wait();
-  console.log("     ClaimIssuer added as Trusted Issuer for topics 1-5");
+  // Add ClaimIssuer as a Trusted Issuer for all 6 claim topics (1-5 + topic 6 FPS Name-Match).
+  // Must include topic 6 — the registry's _requiredClaimTopics also enforces it, so omitting
+  // topic 6 here would leave every investor permanently unverified after onboarding.
+  await (await registry.addTrustedIssuer(claimIssuerAddress, [1, 2, 3, 4, 5, 6])).wait();
+  console.log("     ClaimIssuer added as Trusted Issuer for topics 1-6");
 
   // Cap. 622: Set 50-shareholder limit on the security token
   console.log("\nConfiguring Cap. 622 shareholder cap...");
@@ -503,6 +505,16 @@ async function main() {
   console.log("     Tracked SecurityToken on WalletRegistry");
   await (await walletRegistry.addTrackedToken(cashTokenAddress)).wait();
   console.log("     Tracked CashToken on WalletRegistry");
+
+  // Wire MockCashToken (THKD) to the IdentityRegistry so mints/transfers enforce KYC,
+  // and safe-list the protocol contracts that hold THKD transiently in escrow.
+  await (await cashToken.setIdentityRegistry(registryAddress)).wait();
+  console.log("     MockCashToken: IdentityRegistry wired (KYC enforcement enabled)");
+  await (await cashToken.setSafeList(dvpAddress, true)).wait();
+  await (await cashToken.setSafeList(orderBookAddress, true)).wait();
+  await (await cashToken.setSafeList(orderBookFactoryAddress, true)).wait();
+  await (await cashToken.setSafeList(multiSigWarmAddress, true)).wait();
+  console.log("     MockCashToken: safe-listed DvP, OrderBook, OrderBookFactory, MultiSigWarm");
 
   // Register the multi-sig as a WARM wallet
   await (await walletRegistry.registerWallet(multiSigWarmAddress, 2, "Warm-MultiSig")).wait();
@@ -580,18 +592,18 @@ async function main() {
     }
   }
 
-  // Set boolean KYC claims (topics 1-5)
-  console.log("     Setting KYC claims (topics 1-5)...");
-  for (const topic of [1, 2, 3, 4, 5]) {
+  // Set boolean KYC claims (topics 1-6 — topic 6 = FPS Name-Match Verified)
+  console.log("     Setting KYC claims (topics 1-6)...");
+  for (const topic of [1, 2, 3, 4, 5, 6]) {
     await (await registry.setClaim(INVESTOR1, topic, true)).wait();
   }
-  console.log("     ✓ All 5 boolean claims set");
+  console.log("     ✓ All 6 boolean claims set");
 
   // Issue cryptographic ERC-735 claims via ClaimIssuer
   console.log("     Issuing ERC-735 claims via ClaimIssuer...");
   const inv1IdentityAddr = await registry.identity(INVESTOR1);
   if (inv1IdentityAddr !== ethers.ZeroAddress) {
-    for (const topic of [1, 2, 3, 4, 5]) {
+    for (const topic of [1, 2, 3, 4, 5, 6]) {
       const claimData = ethers.AbiCoder.defaultAbiCoder().encode(
         ["address", "uint256", "uint256"],
         [INVESTOR1, topic, 0]  // 0 = no expiry
