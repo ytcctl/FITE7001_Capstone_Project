@@ -33,7 +33,11 @@ node -e "
   }).then(r => r.json()).then(j => console.log(JSON.stringify(j)));
 "
 ```
+or
+```powershell
+./scripts/load-anvil-state.sh anvil-snapshot-2026-04-25T12-29-26.json
 
+```
 Expected output:
 
 ```json
