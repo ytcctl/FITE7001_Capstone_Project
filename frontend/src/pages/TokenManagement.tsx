@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { SECURITY_TOKEN_ABI } from '../config/contracts';
+import { createNonceManager } from '../utils/nonce';
 import {
   PlusCircle,
   Coins,
@@ -115,7 +116,11 @@ const TokenManagement: React.FC = () => {
     setCreateSuccess(null);
 
     try {
-      const tx = await contracts.tokenFactory.createToken(tokenName, tokenSymbol);
+      // Local nonce management spans createToken + walletRegistry.addTrackedToken
+      // + setSafeList so the second/third txs don't reuse the just-mined nonce.
+      const signer = (contracts.tokenFactory as any).runner as ethers.Signer;
+      const nm = await createNonceManager(signer);
+      const tx = await contracts.tokenFactory.createToken(tokenName, tokenSymbol, nm.next());
       const receipt = await tx.wait();
 
       // Extract TokenCreated event
@@ -145,7 +150,7 @@ const TokenManagement: React.FC = () => {
       // Auto-register the new token in WalletRegistry for custody tracking
       if (newAddress && contracts.walletRegistry) {
         try {
-          const trackTx = await contracts.walletRegistry.addTrackedToken(newAddress);
+          const trackTx = await contracts.walletRegistry.addTrackedToken(newAddress, nm.next());
           await trackTx.wait();
         } catch (trackErr) {
           console.warn('Auto-track token in WalletRegistry failed:', trackErr);
@@ -153,7 +158,7 @@ const TokenManagement: React.FC = () => {
         try {
           const newToken = new ethers.Contract(newAddress, ['function setSafeList(address,bool)'], contracts.securityToken.runner);
           const msAddr = await contracts.multiSigWarm.getAddress();
-          const safeTx = await newToken.setSafeList(msAddr, true);
+          const safeTx = await newToken.setSafeList(msAddr, true, nm.next());
           await safeTx.wait();
         } catch (safeErr) {
           console.warn('Auto-safe-list MultiSigWarm on new token failed:', safeErr);
@@ -242,7 +247,9 @@ const TokenManagement: React.FC = () => {
     setCreateErrorV2(null);
     setCreateSuccessV2(null);
     try {
-      const tx = await contracts.tokenFactoryV2.createToken(v2TokenName, v2TokenSymbol);
+      const signer = (contracts.tokenFactoryV2 as any).runner as ethers.Signer;
+      const nm = await createNonceManager(signer);
+      const tx = await contracts.tokenFactoryV2.createToken(v2TokenName, v2TokenSymbol, nm.next());
       const receipt = await tx.wait();
       const event = receipt.logs.find((log: ethers.Log) => {
         try {
@@ -259,7 +266,7 @@ const TokenManagement: React.FC = () => {
       // Auto-register the new token in WalletRegistry for custody tracking
       if (newAddress && contracts.walletRegistry) {
         try {
-          const trackTx = await contracts.walletRegistry.addTrackedToken(newAddress);
+          const trackTx = await contracts.walletRegistry.addTrackedToken(newAddress, nm.next());
           await trackTx.wait();
         } catch (trackErr) {
           console.warn('Auto-track V2 token in WalletRegistry failed:', trackErr);
@@ -267,7 +274,7 @@ const TokenManagement: React.FC = () => {
         try {
           const newToken = new ethers.Contract(newAddress, ['function setSafeList(address,bool)'], contracts.securityToken.runner);
           const msAddr = await contracts.multiSigWarm.getAddress();
-          const safeTx = await newToken.setSafeList(msAddr, true);
+          const safeTx = await newToken.setSafeList(msAddr, true, nm.next());
           await safeTx.wait();
         } catch (safeErr) {
           console.warn('Auto-safe-list MultiSigWarm on new V2 token failed:', safeErr);

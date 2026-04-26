@@ -21,6 +21,7 @@
    - 6.6 [Step 6 — Monitor Trading](#66-step-6--monitor-trading)
    - 6.7 [Step 7 — Settle Trades (DvP)](#67-step-7--settle-trades-dvp)
    - 6.8 [Step 8 — Deploy Governance](#68-step-8--deploy-governance)
+   - 6.9 [Step 9 — Compliance Operations (Force Cancel + Force Transfer)](#69-step-9--compliance-operations-force-cancel--force-transfer)
 7. [Admin Page Reference](#7-admin-page-reference)
    - 7.1 [Token Management](#71-token-management)
    - 7.2 [KYC Management](#72-kyc-management)
@@ -90,20 +91,41 @@ anvil --host 0.0.0.0 --port 8545 --no-request-size-limit
 
 ### 3.2 Load Pre-existing State (Recommended)
 
-If a state snapshot exists (e.g., `anvil-snapshot-2026-04-18T16-58-42.json`), load it:
+If a state snapshot exists (e.g., `anvil-snapshot-2026-04-25T12-29-26.json`), load it via the helper script:
 
-```powershell
+```bash
+./scripts/load-anvil-state.sh anvil-snapshot-2026-04-25T12-29-26.json
+```
+
+The script reads the snapshot (raw hex), POSTs an `anvil_loadState` JSON-RPC request to `http://127.0.0.1:8545`, and exits non-zero unless Anvil returns `result:true`. To target a different RPC URL: `RPC_URL=http://127.0.0.1:8546 ./scripts/load-anvil-state.sh path/to/snapshot.json`.
+
+**Manual fallback** (if the script is unavailable — note that the snapshot is a raw hex string, so `JSON.parse` will fail; read it as a plain string):
+
+```bash
 node -e "
   const fs = require('fs');
-  const { ethers } = require('ethers');
-  const p = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
-  const data = fs.readFileSync('anvil-snapshot-2026-04-18T16-58-42.json','utf8');
-  const hex = JSON.parse(data);
-  p.send('anvil_loadState', [hex]).then(() => console.log('State loaded'));
+  const state = fs.readFileSync('anvil-snapshot-2026-04-25T12-29-26.json', 'utf8').trim();
+  fs.writeFileSync('anvil-load-request.json', JSON.stringify({jsonrpc:'2.0',method:'anvil_loadState',params:[state],id:1}));
 "
+curl -s -X POST -H "Content-Type: application/json" --data-binary @anvil-load-request.json http://127.0.0.1:8545
 ```
 
 > **Important:** State must be loaded via the `anvil_loadState` RPC method, NOT the `--load-state` CLI flag.
+
+### 3.2.1 Take a Snapshot
+
+Before any irreversible operation (e.g., a hardening run, governance execution, or force-transfer), capture state with:
+
+```bash
+TS=$(date -u +"%Y-%m-%dT%H-%M-%S")
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"anvil_dumpState","params":[],"id":1}' \
+  http://127.0.0.1:8545 \
+  | node -e "let b='';process.stdin.on('data',d=>b+=d).on('end',()=>{require('fs').writeFileSync(process.argv[1],JSON.parse(b).result)})" \
+    "anvil-snapshot-${TS}.json"
+```
+
+The resulting `anvil-snapshot-<timestamp>.json` can be reloaded with the script above to roll back to that point.
 
 ### 3.3 Fix the Blockchain Clock
 
@@ -421,10 +443,7 @@ Once a market is created and investors have tokens + cash:
 
 ### Admin Actions on Trading
 
-As admin, you have additional powers:
-
-- **Force-cancel any order:** Use the force-cancel function with an order ID and reason
-- **Cancel all orders for a non-compliant investor:** Enter the investor address to cancel all their open orders across the market
+The Trading page itself does not expose admin-only controls — admins place orders the same way investors do. Compliance actions against a specific investor (force-cancel orders, cancel pending mint proposals, cancel pending settlements, force-transfer balances) live in **KYC Management → Compliance — Force Cancel**. See [§7.2 KYC Management](#72-kyc-management) and the new [Step 9 — Compliance Operations](#69-step-9--compliance-operations-force-cancel--force-transfer) workflow.
 
 ---
 
@@ -504,6 +523,67 @@ For each token that needs decentralized governance:
 
 ---
 
+### 6.9 Step 9 — Compliance Operations (Force Cancel + Force Transfer)
+
+When an investor is flagged as non-compliant (sanctions hit, lost wallet, court order, liquidator directive), the Custodian unwinds their on-chain footprint and — if required — sweeps their tokens to a recovery wallet.
+
+**Navigate to:** Sidebar → **KYC Management** → scroll to **Compliance — Force Cancel**
+
+#### 6.9.1 Scan the Non-Compliant Investor
+
+1. Enter the **Investor Address** in the Compliance — Force Cancel section
+2. Click **"Scan"**
+
+The scanner walks every active market, every governance suite, every DvP settlement, and every security token, and returns:
+
+| List | What It Finds |
+|------|---------------|
+| **Outstanding Trade Orders** | Open / partially-filled orders the investor placed in any active OrderBook |
+| **Pending Mint Proposals** | Active or queued governance proposals that target the investor's address |
+| **Pending DvP Settlements** | Settlements with status `Pending` where the investor is buyer or seller |
+| **Force Transfer (ERC-1644)** | Per-token rows of the investor's non-zero security-token balances |
+| **History / Audit Trail** | Collapsible: completed transfers, completed orders, completed settlements, completed proposals |
+
+#### 6.9.2 Cancel Outstanding Activity
+
+For each list, click the per-row cancel button:
+
+- **Cancel** (per trade order) → calls `OrderBook.forceCancelOrder(id, reason)`
+- **Cancel Proposal** → calls `Governor.cancel(...)`
+- **Cancel** (per settlement) → calls `DvPSettlement.cancelSettlement(id)`
+
+#### 6.9.3 Force Transfer (Court-Order Recovery, ERC-1644)
+
+> **Use only when authorised by a valid legal instrument** — this bypasses freeze checks and compliance modules. Each call must reference an on-chain anchored legal-order hash for SFC / HKMA auditability.
+
+For each token row showing a non-zero balance:
+
+| Field | Notes |
+|-------|-------|
+| **Recipient address (0x…)** | Must be Identity-Registry verified (the UI pre-checks `isVerified(to)` before signing). Cannot equal the caller — contract rejects self-dealing. |
+| **Amount** | ≤ current balance; in display units (the UI uses 18-decimals `parseEther`). |
+| **Legal order hash (bytes32)** | Required. `0x` + 64 hex chars. Typically the SHA-256 multihash digest of the encrypted court-order document on IPFS. Enforced on-chain: `require(legalOrderHash != bytes32(0))`. |
+| **Operator data (optional hex)** | Free-form supplementary context (case reference, internal nonce, full IPFS CID string). Defaults to `0x`. |
+
+Click **"Force Transfer"**. The handler:
+
+1. Validates inputs locally (address, amount range, bytes32 hash, hex operator data).
+2. Calls `identityRegistry.isVerified(to)` and aborts with a clear message if false.
+3. Submits `securityToken.forcedTransfer(from, to, amount, legalOrderHash, operatorData)`.
+4. Re-reads the source balance and updates / removes the row.
+5. The contract emits `ForcedTransfer(controller, from, to, amount, legalOrderHash, operatorData)` for audit.
+
+**Pre-recovery checklist** for the recovery wallet `to`:
+
+- Registered in the Identity Registry (KYC Management → Register Identity)
+- Has at least claim topic `1` (KYC Verified) issued
+- In an allowed jurisdiction (Compliance Rules)
+- ETH balance ≥ gas cost (Mint ETH (Test) on devnet, or fund externally)
+
+> **Role gate:** `forcedTransfer` requires `AGENT_ROLE` on the security token. The KYC Management page is visible to Admin OR Agent, but a non-Agent admin will see the transaction revert. Use the Agent / Custodian account for production force-transfers.
+
+---
+
 ## 7. Admin Page Reference
 
 ### 7.1 Token Management
@@ -529,22 +609,35 @@ Manage the creation and lifecycle of security tokens.
 
 **Path:** `/kyc` · **Access:** Admin + Agent
 
-Full investor identity lifecycle management.
+Full investor identity lifecycle management plus compliance enforcement actions.
 
 | Section | Purpose |
 |---------|---------|
-| **Register Identity** | Register a new investor with country code and identity mode |
+| **Register Identity** | Register a new investor with country code (ONCHAINID or Boolean mode) |
 | **Issue Claims** | Issue or revoke KYC/AML claims (signed ERC-735 or boolean) |
 | **Lookup Investor** | Query registration status, verification, claims, and identity contract |
-| **Compliance Force Cancel** | Scan a non-compliant investor and cancel their outstanding orders, proposals, and settlements |
+| **Compliance — Force Cancel** | Scan a non-compliant investor; cancel outstanding orders, mint proposals, and settlements |
+| **Force Transfer (ERC-1644 — Court-Order Recovery)** | Sweep a non-compliant investor's security-token balances to a recovery wallet under a legal order |
+| **History / Audit Trail** (collapsible) | Completed transfers, orders, settlements, and proposals with block numbers and timestamps |
 
-**Compliance Force Cancel** details:
-1. Enter the investor's address and click **"Scan"**
-2. The system finds all outstanding:
-   - Trade orders → **"Cancel Order"** button per order
-   - Governance proposals → **"Cancel Proposal"** button per proposal
-   - DvP settlements → **"Cancel Settlement"** button per settlement
-3. An **Audit Trail** section (collapsible) shows historical transfers, orders, settlements, and proposals with block numbers and timestamps
+> **Heading note:** the on-screen section title is **"Compliance — Force Cancel"** (em-dash). Force Transfer rows render under that same red panel after a scan returns at least one non-zero security-token balance.
+
+**Compliance — Force Cancel** flow:
+1. Enter the investor's address and click **"Scan"**.
+2. For each finding, click the per-row cancel button:
+   - Trade orders → **"Cancel"** (calls `OrderBook.forceCancelOrder`)
+   - Governance mint proposals → **"Cancel Proposal"** (calls `Governor.cancel`)
+   - DvP settlements → **"Cancel"** (calls `DvPSettlement.cancelSettlement`)
+3. Status feedback streams into the panel's status line.
+
+**Force Transfer (ERC-1644)** flow:
+1. After scan, security-token rows with non-zero balance appear with a current-balance display.
+2. Per row, fill **Recipient address**, **Amount**, **Legal order hash (bytes32)**, and optional **Operator data**.
+3. Click **"Force Transfer"** — the UI pre-checks `identityRegistry.isVerified(to)` (aborts if recipient not verified), then calls `securityToken.forcedTransfer(from, to, amount, legalOrderHash, operatorData)`.
+4. After confirmation, the source balance is re-read; row is updated or removed if balance reaches zero.
+5. The on-chain `ForcedTransfer(controller, from, to, amount, legalOrderHash, operatorData)` event provides the SFC / HKMA audit anchor.
+
+See [§6.9 Step 9 — Compliance Operations](#69-step-9--compliance-operations-force-cancel--force-transfer) for the full end-to-end workflow.
 
 ---
 
@@ -687,11 +780,7 @@ Key actions: Create Settlement, Execute, Cancel, Mark Failed, Batch Execute.
 
 **Path:** `/trading` · **Access:** All
 
-The Trading page is public but admin has additional powers:
-
-- **Place orders** like any investor (Buy/Sell with price and quantity)
-- **Force-cancel** any order by ID with a reason
-- **Cancel all orders** for a non-compliant investor by address
+The Trading page is public — admins place and cancel their own orders the same way investors do. There are no admin-only controls on this page; compliance actions against another investor (force-cancel orders, cancel proposals/settlements, force-transfer balances) live in [§7.2 KYC Management → Compliance — Force Cancel](#72-kyc-management).
 
 Order placement flow:
 1. Select market from dropdown
@@ -819,6 +908,17 @@ The mint amount exceeds the governance threshold. Either:
 ### Transactions Stuck or Failing After State Load
 
 The blockchain clock may be behind. Run the clock-fix script (Section 3.3).
+
+### Force Transfer Reverts
+
+| Error / Symptom | Cause | Fix |
+|---|---|---|
+| `"Recipient is not verified in the Identity Registry"` (UI pre-check) | Recovery wallet not registered + verified | Run KYC Management → Register Identity + Issue claim topic 1 for the recovery wallet, then retry |
+| `"missing legal order hash"` (on-chain revert) | Hash field empty or `0x0000…` | Provide a non-zero `bytes32` (typically the SHA-256 multihash of the encrypted court order) |
+| `"recipient not verified"` (on-chain revert) | UI pre-check skipped or registry state changed mid-tx | Re-verify recipient KYC; rescan |
+| `"cannot force-transfer to caller"` | Recipient address equals the caller (msg.sender) | Use a different recovery wallet |
+| `"insufficient balance"` | Amount exceeds source balance (possibly because another tx reduced it) | Click **Scan** again to refresh balances |
+| `AccessControl: account ... is missing role 0x...` | Connected wallet lacks `AGENT_ROLE` on this token | Switch to the Agent / Custodian account (see §8) |
 
 ### Settlement Expired
 

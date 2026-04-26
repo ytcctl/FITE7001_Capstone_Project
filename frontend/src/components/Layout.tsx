@@ -32,6 +32,8 @@ interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Short hover description explaining what this tab does. */
+  description: string;
   /** Visible to Admin + Agent (Agent has AGENT_ROLE on the contract) */
   adminOrAgent?: boolean;
   /** Visible to Admin only (Agent has no on-chain role) */
@@ -41,20 +43,99 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/kyc', label: 'KYC Management', icon: ShieldCheck, adminOrAgent: true },
-  { to: '/mint', label: 'Token Minting', icon: Coins, adminOrAgent: true },
-  { to: '/settlement', label: 'DvP Settlement', icon: ArrowRightLeft },
-  { to: '/trading', label: 'Trading', icon: BarChart3 },
-  { to: '/markets', label: 'Market Management', icon: Store, adminOnly: true },
-  { to: '/compliance', label: 'Compliance Rules', icon: Scale, adminOnly: true },
-  { to: '/oracle', label: 'Oracle Committee', icon: ShieldAlert, privileged: true },
-  { to: '/tokens', label: 'Token Management', icon: Building2, adminOnly: true },
-  { to: '/custody', label: 'Wallet Custody', icon: Vault, privileged: true },
-  { to: '/freeze', label: 'Freeze Management', icon: Snowflake, adminOrAgent: true },
-  { to: '/governance', label: 'Governance', icon: Vote },
-  { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
-  { to: '/mint-eth', label: 'Mint ETH (Test)', icon: Sparkles, adminOnly: true },
+  {
+    to: '/',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    description: 'Overview of system status, your portfolio balances, and recent on-chain activity.',
+  },
+  {
+    to: '/kyc',
+    label: 'KYC Management',
+    icon: ShieldCheck,
+    adminOrAgent: true,
+    description: 'Register investor identities, set ERC-735 KYC claims, and verify wallets for trading.',
+  },
+  {
+    to: '/mint',
+    label: 'Token Minting',
+    icon: Coins,
+    adminOrAgent: true,
+    description: 'Issue new HKSAT security tokens or THKD cash tokens to KYC-verified addresses.',
+  },
+  {
+    to: '/settlement',
+    label: 'DvP Settlement',
+    icon: ArrowRightLeft,
+    description: 'Create and execute atomic Delivery-vs-Payment settlements between buyer and seller.',
+  },
+  {
+    to: '/trading',
+    label: 'Trading',
+    icon: BarChart3,
+    description: 'Place buy/sell orders on the on-chain order book and view your order history.',
+  },
+  {
+    to: '/markets',
+    label: 'Market Management',
+    icon: Store,
+    adminOnly: true,
+    description: 'Configure trading pairs, fees, and market parameters for the order book.',
+  },
+  {
+    to: '/compliance',
+    label: 'Compliance Rules',
+    icon: Scale,
+    adminOnly: true,
+    description: 'Manage country restrictions, transfer limits, and Cap. 622 shareholder caps.',
+  },
+  {
+    to: '/oracle',
+    label: 'Oracle Committee',
+    icon: ShieldAlert,
+    privileged: true,
+    description: 'Multi-signer oracle for compliance attestations and off-chain data feeds.',
+  },
+  {
+    to: '/tokens',
+    label: 'Token Management',
+    icon: Building2,
+    adminOnly: true,
+    description: 'Deploy new security tokens via the factory and manage existing token metadata.',
+  },
+  {
+    to: '/custody',
+    label: 'Wallet Custody',
+    icon: Vault,
+    privileged: true,
+    description: 'Multi-signature warm-wallet custody for institutional asset safekeeping.',
+  },
+  {
+    to: '/freeze',
+    label: 'Freeze Management',
+    icon: Snowflake,
+    adminOrAgent: true,
+    description: 'Freeze or unfreeze investor wallets and tokens to enforce regulatory holds.',
+  },
+  {
+    to: '/governance',
+    label: 'Governance',
+    icon: Vote,
+    description: 'Create proposals, delegate votes, and participate in on-chain governance.',
+  },
+  {
+    to: '/portfolio',
+    label: 'Portfolio',
+    icon: Briefcase,
+    description: 'View your token balances, transaction history, and KYC status.',
+  },
+  {
+    to: '/mint-eth',
+    label: 'Mint ETH (Test)',
+    icon: Sparkles,
+    adminOnly: true,
+    description: 'Test-only utility to top up dev accounts with ETH on the local devnet.',
+  },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -263,36 +344,48 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             if (isHidden) return null;
 
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-white/10 text-white shadow-sm border border-white/5'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon size={20} className={isActive ? 'text-purple-400' : 'text-gray-500'} />
-                {item.label}
-                {item.adminOnly && (
-                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-yellow-400/70">
-                    <Shield size={10} />
-                    Admin
-                  </span>
-                )}
-                {item.adminOrAgent && (
-                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-orange-400/70">
-                    <Shield size={10} />
-                    Staff
-                  </span>
-                )}
-                {item.privileged && (
-                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-green-400/70">
-                    <Shield size={10} />
-                    Privileged
-                  </span>
-                )}
-              </NavLink>
+              <div key={item.to} className="group relative">
+                <NavLink
+                  to={item.to}
+                  title={item.description}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? 'bg-white/10 text-white shadow-sm border border-white/5'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Icon size={20} className={isActive ? 'text-purple-400' : 'text-gray-500'} />
+                  {item.label}
+                  {item.adminOnly && (
+                    <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-yellow-400/70">
+                      <Shield size={10} />
+                      Admin
+                    </span>
+                  )}
+                  {item.adminOrAgent && (
+                    <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-orange-400/70">
+                      <Shield size={10} />
+                      Staff
+                    </span>
+                  )}
+                  {item.privileged && (
+                    <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-green-400/70">
+                      <Shield size={10} />
+                      Privileged
+                    </span>
+                  )}
+                </NavLink>
+                {/* Custom hover tooltip (desktop only — fades in on hover) */}
+                <div
+                  role="tooltip"
+                  className="hidden md:block pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 w-64 z-[120] opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-150"
+                >
+                  <div className="bg-gray-900/95 backdrop-blur border border-white/10 text-gray-200 text-xs rounded-xl shadow-2xl px-3 py-2 leading-relaxed">
+                    <div className="font-semibold text-white mb-1">{item.label}</div>
+                    {item.description}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </nav>

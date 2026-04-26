@@ -161,7 +161,8 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
             CLAIM_ACCREDITED_INVESTOR,
             CLAIM_JURISDICTION_APPROVED,
             CLAIM_SOURCE_OF_FUNDS,
-            CLAIM_PEP_SANCTIONS_CLEAR
+            CLAIM_PEP_SANCTIONS_CLEAR,
+            CLAIM_FPS_NAME_MATCH
         ];
     }
 
@@ -215,8 +216,8 @@ contract HKSTPIdentityRegistry is AccessControl, Pausable {
             }
         }
 
-        // Remove from per-topic arrays
-        for (uint256 t = 1; t <= 5; t++) {
+        // Remove from per-topic arrays (topics 1..6 — keep in sync with claim constants above)
+        for (uint256 t = 1; t <= 6; t++) {
             if (_isTrustedForTopic[t][issuer]) {
                 _isTrustedForTopic[t][issuer] = false;
                 address[] storage issuers = _trustedIssuersByTopic[t];

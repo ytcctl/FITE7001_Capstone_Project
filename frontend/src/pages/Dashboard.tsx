@@ -94,10 +94,73 @@ const Dashboard: React.FC = () => {
       setIsVerified(verified);
       setIsRegistered(registered);
 
-      // Load claim status
+      // Load claim status — mirror the contract's isVerified semantics:
+      // when an ONCHAINID + trusted issuers exist, signed ERC-735 claims are
+      // authoritative; the boolean store is consulted only when no signed claim
+      // has ever been issued for the topic. (A boolean-only check would re-flag
+      // properly revoked signed claims as still true — the original bug.)
       const claims: Record<number, boolean> = {};
-      for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
-        claims[topic] = await contracts.identityRegistry.hasClaim(account, topic);
+      try {
+        const identityContract = await contracts.identityRegistry.identity(account);
+        const trustedIssuers = await contracts.identityRegistry.getTrustedIssuers();
+        const hasOnchainId = identityContract && identityContract !== ethers.ZeroAddress;
+
+        if (hasOnchainId && trustedIssuers.length > 0) {
+          const provider = (contracts.identityRegistry as any).runner?.provider ?? contracts.identityRegistry.runner;
+          const idContract = new ethers.Contract(
+            identityContract,
+            [
+              'function getClaimIdsByTopic(uint256 topic) view returns (bytes32[])',
+              'function getClaim(bytes32 claimId) view returns (uint256 topic, uint256 scheme, address issuer, bytes signature, bytes data, string uri)',
+            ],
+            provider
+          );
+
+          for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
+            let claimIds: string[] = [];
+            let topicValid = false;
+            try {
+              claimIds = await idContract.getClaimIdsByTopic(topic);
+              for (const cid of claimIds) {
+                const claim = await idContract.getClaim(cid);
+                try {
+                  const valid = await contracts.claimIssuer.isClaimValid(
+                    identityContract, topic, claim.signature, claim.data
+                  );
+                  if (!valid) continue;
+                  const revoked = await contracts.claimIssuer.isClaimRevoked(cid);
+                  if (revoked) continue;
+                  if (claim.data.length >= 194) {
+                    try {
+                      const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+                        ['address', 'uint256', 'uint256'], claim.data
+                      );
+                      const expiry = decoded[2];
+                      if (expiry > 0n && BigInt(Math.floor(Date.now() / 1000)) > expiry) continue;
+                    } catch {}
+                  }
+                  topicValid = true;
+                  break;
+                } catch { continue; }
+              }
+            } catch { /* getClaimIdsByTopic failed — treat as no signed claims */ }
+            if (claimIds.length === 0) {
+              try { claims[topic] = await contracts.identityRegistry.hasClaim(account, topic); } catch { claims[topic] = false; }
+            } else {
+              claims[topic] = topicValid;
+            }
+          }
+        } else {
+          // No ONCHAINID or no trusted issuers — boolean store is the only source.
+          for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
+            claims[topic] = await contracts.identityRegistry.hasClaim(account, topic);
+          }
+        }
+      } catch (e) {
+        console.warn('Claim resolution failed, falling back to boolean store:', e);
+        for (const topic of Object.keys(CLAIM_TOPICS).map(Number)) {
+          try { claims[topic] = await contracts.identityRegistry.hasClaim(account, topic); } catch { claims[topic] = false; }
+        }
       }
       setClaimStatus(claims);
     } catch (e) {

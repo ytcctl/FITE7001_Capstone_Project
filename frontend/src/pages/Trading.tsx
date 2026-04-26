@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { ORDER_BOOK_ABI, SECURITY_TOKEN_ABI, CONTRACT_ADDRESSES } from '../config/contracts';
+import { createNonceManager } from '../utils/nonce';
 import {
   TrendingUp,
   TrendingDown,
@@ -475,15 +476,18 @@ const Trading: React.FC = () => {
       const priceBN = ethers.parseUnits(price, 6);
       const qtyBN = ethers.parseUnits(quantity, 18);
       const tradeCountBefore = Number(await obContract.tradeCount());
+      // Manage nonces locally across approve + place to bypass wallet/provider caches.
+      const signer = (obContract as any).runner as ethers.Signer;
+      const nm = await createNonceManager(signer);
 
       if (side === 'buy') {
         const cashNeeded = (priceBN * qtyBN) / ethers.parseUnits('1', 18);
         const currentAllowance = await contracts.cashToken.allowance(account, obAddr);
         if (currentAllowance < cashNeeded) {
-          const approveTx = await contracts.cashToken.approve(obAddr, cashNeeded);
+          const approveTx = await contracts.cashToken.approve(obAddr, cashNeeded, nm.next());
           await approveTx.wait();
         }
-        const tx = await obContract.placeBuyOrder(priceBN, qtyBN);
+        const tx = await obContract.placeBuyOrder(priceBN, qtyBN, nm.next());
         await tx.wait();
 
         const tradeCountAfter = Number(await obContract.tradeCount());
@@ -495,10 +499,10 @@ const Trading: React.FC = () => {
       } else {
         const currentAllowance = await secTokenContract.allowance(account, obAddr);
         if (currentAllowance < qtyBN) {
-          const approveTx = await secTokenContract.approve(obAddr, qtyBN);
+          const approveTx = await secTokenContract.approve(obAddr, qtyBN, nm.next());
           await approveTx.wait();
         }
-        const tx = await obContract.placeSellOrder(priceBN, qtyBN);
+        const tx = await obContract.placeSellOrder(priceBN, qtyBN, nm.next());
         await tx.wait();
 
         const tradeCountAfter = Number(await obContract.tradeCount());

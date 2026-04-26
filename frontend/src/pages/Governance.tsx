@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { CONTRACT_ADDRESSES, SECURITY_TOKEN_ABI, GOVERNOR_ABI, TIMELOCK_ABI, rpcUrlForBrowser } from '../config/contracts';
+import { createNonceManager } from '../utils/nonce';
 import { Vote, Clock, CheckCircle, XCircle, AlertTriangle, Users, Shield, Loader2, ChevronDown, ChevronUp, RefreshCw, Plus, Play, FileText, Timer, Rocket } from 'lucide-react';
 
 /** Check if an error contains the ERC20InsufficientBalance custom error (selector 0xe450d38c). */
@@ -36,11 +37,18 @@ function decodeGovernanceError(e: any): string {
         return `Insufficient voting power to propose. You have ${votes.toLocaleString()} votes but need at least ${threshold.toLocaleString()}.`;
       }
       // GovernorUnexpectedProposalState(uint256 proposalId, ProposalState current, bytes32 expected)
-      if (sel === '0x5765a514') {
+      // Two known selectors across OZ versions: 0x5765a514 (older) and 0x31b75e4d (v5).
+      if (sel === '0x5765a514' || sel === '0x31b75e4d') {
         const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
           ['uint256', 'uint8', 'bytes32'], '0x' + revertData.slice(10));
         const STATES = ['Pending','Active','Canceled','Defeated','Succeeded','Queued','Expired','Executed'];
-        return `Proposal is currently "${STATES[Number(decoded[1])] || decoded[1]}" — cannot perform this action.`;
+        const stateName = STATES[Number(decoded[1])] || String(decoded[1]);
+        // At propose-time, this means the same proposal (same targets+values+calldatas+description)
+        // already exists. Guide the user to either act on the existing one or change the description.
+        if (Number(decoded[1]) !== 2 && Number(decoded[1]) !== 3 && Number(decoded[1]) !== 6 && Number(decoded[1]) !== 7) {
+          return `A proposal with the same description and action already exists and is in "${stateName}" state. Either act on the existing proposal in the list below, or edit the description (e.g. add a unique suffix) to create a new one.`;
+        }
+        return `Proposal is currently "${stateName}" — cannot perform this action.`;
       }
       // GovernorAlreadyCastVote(address voter)
       if (sel === '0x71c6af49') {
@@ -180,7 +188,7 @@ interface GovernanceSuite {
 }
 
 const Governance: React.FC = () => {
-  const { contracts, account, roles } = useWeb3();
+  const { contracts, account, roles, signer } = useWeb3();
 
   // ─── Token selector ───────────────────────────────────────
   const [governanceSuites, setGovernanceSuites] = useState<GovernanceSuite[]>([]);
@@ -583,14 +591,24 @@ const Governance: React.FC = () => {
           case 'mint': {
             if (!actionParam1 || !actionParam2) throw new Error('Recipient address and amount are required');
             const to = ethers.getAddress(actionParam1.trim());
-            // Regulatory check: recipient must be registered and KYC-verified
-            if (contracts) {
+            // Recognised protocol custody contracts (warm wallet, timelock) bypass the
+            // investor-KYC pre-check — they're treasury endpoints, not investor wallets.
+            const protocolCustody = new Set(
+              [CONTRACT_ADDRESSES.multiSigWarm, CONTRACT_ADDRESSES.timelock]
+                .filter(Boolean)
+                .map((a) => a.toLowerCase())
+            );
+            const isProtocolCustody = protocolCustody.has(to.toLowerCase());
+
+            // Regulatory check: investor recipients must be registered and KYC-verified.
+            // Protocol custody contracts are exempt (compliance enforced via on-chain hooks).
+            if (contracts && !isProtocolCustody) {
               const [isRegistered, isVerifiedAddr] = await Promise.all([
                 contracts.identityRegistry.contains(to).catch(() => false),
                 contracts.identityRegistry.isVerified(to).catch(() => false),
               ]);
               if (!isRegistered || !isVerifiedAddr) {
-                setStatus({ type: 'error', message: 'Proposal creation is unavailable. Your KYC verification has not been completed. For further assistance, please contact our support team.' });
+                setStatus({ type: 'error', message: 'Proposal creation is unavailable. The recipient has not completed KYC verification. For further assistance, please contact our support team.' });
                 setProposing(false);
                 return;
               }
@@ -645,6 +663,26 @@ const Governance: React.FC = () => {
         calldata = '0x';
         value = 0n;
       }
+
+      // Pre-check: avoid a wasted on-chain revert when a proposal with the same
+      // (targets, values, calldatas, description) already exists in an active state.
+      try {
+        const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposalDescription));
+        const proposalId: bigint = await activeGovernor!.hashProposal(
+          [target],
+          [value],
+          [calldata],
+          descHash
+        );
+        const existingState: bigint = await activeGovernor!.state(proposalId).catch(() => -1n);
+        // Active states (Pending=0, Active=1, Succeeded=4, Queued=5) block re-propose.
+        if (existingState === 0n || existingState === 1n || existingState === 4n || existingState === 5n) {
+          const STATES = ['Pending','Active','Canceled','Defeated','Succeeded','Queued','Expired','Executed'];
+          setStatus({ type: 'error', message: `A proposal with the same description and action already exists and is in "${STATES[Number(existingState)]}" state. Either act on the existing proposal in the list below, or edit the description (e.g. add a unique suffix like "(v2)") to create a new one.` });
+          setProposing(false);
+          return;
+        }
+      } catch { /* hashProposal/state may not be available on older governors — fall through */ }
 
       const tx = await activeGovernor!.propose(
         [target],
@@ -751,30 +789,109 @@ const Governance: React.FC = () => {
           const iface = new ethers.Interface(SECURITY_TOKEN_ABI);
           const decoded = iface.decodeFunctionData('mint', proposal.calldatas[0]);
           const recipient = decoded[0] as string;
-          const [isRegistered, isVerifiedAddr] = await Promise.all([
-            contracts.identityRegistry.contains(recipient).catch(() => false),
-            contracts.identityRegistry.isVerified(recipient).catch(() => false),
-          ]);
-          if (!isRegistered || !isVerifiedAddr) {
-            const reason = 'Proposal execution has failed. Your KYC verification has not been completed. For further assistance, please contact our support team.';
-            // Attempt to cancel the proposal
+          // Protocol custody contracts (warm wallet, timelock) bypass investor-KYC.
+          const protocolCustody = new Set(
+            [CONTRACT_ADDRESSES.multiSigWarm, CONTRACT_ADDRESSES.timelock]
+              .filter(Boolean)
+              .map((a) => a.toLowerCase())
+          );
+          const isProtocolCustody = protocolCustody.has(recipient.toLowerCase());
+
+          // For protocol custody, the on-chain mint still enforces isVerified(recipient).
+          // Auto-register the custody contract as a verified identity if not yet registered,
+          // so the timelock-executed mint can succeed.
+          //
+          // The registry uses cryptographic ERC-735 verification when the identity has
+          // an ONCHAINID and trusted issuers exist — boolean claims alone aren't enough.
+          // We must issue signed claims via the ClaimIssuer (signing key = connected admin).
+          if (isProtocolCustody && (roles.isAdmin || roles.isAgent) && signer) {
             try {
-              const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
-              const cancelTx = await activeGovernor.cancel(
-                [...proposal.targets],
-                [...proposal.values],
-                [...proposal.calldatas],
-                descHash
-              );
-              await cancelTx.wait();
-            } catch { /* Cancel may fail if caller is not the proposer */ }
-            setDefeatedProposals((prev) => new Map(prev).set(proposal.id, reason));
-            setStatus({ type: 'error', message: `✗ Proposal Defeated — ${reason}` });
-            await loadProposals();
-            return;
+              const isVerifiedAddr = await contracts.identityRegistry.isVerified(recipient).catch(() => false);
+              if (!isVerifiedAddr) {
+                setStatus({ type: 'info', message: 'Registering custody contract as a verified identity (one-time setup)…' });
+                // Local nonce management spans registerIdentity + 5 issueClaim txs
+                // — wallet/provider per-block cache won't see prior txs in time
+                // for the next, so increment locally instead.
+                const nm = await createNonceManager(signer);
+                const isRegistered = await contracts.identityRegistry.contains(recipient).catch(() => false);
+                if (!isRegistered) {
+                  // Auto-deploy an ONCHAINID for the custody contract via the configured factory.
+                  // country is a string (ISO 3166 alpha-2 code).
+                  const tx = await contracts.identityRegistry.registerIdentity(
+                    recipient,
+                    ethers.ZeroAddress,
+                    'HK',
+                    nm.next()
+                  );
+                  await tx.wait();
+                }
+                // Issue signed ERC-735 claims for topics 1..5 via the ClaimIssuer.
+                const identityAddr = await contracts.identityRegistry.identity(recipient);
+                if (identityAddr === ethers.ZeroAddress) {
+                  throw new Error('ONCHAINID was not deployed for the custody contract');
+                }
+                const coder = ethers.AbiCoder.defaultAbiCoder();
+                for (let topic = 1; topic <= 5; topic++) {
+                  setStatus({ type: 'info', message: `Issuing signed claim ${topic}/5 for custody contract…` });
+                  // data = abi.encode(identityContract, topic, expiry=0)
+                  const data = coder.encode(
+                    ['address', 'uint256', 'uint256'],
+                    [identityAddr, topic, 0]
+                  );
+                  // dataHash = keccak256(abi.encode(identity, topic, data))
+                  const dataHash = ethers.keccak256(
+                    coder.encode(['address', 'uint256', 'bytes'], [identityAddr, topic, data])
+                  );
+                  const signature = await signer.signMessage(ethers.getBytes(dataHash));
+                  const claimTx = await contracts.identityRegistry.issueClaim(
+                    recipient,
+                    topic,
+                    CONTRACT_ADDRESSES.claimIssuer,
+                    signature,
+                    data,
+                    nm.next()
+                  );
+                  await claimTx.wait();
+                }
+                // Verify the registration took effect before proceeding.
+                const verifiedNow = await contracts.identityRegistry.isVerified(recipient).catch(() => false);
+                if (!verifiedNow) {
+                  throw new Error('Custody contract still not verified after issuing claims — the ClaimIssuer may not trust the connected wallet as a signer.');
+                }
+                setStatus({ type: 'info', message: 'Custody contract verified. Executing proposal…' });
+              }
+            } catch (regErr: any) {
+              setStatus({ type: 'error', message: `Failed to register custody contract: ${regErr?.reason || regErr?.message || 'Unknown error'}. Please register the warm wallet manually in KYC Management before retrying.` });
+              return;
+            }
           }
-          // Frozen check: block minting to a frozen address
-          try {
+
+          if (!isProtocolCustody) {
+            const [isRegistered, isVerifiedAddr] = await Promise.all([
+              contracts.identityRegistry.contains(recipient).catch(() => false),
+              contracts.identityRegistry.isVerified(recipient).catch(() => false),
+            ]);
+            if (!isRegistered || !isVerifiedAddr) {
+              const reason = 'Proposal execution has failed. The recipient has not completed KYC verification. For further assistance, please contact our support team.';
+              // Attempt to cancel the proposal
+              try {
+                const descHash = ethers.keccak256(ethers.toUtf8Bytes(proposal.description));
+                const cancelTx = await activeGovernor.cancel(
+                  [...proposal.targets],
+                  [...proposal.values],
+                  [...proposal.calldatas],
+                  descHash
+                );
+                await cancelTx.wait();
+              } catch { /* Cancel may fail if caller is not the proposer */ }
+              setDefeatedProposals((prev) => new Map(prev).set(proposal.id, reason));
+              setStatus({ type: 'error', message: `✗ Proposal Defeated — ${reason}` });
+              await loadProposals();
+              return;
+            }
+          }
+          // Frozen check: block minting to a frozen address (skipped for protocol custody)
+          if (!isProtocolCustody) try {
             const tokenTarget = proposal.targets?.[0];
             const signer = (activeGovernor as any).runner as ethers.Signer;
             const tokenC = tokenTarget ? new ethers.Contract(tokenTarget, SECURITY_TOKEN_ABI, signer) : contracts.securityToken;
