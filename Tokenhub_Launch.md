@@ -37,8 +37,6 @@ or
 ```powershell
 ./scripts/load-anvil-state.sh anvil-snapshot-2026-04-25T12-29-26.json
 
-anvil --load-state anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json --host 127.0.0.1 --port 8545
-
 ```
 Expected output:
 
