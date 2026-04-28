@@ -2,9 +2,27 @@
 
 ## Prerequisites
 
-- **Node.js** installed
+- **Node.js** installed (v18+ for native `fetch`)
 - **Foundry / Anvil** installed (`~/.foundry/bin` on PATH)
+- Frontend deps installed: `cd frontend && npm install`
 - Working directory: `FITE7001_Capstone_Project`
+
+## Quick Start (TL;DR)
+
+```powershell
+# Terminal 1 — start Anvil
+$env:Path = "$env:USERPROFILE\.foundry\bin;$env:Path"
+anvil --host 0.0.0.0 --port 8545 --no-request-size-limit
+
+# Terminal 2 — load state, fix clock, run frontend
+cd C:\Users\ASUS\Downloads\FITE7001_Capstone_Project
+node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json','utf8'));fetch('http://127.0.0.1:8545',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'anvil_loadState',params:[s],id:1})}).then(r=>r.json()).then(j=>console.log(j))"
+# (then run the clock-fix snippet from Step 2b)
+cd frontend
+npm run dev
+```
+
+Open **http://localhost:3000/**.
 
 ## Step 1: Start Anvil
 
@@ -20,11 +38,11 @@ anvil --host 0.0.0.0 --port 8545 --no-request-size-limit
 In a **separate terminal**, run:
 
 ```powershell
-cd C:\Users\ytcct\Downloads\Development\FITE7001_Capstone_Project
+cd C:\Users\ASUS\Downloads\FITE7001_Capstone_Project
 
 node -e "
   const fs = require('fs');
-  const state = JSON.parse(fs.readFileSync('anvil-snapshot-2026-04-18T16-58-42.json', 'utf8'));
+  const state = JSON.parse(fs.readFileSync('anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json', 'utf8'));
   const body = JSON.stringify({ jsonrpc: '2.0', method: 'anvil_loadState', params: [state], id: 1 });
   fetch('http://127.0.0.1:8545', {
     method: 'POST',
@@ -33,6 +51,8 @@ node -e "
   }).then(r => r.json()).then(j => console.log(JSON.stringify(j)));
 "
 ```
+
+> Replace the filename with the latest `anvil-snapshot-*.json` in the project root if a newer one exists.
 
 Expected output:
 
@@ -101,7 +121,7 @@ $env:VITE_TUNNEL = "1"; npm run dev
 | `anvil_dumpState` RPC | Hex-encoded blob (`"0x1f8b..."`) | `anvil_loadState` RPC |
 | `--dump-state` CLI flag | `SerializableState` JSON | `--load-state` CLI flag |
 
-These formats are **not interchangeable**. The snapshot file `anvil-snapshot-2026-04-18T16-58-42.json` was created via `anvil_dumpState` RPC, so it **must** be loaded via `anvil_loadState` RPC — not `--load-state`.
+These formats are **not interchangeable**. The snapshot files in the project root (e.g. `anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json`) were created via `anvil_dumpState` RPC, so they **must** be loaded via `anvil_loadState` RPC — not `--load-state`.
 
 ### Saving a New Snapshot
 
