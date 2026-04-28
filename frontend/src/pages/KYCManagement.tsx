@@ -4,7 +4,7 @@ import { CLAIM_TOPICS, CONTRACT_ADDRESSES, IDENTITY_ABI, ORDER_BOOK_ABI, GOVERNO
   DVP_SETTLEMENT_ABI, SECURITY_TOKEN_ABI, TOKEN_FACTORY_ABI, TOKEN_FACTORY_V2_ABI, CASH_TOKEN_ABI, rpcUrlForBrowser } from '../config/contracts';
 import { createNonceManager } from '../utils/nonce';
 import { ethers } from 'ethers';
-import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldCheck, UserPlus, CheckCircle, XCircle, Search, Loader2, Key, Fingerprint, AlertTriangle, ShieldAlert, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 
 const KYCManagement: React.FC = () => {
   const { account, signer, contracts, roles } = useWeb3();
@@ -50,6 +50,19 @@ const KYCManagement: React.FC = () => {
   const [cancellingProposal, setCancellingProposal] = useState<string | null>(null);
   const [cancellingSettlement, setCancellingSettlement] = useState<number | null>(null);
   const [cancellingTradeOrder, setCancellingTradeOrder] = useState<number | null>(null);
+  // ─── Link Additional Wallet to Existing Identity ──
+  const [linkPrimaryWallet, setLinkPrimaryWallet] = useState('');
+  const [linkNewWallet, setLinkNewWallet] = useState('');
+  const [linkCountry, setLinkCountry] = useState('HK');
+  const [linkPreview, setLinkPreview] = useState<{
+    identityAddr: string;
+    linkedWallets: string[];
+    primaryVerified: boolean;
+  } | null>(null);
+  const [linkPreviewLoading, setLinkPreviewLoading] = useState(false);
+  const [linkSubmitting, setLinkSubmitting] = useState(false);
+  const [linkStatus, setLinkStatus] = useState('');
+
   // ─── Force Transfer (ERC-1644 court-order recovery) state ──
   const [forceTransferRows, setForceTransferRows] = useState<
     { tokenAddr: string; label: string; balance: string; balanceWei: bigint }[]
@@ -409,6 +422,96 @@ const KYCManagement: React.FC = () => {
       setForceCancelStatus(`✗ Cancel settlement failed: ${e?.reason || e?.message || 'Unknown error'}`);
     } finally {
       setCancellingSettlement(null);
+    }
+  };
+
+  // ─── Link Additional Wallet flow ───────────────────────────────
+  // Resolves the primary wallet's ONCHAINID and current linked-wallet list
+  // so the user can confirm they're linking into the correct identity.
+  const handleLinkPreview = async () => {
+    if (!contracts || !linkPrimaryWallet.trim()) {
+      setLinkPreview(null);
+      return;
+    }
+    let primary: string;
+    try { primary = ethers.getAddress(linkPrimaryWallet.trim()); }
+    catch { setLinkStatus('✗ Invalid primary wallet address'); setLinkPreview(null); return; }
+    setLinkPreviewLoading(true);
+    setLinkStatus('');
+    try {
+      const identityAddr = await contracts.identityRegistry.getIdentityForWallet(primary);
+      if (identityAddr === ethers.ZeroAddress) {
+        setLinkStatus('✗ Primary wallet has no ONCHAINID — register it first via "Register Identity" (ONCHAINID mode).');
+        setLinkPreview(null);
+        return;
+      }
+      const [linkedWallets, primaryVerified] = await Promise.all([
+        contracts.identityRegistry.getLinkedWallets(identityAddr),
+        contracts.identityRegistry.isVerified(primary),
+      ]);
+      setLinkPreview({
+        identityAddr,
+        linkedWallets: [...linkedWallets],
+        primaryVerified,
+      });
+    } catch (e: any) {
+      setLinkStatus(`✗ Preview failed: ${e?.reason || e?.message || 'Unknown error'}`);
+      setLinkPreview(null);
+    } finally {
+      setLinkPreviewLoading(false);
+    }
+  };
+
+  const handleLinkWallet = async () => {
+    if (!contracts || !signer) return;
+    let primary: string, newW: string;
+    try { primary = ethers.getAddress(linkPrimaryWallet.trim()); }
+    catch { setLinkStatus('✗ Invalid primary wallet address'); return; }
+    try { newW = ethers.getAddress(linkNewWallet.trim()); }
+    catch { setLinkStatus('✗ Invalid new wallet address'); return; }
+    if (newW.toLowerCase() === primary.toLowerCase()) {
+      setLinkStatus('✗ New wallet must differ from primary wallet'); return;
+    }
+    if (!linkCountry.trim() || linkCountry.trim().length !== 2) {
+      setLinkStatus('✗ Country must be a 2-letter ISO code (e.g. HK, GB, SG)'); return;
+    }
+
+    setLinkSubmitting(true);
+    setLinkStatus('Resolving primary wallet ONCHAINID…');
+    try {
+      const identityAddr = await contracts.identityRegistry.getIdentityForWallet(primary);
+      if (identityAddr === ethers.ZeroAddress) {
+        setLinkStatus('✗ Primary wallet has no ONCHAINID. Register it first.');
+        return;
+      }
+      // Pre-check: new wallet must not already be registered (contract will revert otherwise)
+      const alreadyRegistered = await contracts.identityRegistry.contains(newW);
+      if (alreadyRegistered) {
+        setLinkStatus('✗ New wallet is already registered. Call unlinkWallet first if you want to re-bind it.');
+        return;
+      }
+      setLinkStatus('Submitting linkWallet transaction…');
+      const nm = await createNonceManager(signer);
+      const tx = await contracts.identityRegistry.linkWallet(
+        newW,
+        identityAddr,
+        linkCountry.trim().toUpperCase(),
+        nm.next()
+      );
+      await tx.wait();
+
+      // Refresh preview with the now-linked wallet appended
+      const updatedLinked = await contracts.identityRegistry.getLinkedWallets(identityAddr);
+      setLinkPreview((prev) => prev
+        ? { ...prev, linkedWallets: [...updatedLinked] }
+        : { identityAddr, linkedWallets: [...updatedLinked], primaryVerified: false }
+      );
+      setLinkStatus(`✓ Wallet ${newW.slice(0,6)}…${newW.slice(-4)} linked to ONCHAINID ${identityAddr.slice(0,6)}…${identityAddr.slice(-4)}. Boolean claims copied from primary.`);
+      setLinkNewWallet('');
+    } catch (e: any) {
+      setLinkStatus(`✗ Link failed: ${e?.reason || e?.message || 'Unknown error'}`);
+    } finally {
+      setLinkSubmitting(false);
     }
   };
 
@@ -1081,6 +1184,110 @@ const KYCManagement: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── Link Additional Wallet to Existing Identity (Admin/Agent only) ── */}
+      {(roles.isAdmin || roles.isAgent) && (
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Link2 size={20} className="text-purple-400" />
+            <h3 className="font-bold text-white">Link Additional Wallet to Existing Identity</h3>
+          </div>
+          <p className="text-gray-400 text-sm mb-4">
+            Bind a second (or third…) wallet to an investor's existing ONCHAINID so all of their wallets count as <strong>one shareholder</strong> for Cap. 622 and inherit the same KYC claims.
+            Use this <em>instead of</em> Register Identity when the investor already has a registered wallet — otherwise you'll create a duplicate identity for the same person.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Primary Wallet (already registered)</label>
+              <input
+                type="text"
+                value={linkPrimaryWallet}
+                onChange={(e) => { setLinkPrimaryWallet(e.target.value); setLinkPreview(null); setLinkStatus(''); }}
+                onBlur={handleLinkPreview}
+                placeholder="0x… (resolves the ONCHAINID)"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">New Wallet to Link</label>
+              <input
+                type="text"
+                value={linkNewWallet}
+                onChange={(e) => { setLinkNewWallet(e.target.value); setLinkStatus(''); }}
+                placeholder="0x… (must not be registered)"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Country (ISO 3166-1 α-2)</label>
+              <input
+                type="text"
+                value={linkCountry}
+                onChange={(e) => setLinkCountry(e.target.value.toUpperCase())}
+                maxLength={2}
+                placeholder="HK"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-sm uppercase"
+              />
+            </div>
+          </div>
+
+          {/* Preview box */}
+          {linkPreviewLoading && (
+            <div className="bg-white/5 rounded-xl p-3 mb-3 text-sm text-gray-400 flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" /> Resolving ONCHAINID…
+            </div>
+          )}
+          {linkPreview && !linkPreviewLoading && (
+            <div className="bg-white/5 rounded-xl p-4 mb-3 space-y-2 border border-purple-500/20">
+              <div className="text-sm text-gray-400 flex items-center gap-2">
+                <Fingerprint size={14} className="text-purple-400" />
+                ONCHAINID:&nbsp;
+                <span className="text-purple-300 font-mono text-xs">{linkPreview.identityAddr}</span>
+              </div>
+              <div className="text-sm text-gray-400">
+                Primary wallet KYC verified:{' '}
+                <span className={linkPreview.primaryVerified ? 'text-emerald-400' : 'text-amber-300'}>
+                  {linkPreview.primaryVerified ? 'Yes' : 'No (warning — claims will copy as-is, including any missing topics)'}
+                </span>
+              </div>
+              <div className="text-sm text-gray-400">
+                Currently-linked wallets ({linkPreview.linkedWallets.length}):
+              </div>
+              <ul className="space-y-1 text-xs font-mono">
+                {linkPreview.linkedWallets.map((w, i) => (
+                  <li key={w} className="text-gray-300 flex items-center gap-2">
+                    <span className="inline-block w-4 text-gray-500">{i === 0 ? '★' : '↳'}</span>
+                    <span>{w}</span>
+                    {i === 0 && <span className="text-[10px] text-gray-500">(primary)</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <button
+            onClick={handleLinkWallet}
+            disabled={
+              linkSubmitting ||
+              !linkPrimaryWallet.trim() ||
+              !linkNewWallet.trim() ||
+              !linkCountry.trim()
+            }
+            className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {linkSubmitting && <Loader2 size={16} className="animate-spin" />}
+            <Link2 size={16} />
+            Link Wallet to Identity
+          </button>
+
+          {linkStatus && (
+            <p className={`mt-3 text-sm ${linkStatus.startsWith('✓') ? 'text-emerald-400' : linkStatus.startsWith('✗') ? 'text-red-400' : 'text-purple-300'}`}>
+              {linkStatus}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Compliance — Force Cancel (Admin/Agent only) ── */}
       {(roles.isAdmin || roles.isAgent) && (
