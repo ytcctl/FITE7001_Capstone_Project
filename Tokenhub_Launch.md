@@ -16,7 +16,7 @@ anvil --host 0.0.0.0 --port 8545 --no-request-size-limit
 
 # Terminal 2 — load state, fix clock, run frontend
 cd C:\Users\ASUS\Downloads\FITE7001_Capstone_Project
-node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json','utf8'));fetch('http://127.0.0.1:8545',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'anvil_loadState',params:[s],id:1})}).then(r=>r.json()).then(j=>console.log(j))"
+node -e "const fs=require('fs');const s=fs.readFileSync('anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json','utf8').trim();fetch('http://127.0.0.1:8545',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'anvil_loadState',params:[s],id:1})}).then(r=>r.json()).then(j=>console.log(j))"
 # (then run the clock-fix snippet from Step 2b)
 cd frontend
 npm run dev
@@ -42,7 +42,8 @@ cd C:\Users\ASUS\Downloads\FITE7001_Capstone_Project
 
 node -e "
   const fs = require('fs');
-  const state = JSON.parse(fs.readFileSync('anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json', 'utf8'));
+  // Snapshot file is a raw hex string (e.g. '0x1f8b...'), not JSON — read as text and trim.
+  const state = fs.readFileSync('anvil-snapshot-post-redeploy-2026-04-26T15-28-51.json', 'utf8').trim();
   const body = JSON.stringify({ jsonrpc: '2.0', method: 'anvil_loadState', params: [state], id: 1 });
   fetch('http://127.0.0.1:8545', {
     method: 'POST',
@@ -53,6 +54,8 @@ node -e "
 ```
 
 > Replace the filename with the latest `anvil-snapshot-*.json` in the project root if a newer one exists.
+
+> **Do not wrap the read in `JSON.parse`.** The snapshot files in this repo store the raw hex blob produced by `anvil_dumpState` (no surrounding quotes), so `JSON.parse` fails with `Unexpected non-whitespace character after JSON at position 1`. Just `readFileSync(...).trim()` and pass the string straight into `params`.
 
 Expected output:
 
