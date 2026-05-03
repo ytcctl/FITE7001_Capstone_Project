@@ -99,16 +99,16 @@ async function main() {
       console.log("  ✓ Identity registered (country: HK)");
     }
 
-    // Boolean KYC claims
-    for (const topic of [1, 2, 3, 4, 5]) {
+    // Boolean KYC claims (topics 1-6 — topic 6 = FPS Name-Match Verified, required by registry)
+    for (const topic of [1, 2, 3, 4, 5, 6]) {
       await (await registry.setClaim(addr, topic, true)).wait();
     }
-    console.log("  ✓ KYC claims 1-5 set");
+    console.log("  ✓ KYC claims 1-6 set");
 
     // ERC-735 cryptographic claims
     const identityAddr = await registry.identity(addr);
     if (identityAddr !== ethers.ZeroAddress) {
-      for (const topic of [1, 2, 3, 4, 5]) {
+      for (const topic of [1, 2, 3, 4, 5, 6]) {
         const claimData = ethers.AbiCoder.defaultAbiCoder().encode(
           ["address", "uint256", "uint256"],
           [addr, topic, 0]
